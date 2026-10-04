@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+r"""ocr-name-search — find a NAME in OCR text the way an absence claim needs: forgiving of line breaks, column
+splits and one- or two-letter misreadings.
+
+    tools/ocr-name-search.py "<name>" <text file> [...]      # prints each hit: file, how it matched, the text
+    (import) find(name, text) -> list of hits
+
+WHY (2026-09-28 19:17, the editor ruled that the search be fixed and the audit redone, on the final audit (an internal
+record, 2026-09-28, not published): 84% of printed names findable by exact-ish search). The misses were largely a SEARCH problem: names hyphenated at a line end
+(«Za-/menhof», «Kaba-/nov»), names split by the OCR's interleaving of two columns («Apple-» … «baum»), a letter or
+two misread («Iglauer» → «Jglauer», «Döhler» → «D6hler»). An absence claim must search so as to catch those.
+HOW:
+1. the text is normalised: Unicode NFC; words hyphenated at a line end joined («Za-\nmenhof» → «Zamenhof»);
+2. a word and the name are FOLDED: lower case; diacritics and pre-reform Cyrillic letters folded (ĉ→c, ä→a, ѣ→е,
+   і→и, final ъ dropped); digits that OCR confuses with letters mapped (0→o, 1→l, 5→s, 6→o, 8→b);
+3. a hit is a word (or two adjacent words joined, or a fragment ending in «-» joined with any fragment within the
+   next WINDOW words — a column split) within EDIT letters of the name's surname: 1 for up to 6 letters, 2 beyond.
+Generous on purpose: a false hit costs a look; a false absence costs a wrong finding.
+FIXED 2026-09-29 (G5 name recall, an internal record, 2026-09-29, not published): four faults made names present in the text
+unfindable, so they are now handled:
+4. a line-end hyphen is NOT joined in advance (that fused real compounds: «Dietterle-/statistiko» became one word);
+   the join is tried as a candidate («two words joined»), and so are the parts of every hyphenated word
+   («Grosjean-Maupin» → «Grosjean», «Maupin»; also «/» and apostrophes);
+5. Russian case endings: a Cyrillic surname matches its inflected forms («Бржостовскій» ~ «Бржостовскаго»,
+   «Маринова» ~ «Мариновой», «Коцынъ» ~ «Коцынымъ»): the ending is stripped from both before comparing;
+6. a Latin-letter name is also compared with Cyrillic words transliterated («Lebedev» ~ «Лебедевъ», «Ĉirikov» ~
+   «Чириковъ»), and a Cyrillic name with Latin words;
+7. a name given in two forms («Яковъ Бородкинъ / Jakov Borodkin», «A. Nedoshivin (А. Недошивин)») is found if
+   EITHER form is.
+ADDED 2026-09-30 (approved by the editor; failure-map row 5b): 8. SMALL CAPITALS — a Latin name of 5+ letters is also compared
+   with the letters small caps are misread between folded together (r/n/w, g/c, d/p), so «Bréon» finds «Bnéow».
+ADDED 2026-10-02 (the editor's choice of option 3): 9. a name GLUED to a following short function word («asnesde» = «Asnes de»).
+"""
+import re, sys, unicodedata
+
+WINDOW = 40
+_DIG = str.maketrans({"0": "o", "1": "l", "5": "s", "6": "o", "8": "b"})
+_CYR = str.maketrans({"ѣ": "е", "і": "и", "ѳ": "ф", "ѵ": "и"})
+
+
+def fold(w):
+    w = w.lower().translate(_DIG).translate(_CYR)
+    w = "".join(c for c in unicodedata.normalize("NFD", w) if unicodedata.category(c) != "Mn")
+    w = re.sub(r"ъ$", "", w)
+    return re.sub(r"[^\w]", "", w)
+
+
+def edits(a, b, cap):
+    """Levenshtein distance, stopping early above cap."""
+    if abs(len(a) - len(b)) > cap:
+        return cap + 1
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i] + [0] * len(b)
+        for j, cb in enumerate(b, 1):
+            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb))
+        if min(cur) > cap:
+            return cap + 1
+        prev = cur
+    return prev[-1]
+
+
+def normalise(text):
+    return unicodedata.normalize("NFC", text)
+
+
+_LAT = {"а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh", "з": "z", "и": "i", "й": "j",
+        "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f",
+        "х": "h", "ц": "c", "ч": "ch", "ш": "sh", "щ": "shch", "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "ju", "я": "ja"}
+# Russian case endings, longest first; a surname stem is compared with the ending stripped from both words
+_ENDS = sorted(["аго", "ого", "его", "ому", "ему", "ыми", "ими", "ымъ", "имъ", "ым", "им", "ом", "ем", "ой", "ей",
+                "ою", "ею", "ую", "юю", "ая", "яя", "ий", "ии", "ый", "ые", "ых", "их", "а", "я", "у", "ю", "е", "ы",
+                "и", "о"], key=len, reverse=True)
+_CYRRE = re.compile("[а-яё]")
+
+
+def translit(w):
+    return "".join(_LAT.get(c, c) for c in w)
+
+
+def stem(w):
+    for e in _ENDS:
+        if w.endswith(e) and len(w) - len(e) >= 3:
+            return w[:-len(e)]
+    return w
+
+
+def close(t, target, cap):
+    if not t:
+        return False
+    if edits(t, target, cap) <= cap:
+        return True
+    tc, gc = bool(_CYRRE.search(t)), bool(_CYRRE.search(target))
+    if tc and gc and edits(stem(t), stem(target), cap) <= cap:
+        return True
+    if tc != gc:  # one Cyrillic, one Latin: compare in Latin letters, whole and with the Cyrillic word's ending stripped
+        c, l = (t, target) if tc else (target, t)
+        return any(edits(translit(x), l, cap + 1) <= cap + 1 for x in (c, stem(c)))
+    # SMALL CAPITALS (approved by the editor 2026-09-30 23:0x; failure-map row 5b): a name set in small caps is misread with
+    # letter confusions the ordinary allowance does not cover («BRÉON» → «Bnéow», «HAUGG» → «Haucc», «HODLER» →
+    # «Hopren»). A Latin name of 5+ letters is compared once more with the confusable letters folded together.
+    if not tc and not gc and len(target) >= 5 and edits(t.translate(_SC), target.translate(_SC), cap) <= cap:
+        return True
+    # GLUED TO THE NEXT WORD (the editor's choice of option 3, 2026-10-02; G5 final, ondodeesperanto.1910.04 p.2: «Asnes de» → «asnesde»,
+    # «Moĵaev de» → «mojaevde»). A name of 4+ letters followed, with no space, by a short function word.
+    if len(target) >= 4 and len(t) > len(target):
+        for k in range(len(target) - 1, len(target) + 2):
+            if t[k:] in _GLUE and edits(t[:k], target, cap) <= cap:
+                return True
+    return False
+
+
+_GLUE = {"de", "da", "la", "kaj", "en", "el", "al", "el", "un", "und", "et", "ou", "y", "i", "e", "di", "ed"}
+
+
+# small-caps confusions, each group folded to one letter (G5 re-sample 2026-09-30: r/n/w, g/c, d/p)
+_SC = str.maketrans({"r": "n", "w": "n", "g": "c", "d": "p"})
+
+
+def forms(name):
+    """A name may come in two forms: «X / Y», «X (Y)»."""
+    return [f for f in re.split(r"\s*[/()]\s*", name) if re.search(r"[^\W\d_]{2,}", f)] or [name]
+
+
+def find(name, text):
+    """Hits for the name's LONGEST word (the surname, usually) in text: [(how, matched text)]. Either form of a
+    two-form name counts."""
+    hits = []
+    raw = normalise(text).split()
+    toks = [fold(t) for t in raw]
+    parts = [[fold(x) for x in re.split(r"[-‐¬/'’]", r) if fold(x)] for r in raw]
+    for f in forms(name):
+        target = fold(max(re.findall(r"[^\W\d_]+", f), key=len))
+        cap = 1 if len(target) <= 6 else 2
+        for i, t in enumerate(toks):
+            if close(t, target, cap):
+                hits.append(("word", raw[i]))
+            elif len(parts[i]) > 1 and any(close(x, target, cap) for x in parts[i]):
+                hits.append(("part of a hyphenated word", raw[i]))
+            if i + 1 < len(toks) and toks[i + 1] and close(t + toks[i + 1], target, cap):
+                hits.append(("two words joined", raw[i] + " " + raw[i + 1]))
+            if raw[i].endswith(("-", "¬")) and t and target.startswith(t[:max(2, len(t) - 1)]):
+                for j in range(i + 1, min(len(toks), i + 1 + WINDOW)):
+                    if toks[j] and close(t + toks[j], target, cap):
+                        hits.append(("column split", raw[i] + " … " + raw[j])); break
+        if hits:
+            break
+    return hits
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        sys.exit(__doc__)
+    for f in sys.argv[2:]:
+        for how, m in find(sys.argv[1], open(f, encoding="utf-8", errors="ignore").read()):
+            print(f"{f}\t{how}\t{m}")

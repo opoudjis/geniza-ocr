@@ -1,0 +1,469 @@
+#!/usr/bin/env python3
+r"""ocr-absence-ledger — WHICH CORPORA ADMIT WHICH FINDINGS. Generated from tool outputs only.
+
+    tools/ocr-absence-ledger.py --gate <gate report .md.json> --g1 <G1 report .md.json> --out <stem>
+
+WHY (the editor found on 2026-09-27 14:32 that track was not being kept, and ruled that the apparatus
+must keep it). The first presence/absence classification was assembled by hand from files of different ages,
+and overstated: it counted G1 as clean for corpora whose G1 result was four gates old or missing.
+This tool derives it mechanically and REFUSES stale inputs.
+
+THE RULE (restated from the frozen pipeline contract, an internal record, 2026-09-24, not published; not changed): presence stands over any corpus;
+an absence finding is admissible only over a corpus that passes all four gate checks and is handed
+over with a signed ACCEPTED line. THIS TOOL SIGNS NOTHING (the editor ruled at 14:34 that nothing
+is to be signed off yet); it says what could be signed and what stands in the way.
+
+CLASSES
+  ABSENCE-ADMISSIBLE      passes G2–G4 (the gate's own rule) and G1 is clean on the current text
+  WITH EXCEPTIONS         the same, but named pages or scripts are excluded from absence findings:
+                          MINOR G1 pages (≤ 3 lines of masthead/caption/date missing, image sort);
+                          a LOST page with a residual gap; Russian (bi-script pages) and Georgian /
+                          Armenian text — PRESENCE ONLY, the Esperanto text gated alone
+                          (`ocr-accept.py --script-segregated`, editor 2026-09-27 14:40)
+  PENDING                 no valid verdict yet: G1 pages UNTESTED, G1-flagged pages NOT YET SORTED by
+                          the image check, or the text is newer than the gate / G1 result (STALE)
+  PRESENCE ONLY           fails G4, too short to score, or unscoreable
+Corpora in `geniza/OCR-NOT-CORPUS.tsv` (scaffolding) are not counted at all.
+
+G1 PAGE VERDICTS come from the image sorts (`OCR-G1-SORT-*.md` + `OCR-G1-SORT-KEY-*.tsv`), matched
+by (corpus, page). A LOST page is cleared by the editor's hand-keyed text (`page-NNNN.hand.txt` /
+`.hand-add.txt`) or a ruled re-read listed as complete in RESOLVED_LOST below; otherwise it stays an
+exception. A flagged page with no sort verdict is UNSORTED and makes the corpus PENDING.
+
+CAVEATS carried from 2026-09-27: the Esperanto text of bi-script pages is gated on the strict clean
+(`page-NNNN.eo-gate.txt`), which can understate but not flatter; an ABSENCE search must still run over
+the FULL Esperanto text, never the clean files.
+
+WRITES <out>.tsv (one row per corpus) and prints the tally.
+"""
+import os, re, sys, glob, json, argparse, collections
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import ocr_text_languages as TL   # the language table (2026-10-03)
+GENIZA = os.path.join(HERE, "..", "published", "heterophony-resources", "geniza")
+ROOT = os.path.join(GENIZA, "sources", "ocr-rendersearch")
+# LOST pages re-read on the editor's rulings and found complete apart from ordinary OCR slips
+# (an internal record, 2026-09-26, not published); the one with a residual gap is NOT listed here.
+RESOLVED_LOST = {("C1 Capitanucci Carlevaro - Guida ragionata agli strumenti diagnostici e terapeutici ADC del disturbo da gioco d'azardo 2004", 160),
+                 ("Danlando", 107), ("InternaciaMedicino.1911.1", 12), ("kongresa.libro.08", 93)}
+# Corpora the editor ruled PRESENCE ONLY whatever their OCR (the editor ruled on 2026-09-27 that Posta Mundi
+# is kept in, but presence only, as secondary).
+PRESENCE_ONLY_DECLARED = re.compile(r"posta[-_ ]?mundi")
+# Named items ruled PRESENCE ONLY, whatever their OCR; the ruling is the reason given, ahead of any gate
+# failure, because the editor has ruled the failure not worth fixing.
+PRESENCE_ONLY_NAMED = {
+    # the editor ruled on 2026-09-28 01:06 that dictionaries are not needed for the prosopography: these are
+    # secondary, and not to be fixed.
+    "matematikal": "secondary — a two-language dictionary (editor's ruling, 2026-09-28)",
+    "rusalibrovortaro": "secondary — a two-language dictionary (editor's ruling, 2026-09-28)",
+    "ukraina": "secondary — a two-language dictionary (editor's ruling, 2026-09-28)",
+    # the editor ruled on 2026-09-28 08:55 that korokanti, a songbook, is fine as presence only (Ido; fails its list bar as Ido, 59.4)
+    "korokanti": "secondary — an Ido songbook (editor's ruling, 2026-09-28)",
+    # the editor ruled on 2026-09-28 17:27 that it is irrelevant to the venture, and moved it to secondary (Selimi, Tirana 2004)
+    "Albana_Esperanto-lernolibro_2004": "secondary — irrelevant to the venture (editor's ruling, 2026-09-28)",
+    # the editor ruled Sundiala secondary on 2026-09-28 17:28 (Ido devotional readings, undated)
+    "sundiala": "secondary — Ido devotional readings (editor's ruling, 2026-09-28)",
+    # the editor ruled on 2026-09-28 17:29 that latviana is secondary, and that only its intro page has any relevance,
+    # as a potted history that says very little
+    # (approved as secondary by the editor, 2026-09-28 17:38)
+    "vivo": "secondary — a modern Ido life of Jesus in pictures, 2004 (editor's ruling, 2026-09-28)",
+    "nordamuziko": "secondary — a modern Ido poem (Glebo Malcev, Kiev 2004) (editor's ruling, 2026-09-28)",
+    "latviana":"secondary — a 1966 Latvian Ido course; only its intro page (a brief potted history) relevant (editor's ruling, 2026-09-28)",
+    # the editor ruled on 2026-09-28 01:06 that the Greek had already been given up (Greek nuked 2026-09-27 16:22)
+    "HelenaEsperantisto.1947.143": "Greek text — presence only (editor's ruling, 2026-09-27/28)",
+    # approved by the editor, 2026-09-28 17:23, for 1947.142 (Greek, like 1947.143)
+    "HelenaEsperantisto.1947.142": "Greek text — presence only (editor's ruling, 2026-09-27/28)",
+}
+RESIDUAL_LOST = {("oficiala_aldono_4a", 1): "«PARIS» lost, edge speckle"}
+# FALSE BI-SCRIPT MARKS: pages the Russian pass marked bi-script that carry NO Russian on the image. The mark is ignored
+# (the page's files are left in place). Each entry is a page someone has seen; none is inferred from a word count.
+FALSE_BISCRIPT = {
+    # the editor ruled on 2026-10-01 00:44 that there is no Russian in Mondo, only poor-quality OCR, having seen it with
+    # his own eyes — p.7, an Ido page (the cover), Roman script throughout; the editor saw it
+    # 2026-09-30 (p. 7 perfectly legible, and entirely in Roman script)
+    ("mondo1924", 7): "Ido cover, Roman script; the Russian model read it as junk Cyrillic",
+    # approved by the editor, 2026-10-01 00:45 (E-D by image, scoped to the marked pages only): blind script check of
+    # the 25 marked pages (an internal record, 2026-10-01, not published; batches z01–z05). SCRIPT NONE on these
+    # 11; the other 14 (13 La Ondo mastheads, the 2020 book's Unua Libro facsimile) DO carry Russian and keep their mark.
+    ("mondo1925", 71): "Ido cover, Latin script only",
+    ("mondo1925", 78): "Ido congress programme and list, Latin script only",
+    ("BK-I-GhP-2014-09-28", 19): "contents page, Latin script only",
+    ("EO Adam Zakrzewski - Esperanta-Pola kaj Esperanta-Litova bibliografio 1887-1912", 69): "Polish name index, Latin script only",
+    ("Omagxe-2", 43): "bibliography entries, Latin script only",
+    ("Omagxe-3", 130): "romanised haiku list, Latin script only",
+    ("VochoDeKuracistoj.1909.11", 14): "full-page advertisement, Latin script only",
+    ("jbc.bj.uj.edu.pl.NDIGCZAS043693_1910_011_012", 9): "sheet music, Latin script only",
+    ("46083", 1): "cover of Pola Esperantisto 1959, Latin script only",
+    ("46083", 20): "sheet music, Latin script only",
+    # E3 of the review (editor 2026-10-01 11:5x–13:2x): the «Russian» on these pages is Latin text read as Cyrillic
+    # («Езрегапіа» = Esperanta); the real text is in search (congress pp. 22, 57 and Progreso p. 743 transcribed by vision,
+    # batch y01). IpI 71 p.38 carries one real Cyrillic place name (Ростов-на-Дону), treated as incidental (the editor
+    # accepted that verdict). The 2020 book's p.40 is real Russian, but a facsimile ILLUSTRATION of the 1887 Unua Libro: the
+    # editor ruled that, being an illustration, it is not a legitimate exception.
+    ("71", 38): "contents list, Latin read as Cyrillic; one Cyrillic place name, incidental",
+    ("kongresa.libro.14", 22): "photo page with captions (vision y01)", ("kongresa.libro.14", 55): "travel notes, Latin",
+    ("kongresa.libro.14", 57): "programme table printed sideways (vision y01)", ("kongresa.libro.14", 108): "UEA statistics, Latin",
+    ("Progreso_-_2a_yaro", 496): "Ido prose", ("Progreso_-_2a_yaro", 497): "Ido prose",
+    ("Progreso_-_2a_yaro", 743): "grammatical table printed sideways (vision y01)", ("Progreso_-_2a_yaro", 961): "Ido prose",
+    # the editor confirmed on 2026-10-01 14:2x that Estlanda 1908.6 has no Cyrillic, only Estonian fraktur; the vision
+    # transcription of p.8 (batch k04) is 562 words of Esperanto prose with no Cyrillic
+    ("EstlandaEsperantisto.1908.6", 8): "Esperanto prose with Estonian fraktur; no Cyrillic (editor; vision k04)",
+    ("dokumen.pub_esperanto-and-languages-of-internationalism-in-revolutionary-russia-2020055613-2020055614-9781350160651-"
+     "9781350160668-9781350160675-1350160652", 40): "facsimile of the 1887 Unua Libro: an illustration (editor's ruling)",
+}
+# NAME LISTS ARE JUDGED BY A NAME CHECK ON THE IMAGES, NOT BY G4 (approved by the editor, 2026-10-01 00:02; on 2026-09-30
+# 23:3x the editor had proposed that name lists should no longer be subject to G5 — the test holding them back was G4). G4 counts real words,
+# and names and addresses are not in the word lists, so a well-read roster fails it. An item listed here passed the name-list
+# check (an internal record, 2026-10-01, not published): every text page's image compared with its search text by a blind checker,
+# the names marked unfindable re-run through tools/ocr-name-search.py, and every empty page seen on the image
+# (vision batches q01–q10: all blank). A G4 fail is then cleared; any other reason still counts.
+NAMELIST_CHECKED = {
+    "Nomaro de la kongresanoj 1905": "631 names on 33 text pages, 1 unfindable (p.7 «M. Fichot (Auxerre)»); 32 empty pages blank",
+    "Adresaro de la kongresanoj en Boulogne-sur-Mer 1905": "365 names on 20 text pages, 0 unfindable by the search; empty pages blank",
+    # approved by the editor, 2026-10-01 00:28, for the three below (checks recorded in an internal record, 2026-09-30,
+    # not published: batches u01–u05, m02–m03)
+    "44_ENCYCL_NOMINDEKSO": "about 552 names on 13 pages, all findable",
+    "Adresaro de UK-anoj 1905": "about 723 names on 8 text pages (p.11 read by vision, low confidence), 2 unfindable of 3 flagged "
+                                "(p.12 «Hayes C F»; p.15 «Reddon», «Secrétinat»); empty pages blank",
+    "Lingvo Internacia 1901.5": "about 300 names on 7 pages, 2 unfindable (p.1 «Isaac Mautner», «L. Dudicourt»: split by junk from "
+                                "the other column); p.1 sent to vision 2026-10-01",
+    # approved by the editor, 2026-10-01 00:41: the La Revuo title and contents pages. Their OCR lost the small-capitals names
+    # (checks m01–m02, w01–w05: about 1,170 names, 55 flagged); every page was then TRANSCRIBED by vision (x01–x07),
+    # and all 55 lost names are found in the transcriptions by tools/ocr-name-search.py.
+    "larevuo.1908.0": "contents page transcribed by vision; lost names found in the transcription",
+    "larevuo.1908.0.1": "4 contents pages transcribed by vision; lost names found in the transcription",
+    "larevuo.1911.0": "title page transcribed by vision; lost names found in the transcription",
+    "larevuo.1912.0.2": "25 pages transcribed by vision; 33 of 33 lost names found in the transcription",
+    "larevuo.1913.0": "2 contents pages transcribed by vision; lost names found in the transcription",
+}
+# 2026-09-29: covers of The Esperantist 1903–04 whose small type (contents, the Hon. Secs.' names and addresses, the
+# correspondence register) the SOURCE SCAN does not resolve: 150 ppi, dark. Vision at 200 dpi and lightened 3x tiles
+# both read under a tenth of it (an internal record, 2026-09-29, not published; vision6). A source-quality loss, not an
+# OCR one: only a better scan can close it.
+# 12 of the 14 were then closed from the Bitarkivo epub transcriptions of the same issues
+# (made from Google's scans): the cover matter or advertisement segment filed as the page text. Two have no epub counterpart
+# (p.50, a vol. I no. 2–3 page; p.495, a late-1905 advertisement page) and stay, as the editor ruled: advertisements and
+# contents, which may be given up and treated as exceptions.
+for _p in (50, 495):
+    RESIDUAL_LOST[("TheEsperantist.1903-1904.v1", _p)] = "advertisements; small type unreadable in the source scan (150 ppi, dark), no epub counterpart"
+
+# 2026-09-30: PRINTED PAGES NOT IN THE SCAN AT ALL — found by the page-number check and confirmed by a look at the
+# neighbouring pages (text visibly interrupted across the gap). Not a lost scan page, so not in RESIDUAL_LOST: the page
+# was never scanned. The source of record, with the second-copy check for each, is an internal register, not published
+# (and the look itself: an internal record, 2026-09-29, not published). Omitted blank backs are NOT listed
+# (nothing lost, the editor's rule); whole missing issues are series-level gaps, recorded in the register, not here.
+NOT_IN_SCAN = {
+    "LEsperantiste.1907.5": "printed pp. 110–111 (= 370–371) not in the scan; the text breaks off across the gap; no second copy",
+    "RuslandaEsperantisto1907.5-6": "printed pp. 16–17 not in the scan (the country news jumps from Lapland to Finland); Bitarkivo's scan no longer on archive.org",
+    "bohemaesperantisto_1909_j03_n07_apr": "printed pp. 107–116 (end of III,7 and start of III,8) and 127–128 not in the scan; no second copy (ANNO 1909 is Oct–Dec only)",
+    "bohemaesperantisto_1909_j03_n08_maj": "printed pp. 127–128 not in the scan (this file holds the same III,8 pages as …n07_apr); no second copy",
+    "britaesperantisto_1911_n080_aug": "printed p. 155 not in the scan; the ANNO copy lacks the same leaf",
+    "polonalernolibro": "printed pp. 19, 33, 35 not in the scan (the exercise pages ĆWICZENIE 6, 13, 14)",
+    "AmerikaEsperantisto_1908_v03_n05_jun": "printed pp. 87–88 not in the scan — text or a plate, unclear; no second copy (ANNO goes May → July 1908)",
+}
+
+
+NOTES = {}   # (corpus, page) → the latest sort's note, for the short-item rule below
+
+
+# SPECIAL HANDLING vs WITH EXCEPTIONS (the editor's review of ledger 30q's 221 items, 2026-10-01 11:3x–13:4x; an
+# internal record, 2026-09-30, not published). The editor ruled that EXCEPTIONS as a category is misleading where
+# absence can be attained. So: SPECIAL HANDLING = nothing is excluded, but an absence claim must search a particular way (both the
+# Esperanto text and the Russian reading, `ocr-rendersearch-rus/`; or the Russian reading alone). WITH EXCEPTIONS =
+# part of the item is excluded (pages missing or unread, a script unread, one side failing). An item with both is
+# WITH EXCEPTIONS, its handling notes kept. Short items cleared by the image check of every page → ADMISSIBLE (the editor
+# judged W5 to be absence, and approved moving the 22 short image checks to admissible). The column keeps its old name.
+MINOR_CLEARED = {
+    # E2, the editor ruled at 11:5x that it is Esperanto printed sideways, and admissible — the only loss is the logo word
+    ("LaSunoHispana.1904.5", 1),
+}
+RUSSIAN_DOMINANT = {
+    # E4, accepted by the editor at 13:2x: Russian items whose Esperanto side is next to nothing → search the
+    # Russian reading; sokolova (held for Yushmanov, with special handling, on the editor's ruling at 13:2x)
+    "BultenoTEKS.1911.1", "BultenoTEKS.1911.2", "BultenoTEKS.1912.3", "BultenoTEKS.1912.4", "BultenoTEKS.1912.5",
+    "BultenoTEKS.1913.6", "BultenoTEKS.1913.7", "BultenoTEKS.1913.8", "BultenoTEKS.1914.9",
+    "KovnoEsperanto.1911.1-4", "KovnoEsperanto.1912.10", "KovnoEsperanto.1912.13", "sokolova",
+}
+SCOPED = {
+    # the editor ruled at 13:2x/13:3x that the item is held for the Moret article, and can move up to Accepted for that
+    # article specifically: French∪Esperanto share about 85% on the article's pages
+    "StSl2017_XIV": ("ABSENCE-ADMISSIBLE", "SCOPE: only S. Moret, «Langues internationales, alphabets et Révolution. Les "
+                     "idées de N.V. Jušmanov» (printed pp. 275–292 = scan pp. 276–293); the rest of the volume is out of scope"),
+    # E6, the editor ruled at 13:3x that the item is held for the Interhelpo piece, and its Esperanto dropped: it is Russian
+    "Вернуть Будущее. Альманах ШТАБА № 1": ("SPECIAL HANDLING", "SCOPE: only N. Andrianova, «Интергельпо — ностальгический "
+                     "оптимизм» (scan pp. 161–180); search the RUSSIAN reading (ocr-rendersearch-rus/; pp. 162, 164, 167, 171, "
+                     "174 re-read full-page 2026-10-01); the rest of the almanac is out of scope"),
+}
+ADS_EXCLUDED = {   # the editor ruled on 2026-10-02 11:1x that the 18 he saw are unambiguous advertisements and can go (an internal record, 2026-10-02, not published; less oge.4 p.438, a book list)
+    ('BelgaEsperantisto_1912_n049_nov', 34),
+    ('BelgaEsperantisto_1913_n052_feb', 28),
+    ('BelgaEsperantisto_1913_n055_maj', 32),
+    ('BelgaEsperantisto_1913_n054_apr', 32),
+    ('BelgaEsperantisto_1913_n058-059_aug-sep', 28),
+    ('BelgaEsperantisto_1912_n050_dec', 32),
+    ('BelgaEsperantisto_1913_n053_mar', 32),
+    ('BelgaEsperantisto_1913_n057_jul', 32),
+    ('BelgaEsperantisto_1913_n051_jan', 6),
+    ('BelgaEsperantisto_1913_n056_jun', 32),
+    ('kongresa.libro.04', 107),
+    ('kongresa.libro.04', 102),
+    ('kongresa.libro.04', 97),
+    ('kongresa.libro.04', 100),
+    ('kongresa.libro.09', 53),
+    ('kongresa.libro.09', 187),
+    ('kongresa.libro.07', 190),
+    ('kongresa.libro.08', 91),
+}
+COLUMN_RISK = {   # E5, the editor ruled at 13:3x to keep them, with a note
+    f"KaukazaEsperantisto.1910.{n}" for n in ("1", "2", "3", "5", "6", "7", "8", "9", "10-11", "12")}
+
+
+def reclassify(c, exc):
+    """The class of an item that is neither PRESENCE ONLY nor PENDING, from its notes: (class, notes)."""
+    if c in SCOPED:
+        return SCOPED[c][0], [SCOPED[c][1]]
+    notes = []
+    for e in exc:
+        if (c, 1) in MINOR_CLEARED and re.fullmatch(r"MINOR p\.1 .*", e):
+            continue
+        notes.append(e)
+    handling, cleared, excluded = [], [], []
+    for e in notes:
+        if "Russian scored alone" in e or "both sides pass" in e or (c in RUSSIAN_DOMINANT and "RUSSIAN side only" in e):
+            handling.append(e)
+        elif "cleared by the IMAGE CHECK" in e:
+            cleared.append(e)
+        elif re.fullmatch(r"\d+ bi-script page\(s\): [A-Za-z/-]+ PRESENCE ONLY; Esperanto gated alone", e) \
+                and c in RUSSIAN_DOMINANT:
+            handling.append(e)
+        else:
+            excluded.append(e)
+    if c in RUSSIAN_DOMINANT:
+        handling.append("RUSSIAN-DOMINANT: search the Russian reading (ocr-rendersearch-rus/); the Esperanto side is next to nothing")
+    ads = sorted(p for (x, p) in ADS_EXCLUDED if x == c)
+    if ads:
+        excluded.append("mundane ADVERTISEMENT page(s) p." + ",".join(map(str, ads)) + ": excluded from absence claims (editor's ruling 2026-10-02)")
+    if c in COLUMN_RISK and excluded:
+        excluded.append("RISK: same paper and setting as 1910.4/.13/.14 (presence only for garbled columns on the G5 re-sample)")
+    if excluded:
+        return "WITH EXCEPTIONS", excluded + handling + cleared
+    if handling:
+        return "SPECIAL HANDLING", handling + cleared
+    return "ABSENCE-ADMISSIBLE", cleared
+
+
+def sort_verdicts():
+    v = {}
+    for md in sorted(glob.glob(os.path.join(GENIZA, "ocr", "runs", "OCR-G1-SORT-*.md"))):
+        tag = re.search(r"OCR-G1-SORT-(.+)\.md$", md).group(1)
+        key = os.path.join(GENIZA, "ocr", "runs", f"OCR-G1-SORT-KEY-{tag}.tsv")
+        if not os.path.exists(key):
+            continue
+        k = {l.split("\t")[0]: (l.split("\t")[2], int(l.split("\t")[3])) for l in open(key, encoding="utf-8") if l.strip()}
+        for line in open(md, encoding="utf-8"):
+            # 3 OR 4 digits: sort 2026-09-29b numbers its pages to 1751, and a 3-digit match silently skipped 1000+
+            m = re.match(r"\| (\d{3,4}) \| (NOTHING|MINOR|LOST|SCRIPT) \|(.*)", line)
+            if m and m.group(1) in k:
+                v[k[m.group(1)]] = m.group(2); NOTES[k[m.group(1)]] = m.group(3)
+    return v
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--gate", required=True); ap.add_argument("--g1", required=True); ap.add_argument("--out", required=True)
+    ap.add_argument("--pdfs", required=True, help="the PDF list G1 was run over: a corpus in it but absent from the G1 report had NO silent pages")
+    a = ap.parse_args()
+    gate = {r["corpus"]: r for r in json.load(open(a.gate))}
+    g1 = {r["corpus"]: r for r in json.load(open(a.g1))}
+    t_gate, t_g1 = os.path.getmtime(a.gate), os.path.getmtime(a.g1)
+    notc = {l.split("\t")[0] for l in open(os.path.join(GENIZA, "OCR-NOT-CORPUS.tsv"), encoding="utf-8")
+            if l.strip() and not l.startswith("#") and not l.startswith("corpus\t")}
+    sv = sort_verdicts()
+    g1_input = {os.path.splitext(os.path.basename(l.strip()))[0] for l in open(a.pdfs) if l.strip()}
+    src = {os.path.splitext(os.path.basename(l.strip()))[0]: l.strip() for l in open(a.pdfs) if l.strip()}
+    rows, cnt, pg = [], collections.Counter(), collections.Counter()
+    for c, r in gate.items():
+        if c in notc:
+            continue
+        d = os.path.join(ROOT, c); txt = d + ".txt"
+        why, exc, pend = "", [], []
+        if r["g4"] == -1.0: why = "unscoreable (all Cyrillic)"
+        elif r["g4"] == -2.0: why = "too short to score"
+        elif r["g2_pending"]:     # label the REAL cause (2026-09-27: 8 declared-Ido items read «fails G4» at G4 65–96)
+            why = f"G2 pending — second-language pass not run ({', '.join(r['g2_pending'])}); G4 {r['g4']:.0f}"
+        elif not (r["g3_ok"] and r["g4"] >= (65 if r["list_pages"] else 75)):
+            why = f"fails G4 ({r['g4']:.0f})"
+        if os.path.exists(txt) and os.path.getmtime(txt) > min(t_gate, t_g1):
+            pend.append("STALE: text newer than the gate or G1 result — re-run them")
+        gr = g1.get(c)
+        if gr is None and c not in g1_input:
+            pend.append("G1 never run on this corpus")
+        # in G1's input but absent from its report ⇒ G1 found no silent page on the full text (the
+        # gate's own «silent» can differ: with --script-segregated it counts on the cleaned text)
+        if gr and gr.get("untested", 0) and not gr.get("untested_pages"):
+            pend.append(f"G1 left {gr['untested']} page(s) untested (not listed — re-run G1)")
+        # the sort verdicts apply to EVERY item, whether or not G1 reported it (G1 reports only items with silent pages)
+        if True:
+            gr = gr or {}
+            minor, unsorted_, script = [], [], []
+            g1_pages = set(gr.get("pages", [])) | set(gr.get("untested_pages", []))
+            # FIXED 2026-09-29: EVERY sorted page of the item counts, not only the pages G1 flagged — a LOST or MINOR
+            # verdict from any image look (the near-miss look, the audits) was silently ignored when G1 had not
+            # flagged that page (*Esperanto* (UEA) 1906 n029 p.2, LOST, rose to ADMISSIBLE in ledger 28i).
+            sorted_here = {p for (cc, p) in sv if cc == c}
+            for p in sorted(g1_pages | sorted_here):
+                vv = sv.get((c, p))
+                if vv == "NOTHING":
+                    continue
+                if vv == "SCRIPT":          # only Russian/Georgian/Armenian unread — PRESENCE ONLY for that script
+                    script.append(p); continue
+                if vv == "MINOR":
+                    minor.append(p)
+                elif vv == "LOST":
+                    if os.path.exists(os.path.join(d, f"page-{p:04d}.hand.txt")) or \
+                       os.path.exists(os.path.join(d, f"page-{p:04d}.hand-add.txt")) or (c, p) in RESOLVED_LOST:
+                        continue
+                    exc.append(f"LOST p.{p} ({RESIDUAL_LOST.get((c, p), 'residual gap')})")
+                elif p in g1_pages:
+                    unsorted_.append(p)
+            if script:
+                exc.append("other-script text unread on p." + ",".join(map(str, sorted(script))) + ": PRESENCE ONLY for that script")
+            if minor:
+                exc.append("MINOR p." + ",".join(map(str, sorted(minor))) + " (≤ 3 lines of masthead/caption/date missing)")
+            if unsorted_:
+                pend.append(f"{len(unsorted_)} G1-flagged page(s) not yet image-sorted: p." + ",".join(map(str, sorted(unsorted_))))
+        if c in NOT_IN_SCAN:
+            exc.append("NOT IN SCAN: " + NOT_IN_SCAN[c])
+        nbi = len([f for f in glob.glob(os.path.join(d, "page-*.eo-gate.txt"))
+                   if (c, int(re.search(r"page-(\d+)", os.path.basename(f)).group(1))) not in FALSE_BISCRIPT])
+        # THE LANGUAGE TABLE (2026-10-03): a text it lists with no non-Latin language has no bi-script pages, whatever
+        # clean files are on disk; the label names the scripts the table lists (*Helena Esperantisto*: Greek, not
+        # «Russian/Armenian/Georgian»). Not in the table: the old label.
+        nl = TL.nonlatin(c)
+        if nl == set():
+            nbi = 0
+        if nbi:
+            exc.append(f"{nbi} bi-script page(s): {TL.label(c) if nl else 'Russian/Armenian/Georgian'} PRESENCE ONLY; "
+                       "Esperanto gated alone")
+        nkh = sum(1 for f in glob.glob(os.path.join(d, "page-*.kathye.json"))
+                  if (lambda j: j.get("kat_blocks") or j.get("hye_blocks"))(json.load(open(f))))
+        if nkh:
+            exc.append(f"Georgian/Armenian on {nkh} page(s): PRESENCE ONLY")
+        if why == "too short to score":   # the editor ruled on 2026-09-27 15:35 for an image check — cleared if EVERY page passes it
+            base = [int(m.group(1)) for f in glob.glob(os.path.join(d, "page-*.txt"))
+                    for m in [re.fullmatch(r"page-(\d+)\.txt", os.path.basename(f))] if m]
+            vs = [sv.get((c, p)) for p in base]
+            if base and all(v in ("NOTHING", "MINOR", "SCRIPT") for v in vs):
+                why = ""
+                exc.append("too short for G4 — cleared by the IMAGE CHECK of every page")
+                mn = [p for p, v in zip(base, vs) if v == "MINOR"]
+                if mn:
+                    exc.append("MINOR p." + ",".join(map(str, sorted(mn))))
+            elif base and any(v is None for v in vs):
+                why = ""; pend.append("too short for G4 — image check of its pages not complete")
+        # SPECIAL HANDLING FOR BI-SCRIPT ITEMS (the editor ruled on 2026-09-28 09:55 that Esperanto-only and
+        # Russian-only scores are to be shown, and that an item passing the threshold on either goes into the EXCEPTIONS
+        # category, as special handling). Esperanto-only = G4 on the segregated text (bar 75, or 65 with list pages);
+        # Russian-only = `ru_only` from the gate (bar 40: an internal record, 2026-09-28, not published). An item
+        # with Russian on it that fails on its Esperanto is admitted WITH EXCEPTIONS if its Russian passes —
+        # absence then admissible ON THE RUSSIAN SIDE ONLY (search the Russian readings, ocr-rendersearch-rus/).
+        ru = r.get("ru_only")
+        if (nbi or r.get("cyrillic_pages")) and ru is not None:
+            eo_bar = 65 if r["list_pages"] else 75
+            eo_s = f"{r['g4']:.0f}" if r["g4"] >= 0 else "none (no Esperanto page to score)"
+            if ru >= 40:   # the Russian is scored now: the bi-script note no longer calls it «presence only»
+                # 2026-10-03 19:5x: the label is now the table's scripts («Russian», «Greek/Russian» …), not always
+                # «Russian/Armenian/Georgian»; an exact-string replace missed every new label and 157 items fell from
+                # SPECIAL HANDLING to WITH EXCEPTIONS (chain 2026-10-03-lang). Match any label; other scripts stay
+                # presence only, named.
+                def _scored(e):
+                    m = re.fullmatch(r"(\d+ bi-script page\(s\): )([A-Za-z/-]+) PRESENCE ONLY; Esperanto gated alone", e)
+                    if not m:
+                        return e
+                    rest = [x for x in m.group(2).split("/") if x not in ("Russian", "Ukrainian", "Bulgarian", "Belarusian")]
+                    if m.group(2) == "Russian/Armenian/Georgian":
+                        rest = []          # the old label, unchanged behaviour (not in the table)
+                    if nkh:                # the mask's condition already says «Georgian/Armenian … PRESENCE ONLY»: not
+                        rest = [x for x in rest if x not in ("Armenian", "Georgian")]   # restated (approved by the editor, 20:0x)
+                    return (m.group(1) + "Esperanto gated alone; Russian scored alone"
+                            + (f"; {'/'.join(rest)} PRESENCE ONLY" if rest else ""))
+                exc[:] = [_scored(e) for e in exc]
+            # a «G2 pending» on a language detected in Cyrillic junk (Bulteno TEKS 1914.9: «polish») counts
+            # like a G4 failure here (approved by the editor, 2026-09-28 17:15)
+            if (why.startswith("fails G4") or why.startswith("unscoreable") or why.startswith("G2 pending")) and ru >= 40:
+                exc.append(f"SPECIAL HANDLING (bi-script): Esperanto-only {eo_s} FAILS (bar {eo_bar}) · Russian-only {ru:.0f} passes (bar 40, {r.get('ru_pages')} pp) — absence admissible on the RUSSIAN side only")
+                why = ""
+            # CORRECTED 23:1x the same night: only where bi-script pages are at least a quarter of the item. Three of the
+            # ten «Esperanto side only» items were there by ONE page each — *Mondo* 1924 p.7 (an Ido page the Russian model
+            # read as junk Cyrillic), *Pola Esperantisto* 46083 p.20 (sheet music read as Cyrillic), *Ukraina Stelo* 2017
+            # 3-4 p.52 (one real parallel Ukrainian poem) — not bilingual papers; they keep their standing.
+            elif not why and ru < 40 and nbi * 4 >= int(r.get("pages") or 0):
+                # ESPERANTO SIDE ONLY → PRESENCE ONLY (approved by the editor, 2026-09-30 23:0x). These are the bi-script items where
+                # the Russian fails and only the Esperanto side passed G4 — the worst interleaving of the two scripts. The G5
+                # re-sample (an internal record, 2026-09-30, not published; class ledger-eo) found 3 of 24 of their
+                # Esperanto-side pages contradicted on the image (garbled columns; 89% of printed names found) against the
+                # bar of at most 1 in 40, after every column remedy (layout re-read, garbage filter, per-script scoring,
+                # Russian companion, old-letter model, second reading, vision). Was: WITH EXCEPTIONS, «absence admissible
+                # on the ESPERANTO side only» (10 items, 450 pages at ledger 30p).
+                why = (f"bi-script, Esperanto side only (Esperanto-only {eo_s} passes, Russian-only {ru:.0f} fails): the G5 re-sample "
+                       f"found 3 of 24 Esperanto-side pages contradicted — presence only by the editor's ruling (2026-09-30)")
+            elif not why and ru < 40:
+                # E-L FIX (approved by the editor for Ukrainian Star, 2026-10-01 00:44): Russian fails, bi-script pages under a quarter —
+                # the wording of ledger 30p restored; the 23:0x edit had sent these to the «both sides pass» text below
+                exc.append(f"Esperanto-only {eo_s} passes (bar {eo_bar}) · Russian-only {ru:.0f} FAILS (bar 40, {r.get('ru_pages')} pp)"
+                           " — absence admissible on the ESPERANTO side only")
+            elif not why:
+                # BOTH PASS → still WITH EXCEPTIONS (the editor's ruling, 2026-09-28 17:15): an absence search
+                # that forgot the Russian file would be unsafe
+                exc.append(f"Esperanto-only {eo_s} passes (bar {eo_bar}) · Russian-only {ru:.0f} passes (bar 40, {r.get('ru_pages')} pp)"
+                           " — both sides pass: absence admissible only if BOTH the Esperanto text AND the Russian reading (ocr-rendersearch-rus/) are searched")
+            else:
+                why += f" · Russian-only {ru:.0f} fails (bar 40)"
+        # A SHORT ITEM THAT FAILS G4 MAY BE CLEARED BY THE IMAGE CHECK — with a hard edge (approved by the editor,
+        # 2026-09-28 01:57, on *oficiala aldono* 5a/6a: Esperanto glossed in six
+        # languages, so G4 fails on structure, not on reading). ALL of: at most 4 pages, so every page was
+        # seen; every page's latest sort verdict NOTHING; every note says the text is «well read», with no
+        # «mostly» and no «garbled». Anything longer or less clean stays PRESENCE ONLY.
+        if why.startswith("fails G4"):
+            base = [int(m.group(1)) for f in glob.glob(os.path.join(d, "page-*.txt"))
+                    for m in [re.fullmatch(r"page-(\d+)\.txt", os.path.basename(f))] if m]
+            ns = [NOTES.get((c, p), "").lower() for p in base]
+            if 1 <= len(base) <= 4 and all(sv.get((c, p)) == "NOTHING" for p in base) \
+                    and all("well read" in n and "mostly" not in n and "garbled" not in n for n in ns):
+                exc.append(f"{why} — cleared by the IMAGE CHECK of every page (≤ 4 pages, all NOTHING, well read; editor's ruling 2026-09-28)")
+                why = ""
+        if why.startswith("fails G4") and c in NAMELIST_CHECKED:   # a name list cleared by the name check (above)
+            why = ""
+        if not why and PRESENCE_ONLY_DECLARED.search((c + " " + src.get(c, "")).lower()):   # name OR folder («40» lives in posta-mundi-40/)
+            why = "secondary — presence only by the editor's ruling (Posta Mundi, 2026-09-27)"
+        if c in PRESENCE_ONLY_NAMED:
+            why = PRESENCE_ONLY_NAMED[c] + (f" [gate: {why}]" if why else "")
+        if why: k = "PRESENCE ONLY"
+        elif pend: k = "PENDING"
+        else: k, exc = reclassify(c, exc)
+        if k == "SPECIAL HANDLING":
+            # the editor chose option (a) on 2026-10-02 22:5x, since that is what the extra readings are there for: the absence search on these items
+            # reads EVERY reading on disk (G5 on 10-02c: missed names were in psm4 / rus / rusfull, not in the text searched)
+            exc = exc + ["SEARCH EVERY READING: an absence claim searches sources/ocr-rendersearch-all/<item>.txt "
+                         "(every reading of each page, tools/ocr-search-all-readings.py)"]
+        cnt[k] += 1; pg[k] += r["pages"]
+        rows.append((c, r["pages"], round(r["g4"], 1) if r["g4"] >= 0 else "", k, why, "; ".join(pend), "; ".join(exc)))
+    rows.sort(key=lambda x: (x[3], x[0].lower()))
+    with open(a.out + ".tsv", "w", encoding="utf-8") as f:
+        f.write(f"# GENERATED by tools/ocr-absence-ledger.py from {os.path.basename(a.gate)} + {os.path.basename(a.g1)}. Do not hand-edit — re-run it. SIGNS NOTHING.\n")
+        f.write("corpus\tpages\tG4\tclass\twhy presence only\twhy pending\texceptions (excluded from absence findings)\n")
+        for x in rows:
+            f.write("\t".join(map(str, x)) + "\n")
+    for k in ("ABSENCE-ADMISSIBLE", "SPECIAL HANDLING", "WITH EXCEPTIONS", "PENDING", "PRESENCE ONLY"):
+        print(f"{k:20} items {cnt[k]:5}  pages {pg[k]:7}")
+    pc = collections.Counter()
+    for x in rows:
+        if x[3] == "PENDING":
+            for part in x[5].split("; "):
+                pc[re.sub(r"\d+", "N", part.split(":")[0])] += 1
+    print("pending reasons:", dict(pc))
+
+
+if __name__ == "__main__":
+    main()
