@@ -2,7 +2,10 @@
 
 The OCR quality-assurance method of **[The Geniza of Esperanto](https://geniza.opoudjis.net)** (*Genizo de Esperanto*): how the text of a corpus of Esperanto-era periodicals and books, many of them bilingual and some printed in two scripts, was read, tested and graded, so that a search for a person's name can be trusted to a known degree, whether it finds the name or not.
 
-This is a **frozen release**: the version the methods document describes. It is updated only as new tagged releases.
+This is a **frozen release**: the version the methods document describes. It is updated only as new tagged releases:
+
+- `v1.0` (5 October 2026): the method as signed.
+- `v1.1` (6 October 2026): the name search widened by the OCR confusions measured on 27,308 pages (`METHOD.md`, section 6, «Release v1.1»). The figures of section 8 are unchanged.
 
 ## What is here
 
@@ -12,6 +15,8 @@ This is a **frozen release**: the version the methods document describes. It is 
 | `RUNBOOK.md` | The procedure for bringing a new batch of scans or PDFs through the method, step by step. |
 | `docs/REPLICATION.md` | The replication record: the pipeline stage by stage, with commands, parameters and the reasons for each. |
 | `docs/FAILURE-MAP.md` | Every way the pipeline failed, how it was found, and what fixed it. |
+| `docs/OCR-ACCENT-SURVEY-2026-10-05.md` (and `.tsv`) | What OCR writes in place of each accented Latin letter and each Cyrillic letter, measured on 27,308 pages of known text, old and modern print apart (release v1.1). |
+| `tools/ocr-name-search-confusions.tsv` | The measured confusions the name search tries, generated from the survey (release v1.1). |
 | `tools/` | The tools that implement the method (Python and shell), in the state the documents describe. |
 | `tools/lexicons/hunspell/SOURCE.md` | Where the word lists come from, and their licences. |
 | `tools/tessdata-extra/SOURCE.md` | Where the pre-revolutionary Russian Tesseract model comes from, its licence and checksum. |
@@ -26,7 +31,7 @@ Tesseract 5.5.3 with the 4.1.0 language models and the `orus` model (see `tools/
 
 ## Citing
 
-The Geniza of Esperanto, *geniza-ocr: the OCR quality-assurance method*, release `v1.0` (2026), https://github.com/opoudjis/geniza-ocr.
+The Geniza of Esperanto, *geniza-ocr: the OCR quality-assurance method*, release `v1.1` (2026), https://github.com/opoudjis/geniza-ocr.
 
 ## Licence
 

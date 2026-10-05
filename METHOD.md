@@ -328,6 +328,28 @@ G5 can only be as good as the search that looks for each name, and an absence se
 
 Several of these were added after the first G5 run showed the search losing names that were in the text (Appendix B).
 
+### Release v1.1: the confusions measured, not guessed (5–6 October 2026)
+
+The search's map of digits read for letters (0→o, 1→l, 5→s, 6→o, 8→b) was empirical: it held the swaps found among missed names, not a survey of what OCR does to accented letters. Asked whether every accent permutation in the corpus, and Cyrillic, was accounted for, the honest answer was no, so it was measured (`tools/ocr-accent-survey.py`; the report and full table in `docs/OCR-ACCENT-SURVEY-2026-10-05.md` and `.tsv`).
+
+**The ground truth.** 27,308 pages whose true text is known, in two kinds kept apart: 2,243 pages of old print transcribed by an AI vision model (section 7), and 25,065 pages of born-digital PDFs whose own text layer is exact (modern print, which understates old-print damage). Each page was aligned with the Tesseract readings word by word and letter by letter: Latin letters against the block reading, Cyrillic letters against the two Russian readings. Each mangling is priced as the search sees it: the edits left after folding.
+
+**What it found.** OCR often writes not the base letter but a different one, which the fold does not absorb:
+- old print: é → ĉ 35% (the Esperanto model forcing its own letters onto other accents), ř → f, t or i 72%, ł → l 98%, ü → ii 23%;
+- modern print: ü → ii 50%; ä → ii, ŝi or ĉi;
+- Cyrillic: ѣ → ъ 50% (old print) and 75% (modern), even with the pre-reform model; і dropped or read as ш; ъ and ь confused;
+- born-digital text layers carry ligature characters (ﬁ, ﬂ, ﬀ), which a search for «fi» does not match.
+
+A one-letter mangling uses up the whole allowance of a name of up to six letters; «ü → ii» and its kind lose such a name outright. Old-print Cyrillic rests on only 56 pages, so it is the least certain part of the survey.
+
+**What changed in the search** (`tools/ocr-name-search.py`, steps 10 and 11):
+- compatibility forms are taken apart (NFKC: the ligatures become their letters);
+- ł, ø, đ, ı, ß, æ and œ fold to l, o, d, i, ss, ae and oe;
+- ъ is taken as ь;
+- the name is also tried in every confusion measured at least 5 times and in at least 2% of the letter's occurrences (a dropped letter: 5%), at most 64 spellings per name (`tools/ocr-name-search-confusions.tsv`, generated from the survey: 208 confusions, 66 from old print and 142 from modern, kept apart there, both tried).
+
+**The check.** The four filed G5 samples were scored again from their frozen texts and the judges' returns, with no new vision: the search of v1.0 reproduces the signed figures exactly; the search of v1.1 finds 10 more names (for example the admissible class 194 → 197 of 204, the special-handling class 230 → 233 of 240), contradicts 2 fewer pages, and loses no name. False hits were measured by searching each page's judged names on a page of another item: the v1.0 search already finds something for 10–26% of names, and v1.1 adds about one name in a hundred. The figures of section 8 are not changed: they stand as measured with the search of their day.
+
 ## 7. Vision, only where a check shows a problem
 
 "Vision" here means transcription of a page image by an AI vision model rather than by OCR. It is used only where a check has shown a quality problem, never as the default, and the quota is finite (`tools/ocr-vision-batch.py`, header; RUNBOOK.md § 2, rule 10). At intake, new items are converted by OCR (C4), and vision on their pages comes only after the image sort, on the editor's word (RUNBOOK.md § 1a, "Where each test runs").
@@ -394,6 +416,7 @@ Two intake batches ("cupel" batches, section 11) were run on 3 October, and thei
 - **Batch 1.** The first batch, signed on 3 October (RUNBOOK.md § 1), passed G5 on 40 of its 104 scoped pages: 0 of 40 contradicted, 140 of 141 names found (99%) (an internal record of 3 October 2026, not published).
 - **Batch 2.** The second batch, the Soviet Esperanto press (53 items, 2,983 pages), first failed G5: SPECIAL HANDLING 5 in 40, WITH EXCEPTIONS 8 in 40, the misses nearly all Cyrillic names. The cause was a Russian reading that had not been run on every page. After the fix, a fresh sample passed: SPECIAL HANDLING 0 in 40, WITH EXCEPTIONS 1 in 40, names 99% and 98% (docs/FAILURE-MAP.md R5).
 - **The Russian side.** A G5 confined to the Russian side after the orthography change found 1 page in 40 contradicted and 72 of 75 Cyrillic names (96%) (an internal record of 3 October 2026, not published).
+- **The v1.1 search.** Scored again with the widened search of release v1.1 (section 6, «Release v1.1»), the signed samples find 10 more names and contradict 2 fewer pages; no name found before is lost.
 These figures will be restated after the next intake, the Korĵenkov run (the editor's answer in the outline of this document, an internal record of 4 October 2026, not published).
 
 ## 9. What the method does not claim
