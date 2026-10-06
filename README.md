@@ -6,6 +6,7 @@ This is a **frozen release**: the version the methods document describes. It is 
 
 - `v1.0` (5 October 2026): the method as signed.
 - `v1.1` (6 October 2026): the name search widened by the OCR confusions measured on 27,308 pages (`METHOD.md`, section 6, «Release v1.1»). The figures of section 8 are unchanged.
+- `v1.2` (6 October 2026): v1.1's confusions corrected: a spelling made by a measured confusion no longer gets the full allowance of misread letters on top, which had made whole-corpus searches for short names flood (`METHOD.md`, section 6, «Release v1.2»). Short names tightened: a word of two letters or fewer matches only exactly, and a name of four letters or fewer gets a Russian ending or a misread letter, not both. Use this release, not v1.1. It also adds the search tools of `docs/SEARCHING.md`: `ocr-dowse.py`, `ocr_index.py` (with its check, `ocr-index-check.py`) and `ocr-corpus-lexicon.py` — reading each item by its strongest match, page counts, image checks within a practical limit, a judgement file, and people who share a surname.
 
 ## What is here
 
@@ -17,6 +18,7 @@ This is a **frozen release**: the version the methods document describes. It is 
 | `docs/FAILURE-MAP.md` | Every way the pipeline failed, how it was found, and what fixed it. |
 | `docs/OCR-ACCENT-SURVEY-2026-10-05.md` (and `.tsv`) | What OCR writes in place of each accented Latin letter and each Cyrillic letter, measured on 27,308 pages of known text, old and modern print apart (release v1.1). |
 | `tools/ocr-name-search-confusions.tsv` | The measured confusions the name search tries, generated from the survey (release v1.1). |
+| `docs/SEARCHING.md` | How the corpus is searched for people: a roster against a journal run (the way the project searches), or one name against the whole corpus; the tools, how to read their results and when to stop, people who share a surname, what a silence means, and how long it takes (release v1.2). |
 | `tools/` | The tools that implement the method (Python and shell), in the state the documents describe. |
 | `tools/lexicons/hunspell/SOURCE.md` | Where the word lists come from, and their licences. |
 | `tools/tessdata-extra/SOURCE.md` | Where the pre-revolutionary Russian Tesseract model comes from, its licence and checksum. |
@@ -31,7 +33,7 @@ Tesseract 5.5.3 with the 4.1.0 language models and the `orus` model (see `tools/
 
 ## Citing
 
-The Geniza of Esperanto, *geniza-ocr: the OCR quality-assurance method*, release `v1.1` (2026), https://github.com/opoudjis/geniza-ocr.
+The Geniza of Esperanto, *geniza-ocr: the OCR quality-assurance method*, release `v1.2` (2026), https://github.com/opoudjis/geniza-ocr.
 
 ## Licence
 

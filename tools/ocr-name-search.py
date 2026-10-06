@@ -50,8 +50,10 @@ _LET = str.maketrans({"ł": "l", "ø": "o", "đ": "d", "ı": "i", "ß": "ss", "�
 def fold(w):
     w = unicodedata.normalize("NFKC", w).lower().translate(_DIG).translate(_CYR).translate(_LET)
     w = "".join(c for c in unicodedata.normalize("NFD", w) if unicodedata.category(c) != "Mn")
-    w = re.sub(r"ъ$", "", w).replace("ъ", "ь")
-    return re.sub(r"[^\w]", "", w)
+    # punctuation first, then the final ъ, then ъ as ь (FIXED 2026-10-06: ъ→ь before the punctuation went turned
+    # «Постииковымъ:» into «…ымь», which is no Russian ending, and lost «Постниковъ»)
+    w = re.sub(r"[^\w]", "", w)
+    return re.sub(r"ъ$", "", w).replace("ъ", "ь")
 
 
 def _confusions():
@@ -83,7 +85,9 @@ def variants(word):
             n *= len(o)
         if n <= MAXV:
             break
-    return ["".join(p) for p in itertools.islice(itertools.product(*opts), MAXV)][1:]
+    # each spelling with the number of letters it changed: a measured confusion USES UP the allowance (step 11, 2026-10-06)
+    return [("".join(p), sum(x != c for x, c in zip(p, w)))
+            for p in itertools.islice(itertools.product(*opts), MAXV)][1:]
 
 
 def edits(a, b, cap):
@@ -126,13 +130,37 @@ def stem(w):
     return w
 
 
+def stem_close(t, target, cap):
+    """Two Cyrillic words, compared with a Russian case ending stripped from both. Shared with tools/ocr-dowse.py,
+    which labels the tiers by it."""
+    st, sg = stem(t), stem(target)
+    if len(target) > 4:
+        return edits(st, sg, cap) <= cap
+    # A name of four letters or fewer may have an ending OR a misread letter, not both (the editor's decision,
+    # 2026-10-06): «Кабе» stems to «каб», and one letter more matched «кап», «кат», «каро», «казо» — 5,701 of 6,174
+    # near hits in one journal-year. For such a name the stems must be equal («Каба», «Кабу» still match) ...
+    if st == sg:
+        return True
+    # ... except (a refinement the editor added the same day, conditioned on word length) when the word on the page
+    # is longer than the name, so it really carries an ending, and the name's own stem keeps four letters: «Бсйна»,
+    # «Бсйномъ» are Бейн declined and misread; «Табого», «Капою» are not Кабе (its stem «каб» is too short).
+    return len(sg) >= 4 and len(t) > len(target) and st != t and edits(st, sg, cap) <= cap
+
+
 def close(t, target, cap):
     if not t:
         return False
+    # A word of two letters or fewer matches ONLY exactly (the editor's decision, 2026-10-06: two-letter names are not
+    # searched for, and if they ever were, only an exact match would do). Without this, tolerances stacked:
+    # «Кабе» stripped of the ending «е» became «каб», and one misread letter more matched «ка» — 27,058 hits in one
+    # journal-year; transliteration did the same («ка» → «ka» against «kabe»). A name broken into small pieces is
+    # still found by the joins, which compare the pieces joined.
+    if len(t) <= 2:
+        return t == target
     if edits(t, target, cap) <= cap:
         return True
     tc, gc = bool(_CYRRE.search(t)), bool(_CYRRE.search(target))
-    if tc and gc and edits(stem(t), stem(target), cap) <= cap:
+    if tc and gc and stem_close(t, target, cap):
         return True
     if tc != gc:  # one Cyrillic, one Latin: compare in Latin letters, whole and with the Cyrillic word's ending stripped
         c, l = (t, target) if tc else (target, t)
@@ -163,6 +191,23 @@ def forms(name):
     return [f for f in re.split(r"\s*[/()]\s*", name) if re.search(r"[^\W\d_]{2,}", f)] or [name]
 
 
+def name_targets(f):
+    """One form of a name → the spellings it is compared in: [(folded spelling, why, allowance)], the name as written
+    first. Shared by find() and the corpus index (tools/ocr_index.py), so the two cannot drift apart."""
+    longest = max(re.findall(r"[^\W\d_]+", f), key=len)
+    target = fold(longest)
+    cap = 1 if len(target) <= 6 else 2
+    # the name as written, then as OCR was measured to misspell it (step 11). A spelling made by n measured
+    # confusions keeps only cap - n of the allowance (FIXED 2026-10-06: with the full allowance on top, a dropped
+    # letter let «Méray» → «mray» match «may» — 269,625 hits for one name over the corpus).
+    best = {}
+    for v, n in variants(longest):
+        fv = fold(v)
+        if fv and fv != target:
+            best[fv] = max(best.get(fv, -1), cap - n)
+    return [(target, "", cap)] + [(fv, " (measured OCR confusion)", c) for fv, c in sorted(best.items()) if c >= 0]
+
+
 def find(name, text):
     """Hits for the name's LONGEST word (the surname, usually) in text: [(how, matched text)]. Either form of a
     two-form name counts."""
@@ -171,17 +216,14 @@ def find(name, text):
     toks = [fold(t) for t in raw]
     parts = [[fold(x) for x in re.split(r"[-‐¬/'’]", r) if fold(x)] for r in raw]
     for f in forms(name):
-        longest = max(re.findall(r"[^\W\d_]+", f), key=len)
-        target = fold(longest)
-        cap = 1 if len(target) <= 6 else 2
-        # the name as written, then as OCR was measured to misspell it (step 11)
-        targets = [(target, "")] + sorted({(fold(v), " (measured OCR confusion)") for v in variants(longest)} - {(target, " (measured OCR confusion)")})
+        targets = name_targets(f)
+        memo = {}
 
         def near(t):
-            for tg, why in targets:
-                if close(t, tg, cap):
-                    return why
-            return None
+            # each distinct word is compared once per search (2026-10-06: words repeat; hours became minutes)
+            if t not in memo:
+                memo[t] = next((why for tg, why, c in targets if close(t, tg, c)), None)
+            return memo[t]
 
         for i, t in enumerate(toks):
             w = near(t)
@@ -196,7 +238,7 @@ def find(name, text):
                 w = near(t + toks[i + 1])
                 if w is not None:
                     hits.append(("two words joined" + w, raw[i] + " " + raw[i + 1]))
-            if raw[i].endswith(("-", "¬")) and t and any(tg.startswith(t[:max(2, len(t) - 1)]) for tg, _ in targets):
+            if raw[i].endswith(("-", "¬")) and t and any(tg.startswith(t[:max(2, len(t) - 1)]) for tg, _, _ in targets):
                 for j in range(i + 1, min(len(toks), i + 1 + WINDOW)):
                     w = near(t + toks[j]) if toks[j] else None
                     if w is not None:

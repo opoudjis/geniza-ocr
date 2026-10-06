@@ -350,6 +350,24 @@ A one-letter mangling uses up the whole allowance of a name of up to six letters
 
 **The check.** The four filed G5 samples were scored again from their frozen texts and the judges' returns, with no new vision: the search of v1.0 reproduces the signed figures exactly; the search of v1.1 finds 10 more names (for example the admissible class 194 → 197 of 204, the special-handling class 230 → 233 of 240), contradicts 2 fewer pages, and loses no name. False hits were measured by searching each page's judged names on a page of another item: the v1.0 search already finds something for 10–26% of names, and v1.1 adds about one name in a hundred. The figures of section 8 are not changed: they stand as measured with the search of their day.
 
+### Release v1.2: the confusions corrected, short names tightened (6 October 2026)
+
+The first search of the whole corpus with the v1.1 rules, for the five-letter name «Méray», returned 269,625 hits in 1,724 items. A measured confusion that drops a letter turned «méray» into «mray», and the full allowance of one misread letter still applied on top, so «may», «Mr. A.» and the like matched. The check of v1.1 had asked only whether a name found *something* on an unrelated page, not how much it found, so it did not show this.
+
+Two faults are fixed in v1.2 (`tools/ocr-name-search.py`, step 11 and the fold):
+- a spelling made by measured confusions keeps only the allowance less the confusions it used: one confusion on a name of up to six letters leaves no further misread letter;
+- the fold now drops punctuation before it treats ъ as ь, so a Cyrillic word followed by punctuation keeps its Russian case ending («Постииковымъ:» again matches «Постниковъ»).
+
+Each distinct word is now compared once per search, which takes a whole-corpus search from hours to minutes. The same «Méray» search returns 40,560 hits; one comes through a confusion, and the rest come through the v1.0 rules themselves, chiefly matching across alphabets, which allows one letter more. A search of the whole corpus should therefore be read by kind of match, strongest first, with the common words among the matches set aside.
+
+The first real searches with the new tools then showed that very short names stacked tolerances on top of each other. «Кабе», stripped of its Russian ending to «каб», matched the syllable «ка» with one misread letter more: 27,058 near hits in a single journal-year. Two more rules fix this:
+- a word of two letters or fewer matches only exactly;
+- for a name of four letters or fewer, a Russian case ending or a misread letter is allowed, not both, unless the word on the page is longer than the name (so it really carries an ending) and the name's own stem keeps four letters: «Бсйна», Бейн declined and misread, is still found; «Кап», «Каро», «Табого» are not Кабе. In the same journal-year, «Кабе»'s near hits fall from 27,058 to 1,361.
+
+Checked as before on the four filed G5 samples, the v1.2 search finds 3 more names than v1.0 and contradicts 1 fewer page; false hits fall from 219 to 217. Two names found by v1.0 are not found by v1.2: the signatures «G.L.B.» and «C.F.W.», initials only, which v1.0 had matched only through unrelated two-letter words («ĝi», «eĉ»). The index the search tools use gives exactly what the name search gives (`tools/ocr-index-check.py`: 0 disagreements).
+
+**Searching for many people at once.** This project searches with a roster against a run: every name on its roster of early Esperantists against the items of one journal run, which is how its searches have always been run. Each text is indexed once and every name matched against the index, by the same rules as the name search. A single name can also be searched against the whole corpus. The record of a search reads each item by its strongest kind of match, so that a weak match found where nothing stronger was is not taken for a find; counts pages, not hits; lists the pages to check on the image (none for born-digital pages, a blind sample of 40 beyond 40 pages); and takes a file of the reader's judgements. People who share a surname are sorted by first name, initial and title, read in context, given a default only where the press's usage allows it, and what remains is left for arbitration. Both ways, and the tools, are described in `docs/SEARCHING.md`.
+
 ## 7. Vision, only where a check shows a problem
 
 "Vision" here means transcription of a page image by an AI vision model rather than by OCR. It is used only where a check has shown a quality problem, never as the default, and the quota is finite (`tools/ocr-vision-batch.py`, header; RUNBOOK.md § 2, rule 10). At intake, new items are converted by OCR (C4), and vision on their pages comes only after the image sort, on the editor's word (RUNBOOK.md § 1a, "Where each test runs").
@@ -416,7 +434,7 @@ Two intake batches ("cupel" batches, section 11) were run on 3 October, and thei
 - **Batch 1.** The first batch, signed on 3 October (RUNBOOK.md § 1), passed G5 on 40 of its 104 scoped pages: 0 of 40 contradicted, 140 of 141 names found (99%) (an internal record of 3 October 2026, not published).
 - **Batch 2.** The second batch, the Soviet Esperanto press (53 items, 2,983 pages), first failed G5: SPECIAL HANDLING 5 in 40, WITH EXCEPTIONS 8 in 40, the misses nearly all Cyrillic names. The cause was a Russian reading that had not been run on every page. After the fix, a fresh sample passed: SPECIAL HANDLING 0 in 40, WITH EXCEPTIONS 1 in 40, names 99% and 98% (docs/FAILURE-MAP.md R5).
 - **The Russian side.** A G5 confined to the Russian side after the orthography change found 1 page in 40 contradicted and 72 of 75 Cyrillic names (96%) (an internal record of 3 October 2026, not published).
-- **The v1.1 search.** Scored again with the widened search of release v1.1 (section 6, «Release v1.1»), the signed samples find 10 more names and contradict 2 fewer pages; no name found before is lost.
+- **The v1.2 search.** Scored again with the search of release v1.2 (section 6, «Release v1.1» and «Release v1.2»), the signed samples find 3 more names than v1.0 and contradict 1 fewer page; the two names no longer found are initials-only signatures that v1.0 had matched only through unrelated two-letter words. (The 10 more names reported for v1.1 came partly from the over-generous confusions v1.2 corrects.)
 These figures will be restated after the next intake, the Korĵenkov run (the editor's answer in the outline of this document, an internal record of 4 October 2026, not published).
 
 ## 9. What the method does not claim
