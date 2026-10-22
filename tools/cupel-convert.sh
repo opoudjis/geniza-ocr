@@ -1,7 +1,11 @@
 #!/bin/bash
 # cupel-convert — cupel step C3: convert a batch's NEW PDFs, and merge their psm verdicts — nothing else.
 #
-#   tools/cupel-convert.sh <new-pdf-list> <base verdicts json> <out merged verdicts json>
+#   tools/cupel-convert.sh <new-pdf-list> <base verdicts json> <out merged verdicts json> [--mode=solo|--mode=shared]
+#
+# --mode (the editor ruled on 2026-10-14 00:3x for two modes: running alongside a parallelised dowse, with 40% of the
+# cores, and running alone, with 80% of the cores): the workers every pass may use, from tools/cupel_workers.py; default shared (40%), so a dowse
+# beside it is not starved; --mode=solo for an unattended run (overnight).
 #
 # WHY (2026-10-03, cupel batch 1). tools/ocr-run-corpus.sh converts well, but its step 4 judges psm verdicts over the WHOLE
 # root and then rebuilds every item from that one new verdicts file — not from the merged 30 Sep verdicts the accepted
@@ -12,14 +16,18 @@
 # so the BATCH'S OWN verdicts are also written, to <out minus -merged.json>-batch.json. The batch file is tracked in git;
 # merged files are not (.gitignore), and are rebuilt as base + each batch file in order:
 # 2026-09-30-merged (115,177) + cupel1-batch (328) + cupel2-batch (2,983) = cupel2-merged (118,488).
-# WRITE-SET: the new items' folders under the render root $R (page files, including each page's text-layer
+# WRITE-SET: the new items' folders under sources/ocr-rendersearch/ (page files, including each page's text-layer
 # reading page-NNNN.tl.txt, step 3b; skipped where a file is already converted); the out verdicts file and its batch file (each refused if it exists). Never the existing items. Run from the repo root.
 set -euo pipefail
+cd "$(dirname "$0")/.."   # to the repo root wherever it is called from (editor 2026-10-11 19:3x, sandbox model decision D)
 NEW="${1:?new pdf list}"; BASE="${2:?base verdicts}"; OUT="${3:?out merged verdicts}"
 case "$OUT" in *-merged.json) ;; *) echo "out must end in -merged.json: $OUT"; exit 2;; esac
 BATCH="${OUT%-merged.json}-batch.json"
 G=published/heterophony-resources/geniza; R=$G/sources/ocr-rendersearch
-FILES="${FILES:-3}"; JOBS="${JOBS:-5}"
+MODE="${4:---mode=shared}"; MODE="${MODE#--mode=}"
+case "$MODE" in solo|shared) ;; *) echo "--mode must be solo or shared: $MODE"; exit 2;; esac
+FILES=$(python3 tools/cupel_workers.py "$MODE" files); JOBS=$(python3 tools/cupel_workers.py "$MODE" jobs); TOTAL=$(python3 tools/cupel_workers.py "$MODE" total)
+echo "mode $MODE: $TOTAL workers ($FILES PDFs × $JOBS pages)"
 [ -e "$OUT" ] && { echo "exists: $OUT"; exit 1; }
 [ -e "$BATCH" ] && { echo "exists: $BATCH"; exit 1; }
 DUP=$(sed -E 's#.*/##; s#\.[^.]*$##' "$NEW" | sort | uniq -d); [ -z "$DUP" ] || { echo "duplicate names: $DUP"; exit 2; }
@@ -30,15 +38,15 @@ grep -v '^[[:space:]]*$' "$NEW" | tr '\n' '\0' | xargs -0 -P "$FILES" -n 1 bash 
   [ -s "$R/$stem.txt" ] && { echo "  have $stem"; exit 0; }
   echo "  start $stem $(date +%T)"; python3 tools/ocr-pages.py "$pdf" --out "$R" --lang epo --psm 6 --jobs "$JOBS" 2>&1 | tail -1'
 echo "=== 2 · PSM 4 $(date '+%T')"
-python3 tools/ocr-psm-both.py --pdfs "$NEW" --root "$R" --files 3 --jobs 3 2>&1 | tail -2
+python3 tools/ocr-psm-both.py --pdfs "$NEW" --root "$R" --files "$FILES" --jobs "$JOBS" 2>&1 | tail -2
 echo "=== 3 · TEXT-MASK RE-READ $(date '+%T')"
-python3 tools/ocr-mask-reread.py --pdfs "$NEW" --root "$R" --jobs 8 2>&1 | tail -2
+python3 tools/ocr-mask-reread.py --pdfs "$NEW" --root "$R" --jobs "$TOTAL" 2>&1 | tail -2
 echo "=== 3b · THE PDF'S OWN TEXT LAYER $(date '+%T')"
 # (approved by the editor, 2026-10-04 12:4x: the layer becomes one more competing reading, as the corpus had on 26 Sep.)
 # tools/ocr-textlayer.py writes page-NNNN.tl.txt beside the other readings (a page whose layer holds < 20 characters
 # gets none; a page that has one is skipped); ocr-psm-adjudicate.py weighs it like any other reading. Not ground truth
 # (editor 2026-09-26): it competes, it does not replace.
-python3 tools/ocr-textlayer.py --pdfs "$NEW" --root "$R" --jobs 8 2>&1 | tail -2
+python3 tools/ocr-textlayer.py --pdfs "$NEW" --root "$R" --jobs "$TOTAL" 2>&1 | tail -2
 echo "=== 4 · ADJUDICATE the new items alone $(date '+%T')"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 mkdir "$T/root"

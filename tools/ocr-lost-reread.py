@@ -3,14 +3,15 @@ r"""ocr-lost-reread — re-read pages an image sort called LOST, from enhanced v
 
     tools/ocr-lost-reread.py --list <tsv: NNN, batch, corpus, page, verdict, …> --pdfs <list> --out <dir> [--jobs 8]
 
-WHY (2026-09-29: the editor asked for an attempt to eliminate every LOST page). The blank-page sort (an internal
-record, 2026-09-29, not published) found 81 pages whose print is missing from the text, most of them FAINT scans (Progreso 4/5/7 above all: full text
+WHY. On 2026-09-29 the editor asked for an attempt to eliminate every LOST page. The blank-page sort (an internal record, 2026-09-29, not published)
+found 81 pages whose print is missing from the text, most of them FAINT scans (Progreso 4/5/7 above all: full text
 pages that the G1 ink test took for blank paper, and that Tesseract read as noise). A faint page may read well once
 its contrast is restored.
 HOW: each page's image (the route the conversion uses; a /Rotate page is rendered) is read by `tesseract -l epo
---psm 6` in four versions: as is · autocontrast (0.5% cut) · autocontrast + sharpen · Otsu-binarised. Each reading,
+--psm 6` in four versions: as is · autocontrast (0.5% cut) · autocontrast + sharpen · Otsu-binarised; and, asked for by
+`--versions …,colour` (2026-10-17), a fifth for coloured paper: the brightest colour channel, stretched. Each reading,
 and the current `page-NNNN.txt`, is scored as KNOWN WORDS of 5+ letters against all the Latin-script lexicons
-together (short fragments hit an all-language lexicon by chance: the flip-test lesson of 09-29). The best
+together (short fragments hit an all-language lexicon by chance: the flip-test lesson, failure log 09-29). The best
 version is written to <out>/<corpus>__<page>.txt with a TSV of all scores. Nothing in the corpus is changed: a
 reading replaces the current one only in a separate, reviewed step, and a page still poor goes to vision.
 """
@@ -47,7 +48,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--list", required=True); ap.add_argument("--pdfs", required=True); ap.add_argument("--out", required=True)
     ap.add_argument("--jobs", type=int, default=8)
-    # the corpus-wide second reading (approved by the editor, 2026-09-29; `docs/FAILURE-MAP.md` row 4): one version
+    # the corpus-wide second reading (approved by the editor 2026-09-29; `docs/FAILURE-MAP.md` row 4): one version
     # (boost-sharp won every one of the 302 partly-read faint-volume pages), compared with the page as a SEARCH
     # reads it (its section of the combined `<corpus>.txt`), scores appended as each unit ends, done pages skipped
     ap.add_argument("--versions", default="plain,boost,boost-sharp,otsu")
@@ -135,6 +136,14 @@ def main():
                     if v > best[0]: best = (v, i)
                 versions = {"plain": g, "boost": ac, "boost-sharp": ac.filter(ImageFilter.SHARPEN),
                             "otsu": ac.point(lambda x, t=best[1]: 255 if x > t else 0)}
+                # COLOURED PAPER (2026-10-17, approved by the editor; an internal record, 2026-10-17, not published): a page printed
+                # on blue, orange, grey or purple paper goes dark in grey and Tesseract finds no text. The brightest of the
+                # three channels keeps the paper light and the ink dark; stretched from its 2nd to its 98th percentile.
+                if "colour" in want:
+                    import numpy as np
+                    mx = np.asarray(Image.open(im[p]).convert("RGB")).max(axis=2).astype(float)
+                    lo, hi = np.percentile(mx, 2), np.percentile(mx, 98)
+                    versions["colour"] = Image.fromarray(np.clip((mx - lo) / (hi - lo + 1e-6) * 255, 0, 255).astype("uint8"))
                 versions = {n: v for n, v in versions.items() if n in want}
                 reads = {}
                 for name, img in versions.items():

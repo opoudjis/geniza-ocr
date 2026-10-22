@@ -8,7 +8,7 @@ recording, per language, the sources used, the file count, the token count and t
 
 WHY THE SOURCE MUST BE CLEAN (2026-09-23 — the caution that makes or breaks
 this): a lexicon built from OCR contains the OCR's own errors as legitimate words, and the bands
-COLLAPSE — everything scores well and nothing separates. That was tested exactly, and seen to
+COLLAPSE — everything scores well and nothing separates. This was tested exactly and seen to
 fail. So every source registered here must be either born-digital text or a transcription, never
 an OCR extraction. If you add a language, add it from clean text or do not add it.
 
@@ -22,8 +22,8 @@ russian from Hunspell stem lists. Still deliberately ABSENT, and reported as «n
 Russian** (the 1918 reform: see hunspell/SOURCE.md).
 
 Registered sources (add here, with provenance, when a clean corpus arrives):
-  occidental — a local source folder, not published (146 HTML files, 1927–42, the
-               born-digital occidental-lang.com transcriptions; an earlier bench used these and got
+  occidental — the cosmoglotta/occidental-lang-1927-42/*.html transcriptions (146 files, the
+               born-digital occidental-lang.com transcriptions; an earlier bench test used these and got
                0.93–0.95 self-test against 0.74–0.83 for the ANNO Helvetia OCR)
   esperanto  — ../tekstaro_de_esperanto_html_sen_streketoj (the Tekstaro de Esperanto, curated
                transcriptions, «sen streketoj» = the clean phrase-greppable build)
@@ -46,14 +46,24 @@ SOURCES = {
 HUNSPELL = {"french": "fr", "german": "de", "spanish": "es", "czech": "cs", "italian": "it",
             "swedish": "sv", "dutch": "nl", "polish": "pl", "russian_post1918": "ru",
             "danish": "da", "catalan": "ca",
+            # 2026-10-14 (on the editor's request for Portuguese): Brazila Esperantisto's second language (cupel11);
+            # wooorm/dictionaries `pt` = VERO, Brazilian Portuguese (LGPL-3.0 OR MPL-2.0); MODERN spelling, the
+            # pre-1943 orthography («approvarem») under-credited (hunspell/SOURCE.md)
+            "portuguese": "pt",
             # 2026-09-27 (approved by the editor): second languages of Estlanda Esperantisto, Latviana and Dambrauskas,
-            # which had no word list and so could not earn credit. GREEK built too (at the editor's request, though he
-            # expected it not to help) — the hunspell list is MODERN monotonic; 1947 Helena Esperantisto prints
-            # polytonic katharevousa, so its Greek stays PRESENCE ONLY (treated like Armenian, on the editor's ruling).
-            "estonian": "et", "latvian": "lv", "lithuanian": "lt",   # greek REMOVED 16:25 (on the editor's decision)
+            # which had no word list and so could not earn credit. GREEK built too (at the editor's request, though
+            # the editor expected it not to help) — the hunspell list is MODERN monotonic; 1947 Helena Esperantisto prints
+            # polytonic katharevousa, so its Greek stays PRESENCE ONLY (treated like Armenian).
+            "estonian": "et", "latvian": "lv", "lithuanian": "lt",   # greek REMOVED 16:25 (on the editor's decision to remove it)
             # 2026-10-03 (approved by the editor): the language table found Bulgarian and Ukrainian texts and had no list to
-            # confirm them (an internal record, 2026-10-03, not published); same source, licences in hunspell/SOURCE.md
-            "bulgarian": "bg", "ukrainian": "uk"}
+            # confirm them (geniza/ocr/runs/archive/OCR-TEXT-LANGUAGES-2026-10-03.tsv); same source, licences in hunspell/SOURCE.md
+            "bulgarian": "bg", "ukrainian": "uk",
+            # 2026-10-17 (the editor chose option b, then approved): the base of the Latino sine flexione list
+            # (tools/build-lsf-lexicon.py; an internal record, 2026-10-17, not published); wooorm/dictionaries `la` = Karl Zeiler's Latin 3.1 (2013)
+            "latin": "la",
+            # 2026-10-12 (at the editor's request to add Slovak to the gate): cupel9's Gašparíková & Pollák 1987 is Slovak, and the
+            # gate had no list for it (a Slovak page scored against Czech is not a measurement); same source, hunspell/SOURCE.md
+            "slovak": "sk"}
 HUNSPELL_DIR = REPO / "tools/lexicons/hunspell"
 # STEMS ONLY for these (2026-09-27): affix expansion gave Lithuanian 36.4 M forms (634 MB) and Estonian
 # 15.0 M (227 MB) — too heavy to load, and a false-credit risk. Measured on 31,193 junk tokens (Cyrillic
@@ -121,7 +131,7 @@ def main():
             w = re.sub(r"^\+\w+=", "", w)       # uk.dic marks some entries «+cs=…» (2026-10-03)
             if w and not w.isdigit():
                 words.add(w)
-        # INFLECTED FORMS (2026-09-26: the editor ruled that the inflections are needed). The
+        # INFLECTED FORMS (2026-09-26: the editor ruled that the inflections are absolutely needed). The
         # stems alone held `journal` and `jeune` but not `journaux` and `jeunes`, and EVERY
         # «is this a real word?» test downstream ran on them: the second-model merge, G2's density
         # and G4's bilingual credit. Hunspell's own affix rules (`<code>.aff`, same source) expand

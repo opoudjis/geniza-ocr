@@ -4,7 +4,7 @@ r"""ocr-quality-scan.py — which text extractions are too corrupt to trust, and
     tools/ocr-quality-scan.py                # scan geniza sources, write the report
     tools/ocr-quality-scan.py --top 40       # print the worst N to stdout as well
 
-WHY. The editor noted on 2026-09-05 that there was a great deal to go through, and that some
+WHY. The editor observed on 2026-09-05 that there was a great deal to go through, and that some
 files seemed to need re-OCR. True, and previously only ever noticed one file at a time, in the middle of
 doing something else — the *Bibliografio* scout found the Milter primer's title corrupt in
 BOTH held copies, in different places, and neither prints `meždunarodnogo` correctly. That
@@ -120,7 +120,7 @@ LETTERSPACED = re.compile(r"(?:(?<=\s)|^)(?:[^\W\d_]\s+){3,}[^\W\d_](?=[\s,.;:]|
 #
 # METHOD: the proportion of word tokens of length >= 3 that are real words of the language the
 # file is actually in. Word-shaped garbage still fails a dictionary. Bands measured on the
-# bench (13:12): clean Occidental self-test 0.93-0.95 · ANNO Helvetia 1932 0.74-0.83 ·
+# bench: clean Occidental self-test 0.93-0.95 · ANNO Helvetia 1932 0.74-0.83 ·
 # bitarkivo Kosmoglott 1922-26 0.47-0.50 — the last far worse than anything previously recorded.
 #
 # TWO CAUTIONS, both learned by testing (do not relax either):
@@ -150,8 +150,8 @@ LANG_MARKERS = {
 # to know when to SHUT UP. Without this table the scan's first run flagged 13,061 extractions,
 # and its top eight corpora were `ocr/Ido.*` — thousands of pages of perfectly good Ido scored
 # against the Esperanto lexicon, because Ido shares `kun`, `nur`, `jam`, `pri`, `ma`, `on` with
-# the two languages we hold and so cleared the marker bar. The caution above, exactly: «the measure
-# is per-language, and a hit-rate against the wrong lexicon is meaningless». These markers are
+# the two languages we hold and so cleared the marker bar. This is the caution above, exactly:
+# the measure is per-language, and a hit-rate against the wrong lexicon is meaningless. These markers are
 # chosen to be absent from Esperanto and Occidental, so that a text in one of these languages
 # WINS detection and is then reported as unscoreable rather than as bad.
 # Remove a language from here only by adding a clean lexicon for it in tools/build-lexicons.py.
@@ -173,7 +173,7 @@ UNLEXICONED_MARKERS = {
     "russian": {"что", "как", "это", "для", "был", "она", "все", "его", "или", "при",
                 "так", "если", "было", "года", "него", "они", "мы", "уже"},
 }
-# DECLARED CORPORA — the brief for this check allows the language to be detected OR declared per corpus, and
+# DECLARED CORPORA — the design allows the language to be detected OR declared per corpus, and
 # declaration is the honest answer where detection cannot be trusted. Marker detection fails on
 # badly-OCR'd text in a language close to one we score: *Novialiste* 1938–39 persistently reads
 # as degraded Occidental (0.63) because its own grammar words are mangled, so Novial's
@@ -190,22 +190,108 @@ DECLARED = {
     # NOT «mondo» — *Mondo* is Ido but *La Bela Mondo* and *Tra la Mondo* are Esperanto, and a
     #   substring would catch all three. Mondo is left to marker detection, which now knows Ido.
     "historio-ru/": None,      # Russian
-    # 2026-09-27, the editor ruled that the wrong language had been declared, and approved the fix — both had been scored as Esperanto:
+    # 2026-09-27, the editor found the wrong language declared and approved the correction — both had been scored as Esperanto:
     "1909-Ritz-Speech": "english",   # the 1909 Ritz speech (Tasmania) — lexicon: tools/lexicons/english.txt (web2)
     "dragoumis-1881": None,          # Dragoumis 1881 — Greek (katharevousa); no Greek lexicon, so NOT scored
-    # 2026-09-27, approved by the editor: Ido-named items that detect as Esperanto — declared Ido
+    # 2026-09-27 (approved by the editor): Ido-named items that detect as Esperanto — declared Ido
     "Epigrami-ido-vivo": "ido", "Idomarcho": "ido",
     "Idowoti": "ido",                # Estonian FRAKTUR: its low G4 is the typeface, not the language
-    # 2026-09-27 16:20, the editor ruled that the rest were fine as plain Ido, and the Spanish course mixed Spanish
-    # and Ido (Ido primary, its Spanish credited as a second language). NOT the Internacia lernolibro por
+    # 2026-09-27 16:20, on the editor's judgement (the rest read fine as plain Ido; the Spanish course is mixed Spanish/Ido,
+    # Ido primary, its Spanish credited as a second language). NOT the Internacia lernolibro por
     # Esperantistoj: measured mostly Esperanto (1,805 Esperanto-only vs 588 Ido-only words) — detection right.
     "/Idoguide.": "ido", "/Olimpialaludi2016.": "ido", "/ambicio.": "ido", "/korokanti.": "ido",
     "/latviana.": "ido", "/sundiala.": "ido", "/vivo.": "ido", "/kursoidoenlahispana.": "ido",
-    # 2026-09-28 01:06, the editor approved the suggested fixes (the presence-only breakdown):
+    # 2026-09-28 01:06, fixed as suggested on the editor's decision (the presence-only breakdown):
     "/belgasonorilo.1912.11.": "ido",   # reads as Ido; detection chose Occidental because of a Romanal specimen
     "Contribution_of_A_Jakstas-Dambrauskas": "english",   # an English-language paper
     "Carlevaro - Lalortel Radicarium": "english",         # Carlevaro's radicarium: English apparatus
-    "/1.": "ido",                    # Astro Idista no. 1 (archive-org-ido/astro_idista_1/1.pdf, unique name) — Brazilian, Portuguese + Ido; included by the editor, 16:21
+    "/1.": "ido",                    # Astro Idista no. 1 (archive-org-ido/astro_idista_1/1.pdf, unique name) — Brazilian, Portuguese + Ido; included on the editor's decision, 16:21
+    # 2026-10-12, cupel9 (agreed and confirmed by the editor, the declarations spelled out): main languages outside the planned three,
+    # which detection alone (Esperanto, Ido, Occidental) would score as Esperanto; also DECLARED in ocr-text-languages-table.py
+    "/zakrzewski-historja-1906.": "polish",                  # Zakrzewski, Historja (Warszawa 1906): Polish prose
+    "/gasparikova-pollak-1987-interhelpo": "slovak",         # Gašparíková & Pollák 1987: Slovak (tools/lexicons/slovak.txt, built 2026-10-12)
+    # 2026-10-13, cupel10 (confirmed by the editor, the declarations spelled out): Russian main language; no tools/lexicons/russian.txt,
+    # so known and unscoreable (as «historio-ru/»), not scored as Esperanto; also DECLARED in ocr-text-languages-table.py
+    "/informilo_c_k_seu__1926_27__nn9_12.": "russian",      # Informilo C. K. SEU 1926–27: Russian main, Esperanto sections
+    # 2026-10-14, cupel13 (approved by the editor 14:5x, the declarations spelled out): main languages outside the planned three;
+    # also DECLARED in ocr-text-languages-table.py
+    "/VIjfJaarEsperantoInNederland_1909_kul46590.": "dutch",   # Vijf jaar Esperanto in Nederland (1909): Dutch prose
+    "/Krytyka_1912_R14Cz2_septembro_kul47828.": "polish",       # Krytyka, Sept. 1912: Polish (the congress pieces Lublin's catalogue names are not in it)
+    "/Krytyka_1912_R14Cz2_oktobro_kul47829.": "polish",         # Krytyka, Oct. 1912: Polish
+    # 2026-10-17, cupel14 (confirmed by the editor 00:1x, option a, the declarations spelled out): main languages outside the planned three;
+    # also DECLARED in ocr-text-languages-table.py
+    "/wilson.third.esperanto.congress.": "english",            # Wilson, the Third Esperanto Congress (1907): English, Esperanto cited
+    "/samuel.interhelpo.": "russian",                          # Samuel, Интергельпо (Moscow 1935): Russian; known and unscoreable, as «historio-ru/»
+    # cupel15, 2026-10-17 (confirmed by the editor 21:1x): Volapük main (the list with its analyser), German main for Einstein
+    "/ANNO_e2s_": "volapuk", "/jveizapot.": "volapuk", "/kosmopolan.": "volapuk", "/volaspodelamont00unkngoog.": "volapuk",
+    "/volapükan.melopik.": "volapuk", "/nunal.nulik.": "volapuk", "/Volapukabled_talik_1889_n19": "volapuk",
+    "/volapükabled.": "volapuk", "/levolapuk.": "volapuk",
+    "/einstein-weltsprachliche-zeit-und-streitfragen-1889.": "german",
+    # cupel16, 2026-10-18 (confirmed by the editor 23:0x): main languages outside the planned three; also DECLARED in
+    # ocr-text-languages-table.py (an internal record, 2026-10-18, not published)
+    "/bukalised_literata_1889.": "german",
+    "/cogabled_": "volapuk",
+    "/couturat_leau_histoire_": "french",
+    "/drezen_za_vseobshchim_yazykom_1928.": "russian",
+    "/einstein_examen_critique_1889.": "french",
+    "/el_volapuk_": "spanish",
+    "/feyerabend_weltspracheschwindel_1888.": "german",
+    "/gross_dokums_lecif_deut_1888.": "volapuk",
+    "/gutensohn_abwehr_1888.": "german",
+    "/hain_is_vp_progressing_1889.": "english",
+    "/kausch_lised_vpanas_1901.": "volapuk",
+    "/Kerkhoffs_Dictionaire_1887.front.": "french",
+    "/kniele_einstein_linguo_internacia_1890.": "german",
+    "/kosmopolan_": "volapuk",
+    "/lott_ist_volapuk_die_beste_1888.": "german",
+    "/low_reflexionen_berlin_1888.": "german",
+    "/mittheilungen_": "german",
+    "/mln_v2_1887_schele_de_vere.": "english",
+    "/mulapenad_nebolitik_": "volapuk",
+    "/muller_phantom_1888.": "german",
+    "/nar_v146_1888_bell.": "english",
+    "/nature_v38_1888_scientific_value.": "english",
+    "/nogan_vpik_": "volapuk",
+    "/nov_": "russian",
+    "/nunal_nulik_": "volapuk",
+    "/nunel_valemik_": "english",
+    "/nuns_blefik_": "volapuk",
+    "/nurnberger_presse_": "german",
+    "/pietzker_zur_kritik_1889.": "german",
+    "/romer_vp_und_professoren_1888_bsb.": "german",
+    "/rund_um_die_welt_haupenthal_nachwort.": "german",
+    "/rund_um_die_welt_y": "german",
+    "/scheyrer_concurrenten_1888_onb.": "german",
+    "/schuchardt_auf_anlass_1888.": "german",
+    "/science_v11_1888_bell.": "english",
+    "/siegismund_verzeichniss_1888.": "german",
+    "/sionsharfe_": "german",
+    "/spodel_vpik_hamburg.": "volapuk",
+    "/steiner_drei_weltsprach-systeme_1889.": "german",
+    "/tapuk_1896.": "german",
+    "/timapenad_dan_novegan_1889.": "danish",
+    "/volapuk_journal_london_1888.": "english",
+    "/volapukisten_": "swedish",
+    "/volaspodel_": "volapuk",
+    "/volkswohl_weltsprachliches_": "german",
+    "/vom_guten_das_beste_1897-99.": "german",
+    "/vp_monthly_boston_": "english",
+    "/vpabled_nedanik_haastert_1884-85.": "volapuk",
+    "/vpabled_talik_1888.": "volapuk",
+    "/vpaflen_jveizik_": "volapuk",
+    "/vpagased_lostanik_1891.": "volapuk",
+    "/vpaklubs_": "volapuk",
+    "/vpan_nolik_": "volapuk",
+    "/wesen_zweck_ziel_vortrag.": "german",
+    "/zamponi_einfuhrung_1904.": "german",
+    "/histoiredelalang00coutuoft.": "french",   # cupel16b, Couturat–Leau 1903 (confirmed by the editor 2026-10-19 11:0x)
+    "/scholaetvita_": "latino-sine-flexione",                  # Schola et Vita 1926–1934: Latino sine flexione, scored against tools/lexicons/latino-sine-flexione.txt (the editor chose option b and approved it, 2026-10-17)
+    "/belousov_eroshenko_amiko_de_lusin_1975.": "russian",  # Belousov on Eroshenko, 1975: Russian
+    "/belousov_eroshenko_pioniro_1985.": "russian",         # Belousov on Eroshenko, 1985: Russian
+    # cupel17, 2026-10-21 (accepted by the editor 00:3x): main languages outside the planned three; also DECLARED in
+    # tools/ocr-text-languages-table.py (an internal record, 2026-10-21, not published)
+    "/ANNO_e0d_": "german",    # Rund um die Welt 1909–14: German beside Esperanto
+    "/ANNO_e6g_": "french",    # Lingua Internationale 1911–12: French
 }
 
 
@@ -222,6 +308,12 @@ _LEX = {}
 
 def lexicon(lang):
     """Lazily load a lexicon; None if we hold no clean one for this language."""
+    if lang in ("volapuk", "volapuk-reformed") and lang not in _LEX:
+        # VOLAPÜK: the list and its compound analyser, as in tools/ocr-accept.py lex() (approved by the editor 2026-10-17 18:3x;
+        # «volapuk-reformed», de Jong's, 2026-10-18)
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import volapuk_analyser
+        _LEX[lang] = volapuk_analyser.words_for(lang)
     if lang not in _LEX:
         p = os.path.join(LEXDIR, lang + ".txt")
         try:

@@ -20,6 +20,13 @@ The SCORE step reads each class against ITS verdict:
   ru-accepted    contradicted if Russian NONE
   ledger-*       NAME RECALL: each name the judge lists is searched with tools/ocr-name-search.py in the text(s)
                  of the class's absence side; a page is contradicted if two or more of its names are not found.
+  ledger-eo-side (2026-10-13: the editor decided that their Esperanto side be admitted on name recall, through a G5
+                 sample of their own, and approved trying option 1): the pages of the WITH EXCEPTIONS items admitted on the «RUSSIAN side only» (the
+                 bi-script runs whose Esperanto side fails G4 on the Russian read as Latin junk), scored on their
+                 ESPERANTO side: does the Esperanto search text find the names? Drawn only when --classes names it.
+                 Bi-script pages only (with `page-NNNN.eo-gate.txt`); runs of 1914 or before apart, as
+                 ledger-eo-side-primary (2026-10-13 20:3x, after a first draw of mostly wholly Russian pages).
+                 (An internal record, 2026-10-13, not published: the name look.)
 A clearing class passes if at most 1 of its N pages is contradicted (the proposal's bar).
 """
 import os, re, sys, json, glob, random, argparse, subprocess, statistics, collections, importlib.util
@@ -32,7 +39,8 @@ RA = os.path.join(G, "sources", "ocr-rendersearch-all")   # every reading on dis
 _s = importlib.util.spec_from_file_location("ns", os.path.join(HERE, "ocr-name-search.py"))
 NS = importlib.util.module_from_spec(_s); _s.loader.exec_module(NS)
 CLEARING = {"g1-blank", "g1-plate", "rot-upright", "rot-reread", "ru-rejected", "ru-accepted",
-            "ledger-admissible", "ledger-both", "ledger-eo", "ledger-ru", "ledger-short", "ledger-special", "ledger-exceptions"}
+            "ledger-admissible", "ledger-both", "ledger-eo", "ledger-ru", "ledger-short", "ledger-special", "ledger-exceptions",
+            "ledger-eo-side", "ledger-eo-side-primary"}
 
 
 def pages(path):
@@ -65,8 +73,8 @@ def build(a):
             for l in open(a.pdfs) if l.strip()}
     rows = [l.rstrip("\n").split("\t") for l in open(a.ledger, encoding="utf-8") if not l.startswith("#")][1:]
     live = {r[0]: r for r in rows if r[3] in ("ABSENCE-ADMISSIBLE", "SPECIAL HANDLING", "WITH EXCEPTIONS")}
-    # --items (cupel, 2026-10-03): sample only a batch's NEW items — one sample across the batch (the editor ruled that a
-    # batch's new additions be sampled together, for a more global sample). Comma-separated stems, or @file with one stem per line.
+    # --items (cupel, 2026-10-03): sample only a batch's NEW items — one sample across the batch (the editor decided that
+    # a batch's new additions be sampled together, for a more global sample). Comma-separated stems, or @file with one stem per line.
     if a.items:
         want_i = set([x.strip() for x in open(a.items[1:], encoding="utf-8").read().splitlines() if x.strip()]) if a.items.startswith("@") else set(a.items.split(","))
         miss = want_i - set(r[0] for r in rows)
@@ -122,6 +130,18 @@ def build(a):
                         "eo" if ("ESPERANTO side only" in t or "Russian/Armenian/Georgian PRESENCE ONLY" in t) else "both")
             pool[cls] += [(c, p, side) for p, x in pg.items() if p not in ex and p not in kh
                           and (scope is None or p in scope) and (allowed is None or p in allowed[c]) and len(x.split()) >= 80]
+            # the same pages, judged on their ESPERANTO side (docstring); only the bi-script items, whose Esperanto side the
+            # gate failed («Esperanto-only <G4> FAILS»): a wholly Russian item has no Esperanto side to admit
+            # Second draw (2026-10-13 20:3x, approved by the editor; the first drew mostly wholly Russian pages, 7 of 40 with a
+            # Latin name to test): only the BI-SCRIPT pages (the gate's Esperanto extract `page-NNNN.eo-gate.txt` exists),
+            # and the runs of 1914 or before (PRIMARY by the date rule) in a class of their own, ledger-eo-side-primary,
+            # so the item-weighted draw does not give Kovno Esperanto one page in 40.
+            if cls == "ledger-exceptions" and side == "ru" and re.search(r"Esperanto-only [\d.]+ FAILS", t):
+                y = re.search(r"(18\d\d|19\d\d)", c)
+                k = "ledger-eo-side-primary" if y and int(y.group(1)) <= 1914 else "ledger-eo-side"
+                pool[k] += [(c, p, "eo") for p, x in pg.items() if p not in ex and p not in kh
+                            and (scope is None or p in scope) and (allowed is None or p in allowed[c])
+                            and len(x.split()) >= 80 and os.path.exists(os.path.join(R, c, f"page-{p:04d}.eo-gate.txt"))]
             continue
         cls, side = (("ledger-admissible", "eo") if r[3] == "ABSENCE-ADMISSIBLE" else
                      ("ledger-ru", "ru") if "SPECIAL HANDLING" in t else ("ledger-both", "both") if "both sides pass" in t else
@@ -156,7 +176,7 @@ def build(a):
         open(os.path.join(d, nn + ".esperanto-text.txt"), "w", encoding="utf-8").write(pages(os.path.join(R, c + ".txt")).get(p, ""))
         ru = pages(os.path.join(RR, c + ".txt")).get(p)
         if ru: open(os.path.join(d, nn + ".russian-text.txt"), "w", encoding="utf-8").write(ru)
-        # SPECIAL HANDLING searches EVERY reading on disk (the editor's choice (a), 2026-10-02 22:5x): the scorer searches this file
+        # SPECIAL HANDLING searches EVERY reading on disk (the editor's choice of 2026-10-02 22:5x): the scorer searches this file
         # for ledger-special. Not named in the judges' brief, so a judge never reads it.
         if cls == "ledger-special":
             al = pages(os.path.join(RA, c + ".txt")).get(p)
@@ -231,8 +251,8 @@ def score(a):
     out = []
     for cls in sorted(res):
         n, b, det = res[cls]
-        # THE BAR (the editor's ruling, 2026-09-30 15:15: at most 1 in 40; D2 of 2026-10-03, ruled per class 2026-10-04 00:0x,
-        # the editor approving the recommendation on q4): <= 1 contradicted page at 40 or more pages, 0 below 40 (a small class or batch may not spend the 1)
+        # THE BAR (editor 2026-09-30 15:15: at most 1 in 40; D2 of 2026-10-03, ruled per class on 2026-10-04 00:0x, the editor
+        # accepting the recommendation on question 4): <= 1 contradicted page at 40 or more pages, 0 below 40 (a small class or batch may not spend the 1)
         verdict = ("PASS" if b <= (1 if n >= 40 else 0) else "FAIL") if cls in CLEARING else "measured"
         extra = ""
         if det:

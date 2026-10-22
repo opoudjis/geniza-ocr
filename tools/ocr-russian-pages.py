@@ -39,6 +39,7 @@ import concurrent.futures as fut
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import cyrillic_lexicon as CL   # Russian or Bulgarian list per item (2026-10-17)
 import ocr_text_languages as TL   # the language table (2026-10-03)
 os.environ.setdefault("OMP_THREAD_LIMIT", "1")
 from ocr_page_images import page_images
@@ -120,7 +121,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="list candidates only; read nothing")
     ap.add_argument("--all-pages", default=None,
                     help="=a,b,c: EVERY page (of 30+ words) of these items is read with the Russian model — the MIXED "
-                         "pages the candidate rule cannot see (the editor approved the suggested fix, 2026-09-28: Kovno "
+                         "pages the candidate rule cannot see (approved by the editor as suggested, 2026-09-28 01:06: Kovno "
                          "Esperanto, Ruslanda Esperantisto, …). The accept rule is unchanged, so a mixed page is "
                          "never swapped whole; its Russian reading feeds ocr-layout-mixed / ocr-garbage-filter.")
     a = ap.parse_args()
@@ -163,7 +164,9 @@ def main():
             if c:
                 cand[n] = {"hit_before": round(c[0], 3), "cyrillic_before": round(c[1], 3), "words_before": c[2]}
         if cand:
-            jobs.append((stem, pdfs[stem], a.root, cand, ru))
+            # BULGARIAN (2026-10-17, approved by the editor): an item listed with Bulgarian and no Russian is tested against the
+            # Bulgarian list through the old spelling (tools/cyrillic_lexicon.py); every other item as before
+            jobs.append((stem, pdfs[stem], a.root, cand, CL.for_item(stem, ru)))
     print(f"{sum(len(j[3]) for j in jobs)} candidate pages in {len(jobs)} corpora", flush=True)
     if a.dry_run:
         return

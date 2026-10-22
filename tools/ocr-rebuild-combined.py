@@ -9,8 +9,8 @@ beside it recording which recipe won where and why.
 
 WHY REPLACING THE COMBINED FILE IS SAFE HERE, AND WHERE IT WOULD NOT BE.
 The rule this project nearly broke itself on is that **a converted text which has been CITED is an
-artefact of record and is never replaced in place**. That rule is about the project's cited OCR tree (not
-published), where 22,257 fact-line locators point. It does not bind `ocr-rendersearch/`, which no finding
+artefact of record and is never replaced in place**. That rule is about `sources/ocr/`, where
+22,257 fact-line locators point. It does not bind `sources/ocr-rendersearch/`, which no finding
 cites, which has been handed to nobody, and whose combined file is a DERIVED artefact: every
 page survives on disk as `page-NNNN.txt` and `page-NNNN.psm4.txt`, so any previous combination is
 reconstructible exactly. **Nothing here is lost; only the assembly changes.**
@@ -47,7 +47,7 @@ def main():
         if m:
             win[(corpus, int(m.group(1)))] = x
 
-    # THE TEXT LAYER'S KIND, PER PAGE (options 1 and 2 approved by the editor, 2026-09-30; an internal record, 2026-09-30, not published).
+    # THE TEXT LAYER'S KIND, PER PAGE (approved by the editor 2026-09-30, items 1 and 2; an internal record, 2026-09-30, not published).
     # A page whose largest image covers < 50% of it carries BORN-DIGITAL text: its layer is the printed text (better or
     # as good as our OCR on 96% of sampled pages), so it joins the SEARCH text. On a SCAN (image ≥ 50%) the layer is a
     # library's OCR (ours better on 54%, theirs on 21%): it is NOT added to the search text, triangulation included.
@@ -113,18 +113,35 @@ def main():
             # as Latin letters, re-read with the Russian model and ACCEPTED page by page in
             # `RUSSIAN.json`) takes the Russian reading whole. Blind look 2026-09-26: of 30 accepted
             # pages, 27 better, 3 the same, 0 worse (an internal record, 2026-09-26, not published).
-            latin_src, latin_recipe = src, recipe      # kept for the PREFERRED text, where Latin has primacy (below)
+            latin_src, latin_recipe = src, recipe      # kept for the PREFERRED text: Latin given primacy (below)
             if n in russian:
                 # which Russian reading: `orus` (pre-reform model) or `rus`, by the OLD-LETTER RULE
-                # (the editor's ruling of 2026-09-28; tools/ocr_russian_reading.py)
+                # (the editor's old-letter rule of 2026-09-28; tools/ocr_russian_reading.py)
                 src = RR.russian_reading_path(pages[n])
                 recipe = "orus" if src.endswith(".orus.txt") else "rus"
-            # A RE-OCR (`page-NNNN.reocr.txt`, tools/ocr-reocr-best.py, on the editor's decision of 2026-09-27 to re-OCR the poor scans):
+            # A RE-OCR (`page-NNNN.reocr.txt`, tools/ocr-reocr-best.py, re-OCR approved by the editor 2026-09-27):
             # written ONLY where it scored better than the page as it stood; it outranks the OCR readings
             # and merges, but never an accepted Russian page, a ruled re-read or the editor's hand.
             reocr = pages[n][:-len(".txt")] + ".reocr.txt"
             if os.path.exists(reocr) and n not in russian:
                 src, recipe = reocr, "reocr"
+            # A COLUMN RE-READ (`page-NNNN.cols.txt`, tools/ocr-reocr-best.py columns, 2026-10-18, on the editor's decision to
+            # measure psm 3 first): psm 3, written only where it reads the columns apart and is no worse; outranks the re-OCR it replaces.
+            cols = pages[n][:-len(".txt")] + ".cols.txt"
+            if os.path.exists(cols) and n not in russian:
+                src, recipe = cols, "cols"
+            # THE LAYOUT CUT BY TESSERACT'S BLOCKS (`page-NNNN.blocks.txt`, tools/ocr-reocr-best.py blocks, 2026-10-18): where
+            # psm 3 was refused, its blocks read one by one; written only where no worse, so it stands where `.cols` does not
+            blocks = pages[n][:-len(".txt")] + ".blocks.txt"
+            if os.path.exists(blocks) and n not in russian:
+                src, recipe = blocks, "blocks"
+            # A FRAKTUR RE-READ (`page-NNNN.frk.txt`, tools/ocr-reocr-best.py fraktur, 2026-10-18, on the editor's ruling that
+            # pages left open must be resolved): a German page in Fraktur read with frk+deu; outranks the column re-read.
+            frk = pages[n][:-len(".txt")] + ".frk.txt"
+            if os.path.exists(frk) and n not in russian:
+                src, recipe = frk, "frk"
+            # (the Fraktur model writes the long s as «ſ»: the SEARCH text folds it to «s», so «Wirſching» is found as
+            # «Wirsching» — G5c, 1904 file 62 PDF 31; the `.frk.txt` keeps the letter as printed; folded below, after reading)
             # A VISION TRANSCRIPTION (`page-NNNN.vision.txt`, 2026-09-27, the editor's choice of options 1 and 3): a LOST page no OCR
             # variant recovered, transcribed from the image by an AI vision checker. Recipe «vision» — never
             # confused with the editor's hand. Outranks the OCR readings and accepted Russian; below ruled/hand.
@@ -143,17 +160,19 @@ def main():
             if os.path.exists(hand):
                 src, recipe = hand, "hand"
             text = open(src, encoding="utf-8", errors="ignore").read()
-            # THE PREFERRED READING (the editor ruled 2026-09-30 that, when OCRs are handed over for inclusion in PDFs,
-            # there must still be a preferred reading to inject into the PDF, and which reading is preferred must be
-            # recoverable from the files). The SEARCH text may hold two readings of the same print; the PREFERRED text holds one:
+            if recipe == "frk":
+                text = text.replace("ſ", "s")
+            # THE PREFERRED READING (the editor ruled on 2026-09-30 that when OCRs are handed over for inclusion in PDFs there
+            # must still be a preferred reading to inject into the PDF, and which reading is preferred must be recoverable
+            # from the files). The SEARCH text may hold two readings of the same print; the PREFERRED text holds one:
             # the chosen reading, plus the SUPPLEMENTS (hand-add, vision-add: lines the reading lost, not a second
             # reading). A boosted second reading replaces it as preferred only where it was CLEARLY better, marked on
             # disk by `page-NNNN.boost-preferred` (≥ 20 known long words and ≥ twice the base's); otherwise it serves
             # search only. Written per corpus: `ocr-preferred/<corpus>.txt` (a tree beside the search tree) and `<corpus>/PREFERRED.tsv`.
             pref_base, pref_recipe, supp = text, recipe, []
             pref_src = src
-            # OTHER SCRIPTS (the editor ruled 2026-09-30 that Latin script has primacy, these being Esperanto
-            # publications, and that a single file with both scripts is still the ideal): where an accepted Russian reading took the page in the SEARCH text, the
+            # OTHER SCRIPTS (the editor ruled on 2026-09-30 that Latin has primacy, these being Esperanto publications, while the
+            # ideal is still a single file with both scripts): where an accepted Russian reading took the page in the SEARCH text, the
             # PREFERRED text keeps the Latin reading, and PREFERRED.tsv names the Russian file as the second script.
             # A single text with both scripts in place is the ideal, not yet built.
             second_script = ""
@@ -168,7 +187,7 @@ def main():
                 text = text.rstrip("\n") + "\n" + open(add, encoding="utf-8", errors="ignore").read()
                 recipe += "+hand-add"
                 supp.append(("hand-add", add))
-            # A VISION ADDITION (`page-NNNN.vision-add.txt`, 2026-09-27, mastheads approved by the editor):
+            # A VISION ADDITION (`page-NNNN.vision-add.txt`, 2026-09-27, the editor approved proceeding with mastheads):
             # the lines an image sort judged MINOR-missing (masthead, title, caption, stamp), transcribed
             # from the image by an AI vision checker and APPENDED like a hand-add. Never over the editor's
             # hand: skipped where the page is hand-keyed or already has a hand-add.
@@ -177,6 +196,25 @@ def main():
                 text = text.rstrip("\n") + "\n" + open(vadd, encoding="utf-8", errors="ignore").read()
                 recipe += "+vision-add"
                 supp.append(("vision-add", vadd))
+            # THE C4 READING BESIDE A RE-READ THAT LOST WORDS (2026-10-18, cupel15 G5c; the editor ruled at 11:5x that both readings
+            # be kept on those pages): where the chosen reading is a re-read (`.cols`, `.reocr`) holding under 80% of the 2+-letter words of the
+            # conversion's own reading (`page-NNNN.txt`), that reading is APPENDED to the SEARCH text, as a boosted reading is
+            # (below): the re-read (column-aware) first, then the words it lost (1889 file 59 PDF 1: 617 against 1,302 words, two
+            # names lost; Le Volapük 1889.07 PDF 9: 512 against 658). The PREFERRED text keeps the re-read alone.
+            if recipe.split("+")[0] in ("cols", "reocr", "frk", "blocks"):
+                base_t = open(pages[n], encoding="utf-8", errors="ignore").read()
+                nb, nr = len(re.findall(r"[^\W\d_]{2,}", base_t)), len(re.findall(r"[^\W\d_]{2,}", text))
+                if nb >= 40 and nr < 0.8 * nb:
+                    text = text.rstrip("\n") + "\n" + base_t
+                    recipe += "+c4-add"
+            # SECOND READINGS (2026-10-18, on the editor's ruling to keep both readings; tools/ocr-reocr-best.py adds): a refused Fraktur re-read
+            # (`.frk-add.txt`, «ſ» folded) and a refused psm 3 re-read (`.cols-add.txt`) are APPENDED to the SEARCH text only.
+            for kind in ("frk", "cols"):
+                ap_ = pages[n][:-len(".txt")] + f".{kind}-add.txt"
+                if os.path.exists(ap_) and recipe.split("+")[0] not in ("hand", "ruled"):
+                    t_ = open(ap_, encoding="utf-8", errors="ignore").read()
+                    text = text.rstrip("\n") + "\n" + (t_.replace("ſ", "s") if kind == "frk" else t_)
+                    recipe += f"+{kind}-add"
             # A BOOSTED SECOND READING (`page-NNNN.boost-add.txt`, 2026-09-30, approved by the editor; tools/ocr-lost-reread.py,
             # docs/FAILURE-MAP.md row 4): the page read again from a contrast-boosted, sharpened image, filed
             # only where it held clearly more real words than the text a search reads. APPENDED, not substituted:
@@ -188,8 +226,8 @@ def main():
                 recipe += "+boost-add"
                 if os.path.exists(pages[n][:-len(".txt")] + ".boost-preferred"):
                     pref_base, pref_recipe = open(badd, encoding="utf-8", errors="ignore").read(), "boost"
-            # TRIANGULATION, on the PARTLY-READ pages only (those with a boosted addition; approved by the editor
-            # 2026-09-30, on condition that it be got right in isolation): the SEARCH text also carries EVERY OTHER stored reading of the page
+            # TRIANGULATION, on the PARTLY-READ pages only (those with a boosted addition; approved by the editor 2026-09-30,
+            # with the instruction to get this right in isolation): the SEARCH text also carries EVERY OTHER stored reading of the page
             # — psm6/psm4, the high-resolution re-reads, the PDF's own text layer, the layout reading, the merges, the
             # boosted reading where a vision transcription took the page — because a blind check found text missing
             # from the search text that sat only in `tl` or `layout` (docs/FAILURE-MAP.md row 4). Search only:
@@ -226,7 +264,7 @@ def main():
             # SMALL-CAPS RE-READ (`page-NNNN.sc3x.txt`, 3× Tesseract, 2026-09-30) join the SEARCH text of EVERY page that has
             # one — search only; the PREFERRED reading is unchanged. FIXED 2026-09-30 23:0x: the layout reading had joined
             # search only on the partly-read pages (triangulation, above), so on the 2,913 pages that have one, 16,232 real
-            # Esperanto words it holds were in no searched text (the editor directed that the gap be plugged).
+            # Esperanto words it holds were in no searched text (the editor ruled that the gap be closed).
             for kind in ("layout", "sc3x"):
                 xf = pages[n][:-len(".txt")] + f".{kind}.txt"
                 if os.path.exists(xf) and os.path.abspath(xf) != os.path.abspath(src):
@@ -238,7 +276,7 @@ def main():
             # final: britaesperantisto 1911 n080 p.7 — the ANNO text layer held 3 of the 6 names the judge saw, our own
             # psm6 reading all 6, and only the layer was searched). 3,612 pages in 801 absence-class items prefer the layer;
             # on 2,435 our reading holds >30% word forms the layer lacks. Search only — the layer stays the preferred,
-            # citation text. The same gap as the layout readings above (the editor directed on 2026-09-30 that it be plugged).
+            # citation text. The same gap as the layout readings above (the editor ruled on 2026-09-30 that the gap be closed).
             if os.path.basename(src).endswith(".tl.txt"):
                 for xf in (pages[n], pages[n][:-len(".txt")] + ".psm4.txt"):
                     if os.path.exists(xf) and os.path.abspath(xf) != os.path.abspath(src):
@@ -246,7 +284,7 @@ def main():
                         if t_.strip() and t_ not in text:
                             text = text.rstrip("\n") + "\n" + t_
                             recipe += "+own-ocr-search"
-            # ON A BORN-DIGITAL PAGE THE (EMENDED) LAYER IS THE PREFERRED READING (the editor ruled 2026-09-30 that the
+            # ON A BORN-DIGITAL PAGE THE (EMENDED) LAYER IS THE PREFERRED READING (the editor ruled on 2026-09-30 that the
             # born-digital layer, once emended, is clearly more authoritative; sample: better than our OCR on 38% of pages, worse on 4%).
             # Not over the editor's hand, a ruled re-read or a vision transcription; a blank marker (below) still wins.
             # It carries every script as printed, so no second script is named.
@@ -265,8 +303,8 @@ def main():
             for kind, f in supp:
                 pref = pref.rstrip("\n") + "\n" + open(f, encoding="utf-8", errors="ignore").read()
                 pref_recipe += "+" + kind; pref_files.append(os.path.basename(f))
-            # A PAGE JUDGED BLANK (`page-NNNN.blank`; the editor ruled 2026-09-30 that a page decided as blank is to be
-            # blank, rather than garbage characters being asserted as its content): the PREFERRED reading is empty, so no
+            # A PAGE JUDGED BLANK (`page-NNNN.blank`; the editor ruled on 2026-09-30 that a page decided as blank must not
+            # assert garbage characters as content, so it is blank): the PREFERRED reading is empty, so no
             # show-through or OCR noise is handed over as the page's text. The SEARCH text keeps every reading.
             if os.path.exists(pages[n][:-len(".txt")] + ".blank"):
                 pref, pref_recipe, pref_files = "", "blank", [os.path.basename(pages[n][:-len(".txt")] + ".blank")]

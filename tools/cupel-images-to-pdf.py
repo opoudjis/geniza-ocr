@@ -3,8 +3,8 @@ r"""cupel-images-to-pdf — cupel step C1: a placed scan's TIFFs → single page
 
     tools/cupel-images-to-pdf.py --stem <item> --out <new folder> [--look-all | --look N] <tiff> [<tiff> …]
 
-WHY (the editor's decision D1, 2026-10-03 00:1x: option (b), which had been working fine; option (a) had been used only for
-Kapis, as his requirement; see RUNBOOK.md). The scans are two-page spreads; the converter reads one PDF page per printed
+WHY (the editor's decision D1, 2026-10-03 00:1x: option (b), since (a) had been done only to meet Kapis's requirement and
+(b) has been working fine; RUNBOOK.md). The scans are two-page spreads; the converter reads one PDF page per printed
 page, so page references and the missing-leaf check match the book.
 
 WHAT. The TIFFs are read in the order given, every frame in order (a multi-page TIFF is a batch of spreads). A frame wider
@@ -16,7 +16,8 @@ within 200 px of the item's median confident guess (a blank page would otherwise
   pages/page-NNNN.png      every page image, KEPT (the standing rule: never discard page images)
   SPLIT.tsv                frame · source · page(s) · fold x · width · the fold's ink share (print at the cut; ≥ 0.01 = no print-free column found)
   look/NN.png              with --look N: N spreads, the doubtful first, each with a red line at the cut (with --overlap:
-                           two lines, the two pages' inner edges) — for a blind judge (checked BEFORE any OCR)
+                           two lines, the two pages' inner edges, BLUE = where the left page ends, ORANGE = where the right
+                           page starts, each labelled; 2026-10-07, failure map R12) — for a blind judge (checked BEFORE any OCR)
 """
 import os, sys, argparse, subprocess
 import numpy as np
@@ -102,8 +103,8 @@ def main():
     # the img2pdf COMMAND (Homebrew), lossless: PNG pages go in as they are, at the dpi stored in each PNG
     r = subprocess.run(["img2pdf", *pages, "-o", os.path.join(a.out, a.stem + ".pdf")], capture_output=True, text=True)
     if r.returncode: sys.exit("img2pdf failed: " + r.stderr[-400:])
-    # --look-all (the editor ruled on 2026-10-04 01:3x against a blind look at cuts: too risky for content, unlike names; every
-    # page must be looked at — not a blind sample of 40): EVERY spread goes to the look; the order is still shuffled
+    # --look-all (the editor ruled on 2026-10-04 01:3x that a blind look at a sample of the cuts is too risky for content,
+    # unlike names, and that every page must be looked at — not a blind sample of 40): EVERY spread goes to the look; the order is still shuffled
     if a.look_all:
         a.look = len(spreads)
     if a.look and spreads:
@@ -117,10 +118,31 @@ def main():
         pick = (doubt + rest)[:n]; random.Random(7).shuffle(pick)
         for j, idx in enumerate(pick, 1):
             k_, g, x = spreads[idx]; c = g.convert("RGB"); d = ImageDraw.Draw(c)
-            for xx in ([x] if not a.overlap else [x - a.overlap, x + a.overlap]):   # with --overlap: the two page edges
-                d.line([(xx, 0), (xx, c.size[1])], fill=(255, 0, 0), width=6)
+            if not a.overlap:
+                d.line([(x, 0), (x, c.size[1])], fill=(255, 0, 0), width=6)
+            else:
+                # with --overlap: the two page edges, each in its OWN colour and named for the page it bounds (failure map
+                # R12, 2026-10-06: two red lines named LEFT and RIGHT were swapped by two of four checkers, since each
+                # bounds the OPPOSITE page). BLUE at x + overlap = where the LEFT page ends (it keeps everything left of
+                # it); ORANGE at x − overlap = where the RIGHT page starts (it keeps everything right of it).
+                d.line([(x + a.overlap, 0), (x + a.overlap, c.size[1])], fill=(0, 90, 255), width=6)
+                d.line([(x - a.overlap, 0), (x - a.overlap, c.size[1])], fill=(255, 140, 0), width=6)
             w = 3 if n > 99 else 2   # 100+ spreads: three-digit names
-            c.thumbnail((2400, 2400)); c.save(os.path.join(a.out, "look", f"{j:0{w}d}.png"))
+            c.thumbnail((2400, 2400))
+            if a.overlap:
+                # the labels, drawn after the scaling so they stay readable: a white band at the head, a tag on each line
+                from PIL import ImageFont
+                s = c.size[0] / g.size[0]; d = ImageDraw.Draw(c); f = ImageFont.load_default(size=26)
+                xb, xo = int((x + a.overlap) * s), int((x - a.overlap) * s)
+                d.rectangle([(0, 0), (c.size[0], 76)], fill=(255, 255, 255))
+                d.text((10, 6), "BLUE line = where the LEFT page ends: the left page keeps everything to its left.", fill=(0, 90, 255), font=f)
+                d.text((10, 40), "ORANGE line = where the RIGHT page starts: the right page keeps everything to its right.", fill=(200, 100, 0), font=f)
+                # each tag sits OUTSIDE its line, its arrows pointing across the line to the side that page keeps
+                for xx, lab, col, dx in ((xb, "<< LEFT page ends", (0, 90, 255), 8), (xo, "RIGHT page starts >>", (200, 100, 0), -8)):
+                    tw = d.textlength(lab, font=f); x0 = xx + dx if dx > 0 else xx + dx - tw
+                    for yy in (90, c.size[1] - 40):
+                        d.rectangle([(x0 - 4, yy - 2), (x0 + tw + 4, yy + 30)], fill=(255, 255, 255)); d.text((x0, yy), lab, fill=col, font=f)
+            c.save(os.path.join(a.out, "look", f"{j:0{w}d}.png"))
             open(os.path.join(a.out, "look", "KEY.tsv"), "a").write(f"{j:0{w}d}\tframe {k_}\tgutter {x}\n")
     print(f"{k} frames · {len(spreads)} spreads split · {len(pages)} pages → {a.out}/{a.stem}.pdf")
 

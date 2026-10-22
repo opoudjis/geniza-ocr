@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """ocr_index — an index of a text's word forms, so that a name (or a whole roster) is matched against each distinct
-form ONCE, and its hits looked up, instead of the text being scanned once per name (at the editor's request of
-2026-10-06 that a whole roster be searched against one journal run, the project's usual search, which makes such an
-index essential).
+form ONCE, and its hits looked up, instead of the text being scanned once per name (on the editor's decision of
+2026-10-06 that the dowse must be able to run on just one item at a time (one journal run), with all the roster's
+names against one item, which makes the lexicon more critical).
 
     (import) idx = build(text)            # text marked «=== page N ===»
              hits = match(name, idx)      # [(page, how, as read)]
@@ -39,20 +39,31 @@ class Index:
     def bucket(self):
         for kind, d in (("w", self.words), ("p", self.parts), ("j", self.pairs)):
             for f in d:
-                self.buckets.setdefault((kind, bool(_CYR.search(f)), len(f)), []).append(f)
+                cy = NS.is_cyr(f)
+                self.buckets.setdefault((kind, cy, len(f)), []).append(f)
+                if cy:   # also by the length of its transliteration, whole and stemmed (_lengths, the other alphabet)
+                    for n in {len(NS.translit(f)), len(NS.translit(NS.stem(f)))}:
+                        self.buckets.setdefault((kind, "tl", n), []).append(f)
         return self
 
 
-def build(text):
+def build(text, words_only=False):
+    """words_only (2026-10-17, the readers' roster at scale; approved by the editor, as both speed fixes were likely to
+    be needed anyway): the single words only, no parts, pairs or column splits. Those give only the «join» tier, which the
+    readers' roster does not take (tools/dowse-reader-roster.py: exact, near, confusion), and the word pairs are most of
+    the forms to compare. The strong tiers are the same or more: a name's second form is then tried on pages its first
+    form hit only by a join. Not a presence record: its silences say nothing."""
     idx = Index(); occ = 0
     for p, ptxt in pages(text):
         raw = NS.normalise(ptxt).split()
         toks = [NS.fold(t) for t in raw]
-        parts = [[NS.fold(x) for x in re.split(r"[-‐¬/'’]", r) if NS.fold(x)] for r in raw]
+        parts = [] if words_only else [[NS.fold(x) for x in NS.PARTS.split(r) if NS.fold(x)] for r in raw]   # the name search's own rule
         for i, t in enumerate(toks):
             occ += 1
             if t:
                 idx.words[t].append((p, raw[i]))
+            if words_only:
+                continue
             if len(parts[i]) > 1:
                 for k, x in enumerate(parts[i]):
                     idx.parts[x].append((p, occ, k, t, raw[i]))
@@ -64,20 +75,35 @@ def build(text):
 
 
 def _lengths(targets):
-    """(cyrillic?, length) pairs a form may have and still match one of the targets, by any rule of close()."""
+    """The buckets a form may be in and still match one of the targets, by any rule of close(): (cyrillic?, length),
+    and ("tl", length) for a Cyrillic form by the length of its transliteration.
+
+    THE OTHER ALPHABET BY LENGTH (2026-10-17; judged worth testing and approved by the editor): close() matches a Cyrillic word and a Latin
+    one only by (a) the plain distance, within the allowance c, or (b) the distance of the Cyrillic one transliterated,
+    whole or stemmed, within c + 1; the distance is never below the difference in length. So only forms within those
+    lengths can match, and the rest are not compared: before, every form of the other alphabet up to 4 × the name's
+    length was (Ruslanda Esperantisto, a Latin name against nearly every Russian word of the issue)."""
     out = set()
     for tg, _, c in targets:
-        L, cyr = len(tg), bool(_CYR.search(tg))
+        L, cyr = len(tg), NS.is_cyr(tg)
         for n in range(max(1, L - c - 3), L + c + 5):       # same alphabet: allowance, Russian endings, a glued word
             out.add((cyr, n))
-        for n in range(1, 4 * L + c + 3):                  # the other alphabet, compared through transliteration
+        for n in range(max(1, L - c), L + c + 1):          # the other alphabet, (a) the plain distance
             out.add((not cyr, n))
+        if cyr:                                            # (b) Latin forms near the name transliterated
+            for x in {NS.translit(tg), NS.translit(NS.stem(tg))}:
+                for n in range(max(1, len(x) - c - 1), len(x) + c + 2):
+                    out.add((False, n))
+        else:                                              # (b) Cyrillic forms whose transliteration is near the name
+            for n in range(max(0, L - c - 1), L + c + 2):
+                out.add(("tl", n))
     return out
 
 
 def _cands(idx, kind, lens):
-    for cyr, n in lens:
-        yield from idx.buckets.get((kind, cyr, n), ())
+    """each form once (a Cyrillic form is in two kinds of bucket), the same-alphabet buckets first."""
+    keys = sorted(lens, key=lambda k: (k[0] == "tl", str(k[0]), k[1]))
+    return dict.fromkeys(f for k in keys for f in idx.buckets.get((kind,) + k, ()))
 
 
 def match(name, idx):

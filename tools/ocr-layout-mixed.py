@@ -3,7 +3,7 @@ r"""ocr-layout-mixed — MIXED Russian + Esperanto pages read COLUMN BY COLUMN: 
 
     tools/ocr-layout-mixed.py <root> --pdfs <list> [--jobs 12]
 
-WHY (2026-09-27, the editor chose option γ, then approved it). Choosing Russian or Esperanto line by line
+WHY (2026-09-27: option γ, chosen and then approved by the editor). Choosing Russian or Esperanto line by line
 (`ocr-mixed-lines.py`) cannot work where Russian and Esperanto are printed SIDE BY SIDE: the OCR
 reads straight across the page, so every line is half Russian, half Esperanto, and one half is lost
 whichever is chosen. Four blind looks (an internal record, 2026-09-27, not published) showed this as the main loss.
@@ -45,6 +45,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 os.environ.setdefault("OMP_THREAD_LIMIT", "1")
 from ocr_page_images import page_images
+import cyrillic_lexicon as CL   # Russian or Bulgarian list per item (2026-10-17)
 import ocr_russian_reading as RR   # the old-letter rule: `orus` or `rus` per page
 _sa = importlib.util.spec_from_file_location("acc", os.path.join(HERE, "ocr-accept.py"))
 ACC = importlib.util.module_from_spec(_sa); _sa.loader.exec_module(ACC)   # ru_only_score(): the validated Russian-only score
@@ -98,6 +99,16 @@ def gutter(a, box, pagew, pageh):
     return l + best[0] + best[1] // 2 if both.size and both.mean() >= 0.6 else None
 
 
+# PAGES RULED IN past the page gate (2026-10-17, cupel14 G5b: Kosmoglott 1922 PDF 39, a French note over parallel
+# columns, Russian beside a variant of Esperanto; the French read with the Russian model as Cyrillic rubbish put the
+# page's share at 0.078, so its Russian column reached no Russian search). (item, PDF page) → the ruling. A ruled page
+# already skipped by the gate is done again on the next run.
+RULED_IN = {
+    ("ANNO_e0g_19220005", 39): "decided by the editor, 2026-10-17 (G5b page 026 LOST, Russian MUCH: let the page "
+                               "past the gate so its Russian column is read as PDF 48's was)",
+}
+
+
 def do_page(job):
     """One page; an error is recorded in its .layout.json and never stops the run."""
     try:
@@ -112,19 +123,22 @@ def do_page(job):
 def _do_page(job):
     d, pdf, n = job
     lat, ru = ml.lists()
+    ru = CL.for_item(os.path.basename(d), ru)   # Bulgarian items: the Bulgarian list (tools/cyrillic_lexicon.py, 2026-10-17)
     done = os.path.join(d, f"page-{n:04d}.layout.json")
     rus = open(os.path.join(d, f"page-{n:04d}.rus.txt"), encoding="utf-8", errors="ignore").read()
     g = share(rus, None, lambda ws: ml.ru_score(" ".join(ws), ru)) or 0
     rec = {"page": n, "gate": round(g, 3)}
     txt = os.path.join(d, f"page-{n:04d}.layout.txt")
     if g < 0.14:
-        # RESCUE (2026-09-28, the editor required the gate to be verified: every rejected page read, then checked):
+        # RESCUE (2026-09-28, at the editor's request that every rejected page be read, then checked):
         # of 8,068 pages the gate rejected, 5 carried real Russian by the validated Russian-only score (≥ 40), all
         # just under the gate (0.126–0.139). A page under the gate whose chosen Russian reading scores ≥ 40 is let in.
         rt = RR.russian_reading(os.path.join(d, f"page-{n:04d}.txt")) or ""
         s = ACC.ru_only_score(rt) if rt else None
         if s is not None and s >= 40:
             rec["gate_rescue"] = round(s, 1); g = 0.14
+    if g < 0.14 and (os.path.basename(d), n) in RULED_IN:
+        rec["gate_ruled"] = RULED_IN[(os.path.basename(d), n)]; g = 0.14
     if g < 0.14:
         rec["skipped"] = "page gate"
     else:
@@ -210,6 +224,8 @@ def main():
             if not os.path.exists(os.path.join(d, f"page-{n:04d}.txt")):
                 continue
             if not os.path.exists(lj):
+                jobs.append((d, pdfs[stem], n))
+            elif (stem, n) in RULED_IN and json.load(open(lj, encoding="utf-8")).get("skipped") == "page gate":
                 jobs.append((d, pdfs[stem], n))
             elif a.redo_orus and (RR.russian_reading_path(os.path.join(d, f"page-{n:04d}.txt")) or "").endswith(".orus.txt"):
                 rec = json.load(open(lj, encoding="utf-8"))

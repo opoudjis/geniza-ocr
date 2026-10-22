@@ -49,7 +49,9 @@ import os, re, sys, glob, json, argparse, subprocess, statistics, collections
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import ocr_text_languages as TL   # the language table: which non-Latin languages a text prints (2026-10-03)
+import ocr_text_languages as TL
+import old_orthography as OO   # Portuguese before the spelling reforms (2026-10-21)
+import cyrillic_lexicon as CL   # Russian or Bulgarian list per item (2026-10-17)   # the language table: which non-Latin languages a text prints (2026-10-03)
 LEXDIR = os.path.join(HERE, "lexicons")
 WORD = re.compile(r"[^\W\d_]{3,}", re.UNICODE)
 WORD4 = re.compile(r"[^\W\d_]{4,}", re.UNICODE)
@@ -58,6 +60,13 @@ _LEX = {}
 
 
 def lex(name):
+    if name in ("volapuk", "volapuk-reformed") and name not in _LEX:
+        # VOLAPÜK: the list and its compound analyser (tools/volapuk_analyser.py; approved by the editor, 2026-10-17):
+        # the journals compound and derive beyond any list (an internal record, 2026-10-17, not published);
+        # «volapuk-reformed», de Jong's (2026-10-18, approved by the editor: tools/build-volapuk-reformed-lexicon.py)
+        sys.path.insert(0, HERE)
+        import volapuk_analyser
+        _LEX[name] = volapuk_analyser.words_for(name)
     if name not in _LEX:
         p = os.path.join(LEXDIR, name + ".txt")
         _LEX[name] = ({w.strip().lower() for w in open(p, encoding="utf-8") if w.strip()}
@@ -69,7 +78,7 @@ def lex(name):
 # sheet (Autor · Ort · Jahr · Zitierlink · Nutzungsbedingungen · Hinweis) and Google with an English
 # boilerplate page. They were being scored as the corpus's own text: on *Progreso* vol. 1 the ÖNB
 # sheet is page 1, mostly German, with an Ido title whose «la / por / Linguo» read as Esperanto
-# (the editor proposed on 2026-09-25 that page 1 be excluded from language detection). Recognised by
+# (the editor, 2026-09-25, asked that such a page 1 be excluded from language detection). Recognised by
 # CONTENT, never by page number — 113 corpora carry the ÖNB sheet, 2 the Google one.
 COVER = [re.compile(r"Nationalbibliothek[\s\S]*(Zitierlink|Nutzungsbedingungen)"),
          re.compile(r"digital copy of a book that was preserved|books\.google\.com")]
@@ -79,20 +88,29 @@ _RU = {}
 RU_FOLD = str.maketrans({"ѣ": "е", "і": "и", "ѳ": "ф", "ѵ": "и"})
 RU_END = (("аго", "ого"), ("яго", "его"), ("ыя", "ые"), ("ия", "ие"))
 RU_WORD = re.compile(r"[а-яёѣіѳѵ]{3,}")
+BG_WORD = re.compile(r"[а-яёѣіѳѵѫѭѝєїґ]{3,}")   # Bulgarian, the old spelling with ѫ ѭ (2026-10-17); Ukrainian є ї ґ (2026-10-18)
 
 
-def ru_only_score(text):
+def ru_only_score(text, L=None):
     """Share of Cyrillic words (3+ letters) recognised after folding to modern spelling (ѣ→е, і→и, ѳ→ф, ѵ→и,
     final ъ dropped; -аго/-яго/-ыя/-ия also tried as -ого/-его/-ые/-ие), against the stems list + the corpus
     forms list. None under 30 Cyrillic words. Definition and bar: an internal record, 2026-09-28, not published."""
-    if "L" not in _RU:
+    # L (2026-10-17): another Cyrillic list in place of the Russian one, e.g. tools/cyrillic_lexicon.py's Bulgarian
+    if L is not None:
+        pass
+    elif "L" not in _RU:
         L = set()
         for n in ("russian_post1918", "russian_forms_corpus"):
             p = os.path.join(LEXDIR, n + ".txt")
             if os.path.exists(p):
                 L |= {w.strip().lower() for w in open(p, encoding="utf-8", errors="ignore") if w.strip()}
         _RU["L"] = L
-    L = _RU["L"]
+    if L is None:
+        L = _RU["L"]
+    if L is not _RU.get("L"):
+        # another list (Bulgarian, Ukrainian): its own word pattern (ѫ ѭ, є ї ґ too) and its own folding, so ѣ can be tried as е and as я
+        ws = BG_WORD.findall(text.lower())
+        return (100.0 * sum(w in L for w in ws) / len(ws)) if len(ws) >= 30 else None
     ws = RU_WORD.findall(text.lower())
     if len(ws) < 30:
         return None
@@ -142,7 +160,7 @@ def pages_of(corpus_dir, segregated=False):
         # SCORE THE PREFERRED READING, NOT A DOUBLE ONE (approved by the editor, 2026-09-30). Since 2026-09-30 the search
         # text can hold a second, boosted reading of the same page appended after the first; an appended reading can
         # only add chances to find a name, so it must not lower an item's standing (it did: two items fell to PRESENCE
-        # ONLY on junk from moderate boosted readings, ledger 30b). Where `ocr-preferred/<corpus>.txt` exists (written
+        # ONLY on junk from moderate boosted readings). Where `ocr-preferred/<corpus>.txt` exists (written
         # by tools/ocr-rebuild-combined.py), each page is scored on its PREFERRED reading — EXCEPT on pages with an
         # accepted Russian reading (PREFERRED.tsv `second_script` set), which are scored as before, on the search text,
         # so the Russian scoring is unchanged. Searches still run over the full search text.
@@ -183,7 +201,7 @@ def _segregate(corpus_dir, out):
     CAVEATS (editor, 2026-09-27): the clean file drops some real Latin-script words (ALL-CAPS names,
     initials, line-initial words), so this can slightly FLATTER a G4; and an ABSENCE search must still
     run over the FULL Esperanto text, never over the clean file."""
-    # THE LANGUAGE TABLE FILTERS (2026-10-03: the editor ruled that the table should have acted as a filter): a text the table lists with NO
+    # THE LANGUAGE TABLE FILTERS (2026-10-03, on the editor's ruling that the table should have acted as a filter): a text the table lists with NO
     # non-Latin language is never bi-script, whatever clean files the 28 Sep Cyrillic chain left on disk (*Progreso* 2a
     # yaro, *Mondo* 1924–25, *kongresa libro* 14 … were scored on a stripped side). Not in the table: as before.
     if TL.nonlatin(os.path.basename(os.path.normpath(corpus_dir))) == set():
@@ -213,11 +231,17 @@ def shape_score(text):
     return sum(sig) / 5
 
 
-# Rosters DECLARED lists (the editor ruled on 2026-09-28 01:06 that *Nomaro de la kongresanoj* 1905 be treated
-# as a list) — the shape test reads them as prose, but every unknown word is a name.
+# Rosters DECLARED lists (the editor ruled on 2026-09-28 01:06, on *Nomaro de la kongresanoj* 1905, that it be
+# treated as a list) — the shape test reads them as prose, but every unknown word is a name.
 LIST_DECLARED = {"Nomaro de la kongresanoj 1905"}
 
 FRENCH_TITLES = ("lesperantiste.",)   # corpus-name prefixes of titles known to be French-language
+# corpus-name prefixes of titles whose second language is Portuguese (2026-10-14, cupel11: Brazila Esperantisto, ANNO
+# `e3g` and the BitArkivo July 1907); see «PORTUGUESE BY DECLARATION» below. ANNO `e5e`, *Portugala Revuo* 1909–14
+# (2026-10-21, cupel17, on the editor's decision that the gate honour the declared Portuguese): the gate had read its Portuguese as
+# Spanish (11 items) and Catalan (1), so C7b.1's `por` pass found nothing to read. A prefix here, not every item the
+# language table declares Portuguese: *La Revuo* 1910.0 declares it among five and would be held for a pass it never needed.
+PORTUGUESE_TITLES = ("anno_e3g_", "brazilaesperantisto_", "anno_e5e_")
 
 
 def _declared(corpus):
@@ -254,13 +278,18 @@ def main():
     # second-model pass — exact 70.1/76.6/64.5, wv 72.5/81.4/67.1, wv-strip 73.1/81.7/67.4 (1908.1/.2/.6): stripping
     # the diacritics adds ≤ 0.6 once the Estonian model has restored them, so the stricter test is kept.
     ap.add_argument("--estonian-fold", choices=("none", "wv", "wv-strip"), default="wv",
-                    help="how an Estonian word is matched (on the editor's ruling of 2026-09-28: W > V, and G4 run with the diacritics and "
-                         "without): none = exact; wv = old «w» spelling also tried as «v», diacritics exact; "
+                    help="how an Estonian word is matched (the editor, 2026-09-28, asked for W read as V and for G4 "
+                         "runs with and without the diacritics): none = exact; wv = old «w» spelling also tried as «v», diacritics exact; "
                          "wv-strip = w→v AND ä õ ö ü š ž stripped on both sides")
     ap.add_argument("--no-auxlang-credit", action="store_true", help="switch OFF the page-local credit for the other planned languages (adopted 2026-09-26) — only to reproduce gates before p")
+    ap.add_argument("--no-portuguese-fold", action="store_true",
+                    help="match Portuguese words as printed only — only to reproduce gates before 2026-10-21 "
+                         "(the old spellings, tools/old_orthography.py)")
     a = ap.parse_args()
     if a.estonian_fold != "none" and lex("estonian"):
         _LEX["estonian"] = FoldedEstonian(lex("estonian"), a.estonian_fold)
+    if not a.no_portuguese_fold and lex("portuguese"):
+        _LEX["portuguese"] = OO.FoldedPortuguese(lex("portuguese"))
     global NOT_CORPUS
     NOT_CORPUS = set()
     if a.not_corpus and os.path.exists(a.not_corpus):
@@ -280,7 +309,7 @@ def main():
     others = [n for n in ("french", "catalan", "german", "dutch", "spanish", "italian",
                           "danish", "swedish", "czech", "polish",
                           "estonian", "latvian", "lithuanian", "english") if lex(n)]   # back 2026-09-27 20:00, approved by the editor
-    # ENGLISH added 2026-10-02 (approved by the editor, 11:2x; docs/FAILURE-MAP.md row 5d): it was never tested, so the English of 253
+    # ENGLISH added 2026-10-02 (approved by the editor; docs/FAILURE-MAP.md row 5d): it was never tested, so the English of 253
     # items (The British Esperantist, Amerika Esperantisto …) was only ever read by the Esperanto model. Not in BASELINE.
     # FIXED BASELINE for the relative test below: the median is taken over THESE ten, whatever else is
     # listed — so a near-zero list can no longer drag the bar down (gate t, 2026-09-27: 3 → 139 G2 pending).
@@ -317,7 +346,7 @@ def main():
             sample = [m.group(0).lower() for t in list(pg.values())[:60] for m in WORD.finditer(t)]
             pname = max(PLANNED, key=lambda n: sum(1 for x in sample if x in lex(n))) \
                 if sample else "esperanto"
-            # A DECLARED MAIN LANGUAGE WINS (approved by the editor, 2026-09-28 01:06). Until now a
+            # A DECLARED MAIN LANGUAGE WINS (the editor, 2026-09-28 01:06, approved the suggested fix). Until now a
             # declaration only triggered the Ido → French rule; detection chooses among the planned
             # languages alone, so the Ritz speech, declared English on 2026-09-27, was still scored as
             # Esperanto. Measured 2026-09-28: Ritz 63.9 → 77.3, Jakštas-Dambrauskas 59.6 → 78.0, Carlevaro
@@ -329,14 +358,14 @@ def main():
 
         # G3 — list-shaped pages
         # the SHAPE test reads the FULL text: segregation strips a bi-script page's Russian and can make a list page
-        # look like prose (La Ondo de Esperanto 1909.04 lost its list bar that way, 2026-09-28; approved by the editor)
+        # look like prose (La Ondo de Esperanto 1909.04 lost its list bar that way, 2026-09-28; the editor ruled that both be fixed)
         listy = [p for p, t in (pages_of(d) if a.script_segregated else pg).items() if shape_score(t) >= a.shape_cut]
         if name in LIST_DECLARED:   # a roster the shape test reads as prose: every page is a list page
             listy = list(pg)
         g3_ok = (not listy) or a.psm_used == "4"
 
         # G2 — WHICH second languages are present? ALL of them, not the top one.
-        # The editor asked on 2026-09-25 whether La Belga Sonorilo was trilingual — and it is.
+        # The editor, 2026-09-25, asked of La Belga Sonorilo whether it was not trilingual — and it is.
         #   french 5.26% (exclusive 2.77%) · dutch 5.25% (exclusive 3.05%), both >5× the floor.
         #   A Belgian journal of 1902 carrying both national languages, which is obvious once
         #   said. Every arbitration we ran on it was `epo,fra`; the Dutch was never addressed.
@@ -396,25 +425,43 @@ def main():
         elif name.lower().startswith(FRENCH_TITLES) and not any(n == "french" for n, _ in seconds):
             seconds = [("french", 0.0)] + seconds
             rule = "French title → french by declaration"
+        # PORTUGUESE BY DECLARATION (the editor ruled on 2026-10-14 03:5x that it be by declaration, cupel11). Portuguese is not in
+        # `others`: the corpus-wide search would re-test every item. Without it, Brazila Esperantisto's Portuguese
+        # read as SPANISH, the nearest list (10 issues G2-pending for a Spanish pass, no Portuguese credit at G4).
+        # For these titles Portuguese replaces Spanish and its neighbour Catalan; its density is measured as above.
+        if name.lower().startswith(PORTUGUESE_TITLES) and lex("portuguese"):
+            Lpt = lex("portuguese")
+            dpt = 100 * sum(1 for x in toks if x in Lpt and x not in prim) / len(toks) if toks else 0.0
+            seconds = [(n, v) for n, v in seconds if n not in ("spanish", "catalan", "portuguese")]
+            seconds = [("portuguese", dpt)] + seconds
+            rule = rule or "Portuguese title → portuguese by declaration"
         # G4 — median per-page lexical hit-rate (pages of ≥ 60 tokens), computed AFTER G2 because
         # it needs the corpus's second languages.
-        # BILINGUAL CREDIT, PAGE-LOCAL (adopted by the editor on 2026-09-26, who judged it sensible to constrain it
-        # to where it gives purchase). A word counts if it is valid in the primary language OR
+        # BILINGUAL CREDIT, PAGE-LOCAL (adopted by the editor, 2026-09-26, who judged it sensible to constrain
+        # it to where it will give purchase). A word counts if it is valid in the primary language OR
         # in a second language of this corpus that is PRESENT ON THIS PAGE — at least 10 word types
         # valid in it and not in the primary. Why: counting only primary words made correct French
         # count AGAINST bilingual journals once French arbitration restored it (43 corpora fell,
         # 34 of them *L'Espérantiste*). Why page-local and ≥ 10: counting a second language on every
         # page lifted the Ido-by-rule corpora +4.3 points on French NAMES; ≥ 10 cut that to +1.5.
         # Blind look, 60 pages: pages this lets through were GOOD/USABLE 92% — like passing
-        # corpora (89%), unlike failing ones (80%) (an internal record, 2026-09-26, not published).
+        # corpora (89%), unlike failing ones (80%). (An internal record, 2026-09-26, not published.)
         sec_lex = [(n, lex(n)) for n, _ in seconds if lex(n)]
         # AUXLANG CREDIT (adopted 2026-09-26, approved by the editor): *Posta Mundi* and *Mondo* print Esperanto,
         # Ido and Occidental side by side, so scoring against ONE of them failed them by design. The
         # other two planned languages earn page-local credit under the SAME rule as French. Blind
         # look, 60 pages: corpora it lets through GOOD+USABLE 95%, like passing ones (100%), unlike
-        # failing ones (55%) (an internal record, 2026-09-26, not published). Median G4 elsewhere: +0.
+        # failing ones (55%) — (an internal record, 2026-09-26, not published). Median G4 elsewhere: +0.
         if not a.no_auxlang_credit:
             sec_lex += [(n, lex(n)) for n in PLANNED if n != pname]
+        # DECLARED SECOND LANGUAGES (2026-10-17, approved by the editor): a Latin-script language the language table
+        # licenses for the item (a declaration the editor confirmed against its pages) earns the same page-local credit
+        # as a detected one. Found on Volapükabled: the gate detects a second language by its words NOT in the main list,
+        # and the Volapük analyser takes some German words, so the German columns went uncredited (G4 62–68 against 0.80
+        # with German, an internal record, 2026-10-17, not published). Cited languages license nothing.
+        for n in sorted(TL.languages(name) or ()):
+            if n != pname and n not in TL.NONLATIN and lex(n) and n not in {m for m, _ in sec_lex}:
+                sec_lex.append((n, lex(n)))
         hits = []
         cyr_pages = 0
         for p, t in pg.items():
@@ -445,6 +492,12 @@ def main():
         # accepted Russian page); pages under 30 Cyrillic words not scored; item = median. G4 above, on the
         # segregated text, is the ESPERANTO-ONLY score. Reported only; the ledger applies the rule.
         rus = []
+        # BULGARIAN (2026-10-17, approved by the editor): an item listed with Bulgarian and no Russian is scored against the
+        # Bulgarian list through the old spelling (tools/cyrillic_lexicon.py), the same bar; reported as its Bulgarian-only score
+        # UKRAINIAN (2026-10-18, approved by the editor): likewise an item listed with Ukrainian and no Russian, against the
+        # Ukrainian list through the Galician spelling (an internal record, 2026-10-18, not published)
+        cyr_side = CL.language(name)
+        cyr_list = CL.words(cyr_side)
         # the language table (2026-10-03): no Russian-only score for a text the table lists with no Cyrillic language
         for p, t in (pg.items() if TL.cyrillic(name) != set() else ()):
             rc = os.path.join(d, f"page-{p:04d}.ru-clean.txt")
@@ -453,7 +506,7 @@ def main():
             else:
                 tk = [m.group(0) for m in WORD.finditer(t)]
                 src = t if tk and sum(1 for x in tk if CYRILLIC.search(x)) >= 0.5 * len(tk) else None
-            s = ru_only_score(src) if src else None
+            s = ru_only_score(src, cyr_list) if src else None
             if s is not None:
                 rus.append(s)
         ru_only = round(statistics.median(rus), 1) if rus else None
@@ -465,13 +518,16 @@ def main():
         CODE = {"french": "fra", "german": "deu", "czech": "ces", "polish": "pol",
                 "catalan": "cat", "dutch": "nld", "spanish": "spa", "swedish": "swe",
                 "italian": "ita", "danish": "dan",
-                "english": "eng"}   # 2026-10-02 22:2x: English joined G2 `others` that day; without this entry its pass
+                "english": "eng",
+                "portuguese": "por",   # 2026-10-14, by declaration on the editor's ruling (cupel11); NOT in `others` either
+                "slovak": "slk"}   # 2026-10-12, on the editor's request to add Slovak to the gate (cupel9); Slovak is NOT in `others`
+                                   # (the corpus-wide second-language search): adding it there re-tests every Czech item   # 2026-10-02 22:2x: English joined G2 `others` that day; without this entry its pass
                                     # (recorded as `eng`) was never found, and gate 10-02b held 239 items «G2 pending»
         smp = os.path.join(d, "SECOND-MODEL.json")
         sm = json.load(open(smp, encoding="utf-8")) if os.path.exists(smp) else {}
         # A VISION READING SATISFIES G2 ON ITS PAGE (approved by the editor, 2026-09-30, after a blind check of 40
-        # second-language vision pages: 38 of 38 COMPLETE, in their own script — an internal record, 2026-09-30,
-        # not published). A pending second language counts as handled when EVERY page that carries it
+        # second-language vision pages: 38 of 38 COMPLETE, in their own script — an internal record,
+        # 2026-09-30, not published). A pending second language counts as handled when EVERY page that carries it
         # (≥ 10 word types valid in it and not in the primary, the page-local test of G4 above) has a vision,
         # hand-keyed or ruled reading as its chosen reading (PREFERRED.tsv, search recipe). One page without
         # such a reading keeps the language pending.
@@ -510,7 +566,7 @@ def main():
                      "list_pages": len(listy), "g3_ok": g3_ok, "g4": g4, "cyrillic_pages": cyr_pages,
                      "primary": pname, "g2_rule": rule, "g2_pending": pending, "g2_unarbitrated": unarb,
                      "g2_by_vision": by_vision, "g2_not_carried": not_carried, "g2_neighbour": neighbour_notes,
-                     "ru_only": ru_only, "ru_pages": len(rus),
+                     "ru_only": ru_only, "ru_pages": len(rus), **({"cyr_side": cyr_side} if cyr_side != "russian" else {}),
                      "second": second, "second_density": best,
                      "all_seconds": [{"lang": n, "density": round(v, 2)} for n, v in seconds]})
 

@@ -35,6 +35,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location("ml", os.path.join(HERE, "ocr-mixed-lines.py"))
 ml = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(ml)
 sys.path.insert(0, HERE)
+import cyrillic_lexicon as CL   # Russian or Bulgarian list per item (2026-10-17)
 import ocr_russian_reading as RR   # the old-letter rule: `orus` or `rus` per page
 import ocr_text_languages as TL    # the language table (2026-10-03): which texts print a Cyrillic language
 UK_WORDS = 20
@@ -52,7 +53,7 @@ ACC = importlib.util.module_from_spec(_sa); _sa.loader.exec_module(ACC)   # ru_o
 GATE = 0.14
 
 # FIX 1, TIGHTENED (the editor ruled on 2026-10-02 that a page needs 30 or more Russian words that are not words of another
-# language, and that the Russian must look like connected Russian, held to the runs test as stated). Esperanto print read by the Russian model yields Cyrillic
+# language, and that the Russian must look like connected Russian; the runs test to be held as stated). Esperanto print read by the Russian model yields Cyrillic
 # look-alikes that hit the Russian list (рог = por, пеК = nek, Кат = kaj); of the 351 pages fix 1 alone admitted, 188 kept
 # under 10 Russian words once these were removed. A Russian-list word counts only if no look-alike reading of it is an
 # Esperanto word; the page needs >= 30 such words AND >= 3 of them standing in runs of >= 3 (column breaks split).
@@ -118,6 +119,7 @@ def main():
                 os.remove(stale)
             continue
         body = []
+        ru_i = CL.for_item(stem, ru)   # Bulgarian items: the Bulgarian list (tools/cyrillic_lexicon.py, 2026-10-17)
         for f in sorted(glob.glob(os.path.join(d, "page-*.rus.txt")),
                         key=lambda p: int(re.search(r"page-(\d+)\.rus\.txt", p).group(1))):
             n = int(re.search(r"page-(\d+)\.rus\.txt", f).group(1))
@@ -128,7 +130,7 @@ def main():
             # the page (the page-image helper extracted it in place of the page), so `rus`/`orus` came back near-empty —
             # 142 such pages in 14 items. Where `page-NNNN.rusfull.txt` exists (Tesseract rus --psm 4 on a 300 dpi
             # render of the whole page), it is the reading used.
-            # 2026-10-02 (the editor approved both proposals, as too much was at stake): the full-page re-read now exists for EVERY page with a Russian
+            # 2026-10-02 (options 1 and 2 approved by the editor, as too much was at stake): the full-page re-read now exists for EVERY page with a Russian
             # reading; the reading kept is whichever holds MORE real Russian words (ml.ru_score) — no longer the re-read
             # unconditionally (on Ukraina Stelo's Esperanto pages it is Cyrillic junk).
             # 2026-10-02 21:5x: the gate is ALSO tested on the original `rus` reading (t0). Swapping `t` for the re-read
@@ -138,7 +140,7 @@ def main():
             full = f.replace(".rus.txt", ".rusfull.txt")
             if os.path.exists(full):
                 tf = open(full, encoding="utf-8", errors="ignore").read()
-                if ml.ru_score(tf, ru) > ml.ru_score(chosen, ru):
+                if ml.ru_score(tf, ru_i) > ml.ru_score(chosen, ru_i):
                     t = chosen = tf; picked_orus = False
             # FIX 1 (same ruling): a page whose kept reading holds at least 30 real Russian words is admitted even if the
             # proportion gate rejects it — 1,237 pages in 138 items were kept out (Kaŭkaza Esperantisto 1910.5 p.6: all five
@@ -149,14 +151,18 @@ def main():
             ukf = f.replace(".rus.txt", ".ukr.txt")
             uk_ok = ("ukrainian" in (TL.cyrillic(stem) or set()) and os.path.exists(ukf)
                      and uk_words(open(ukf, encoding="utf-8", errors="ignore").read()) >= UK_WORDS)
-            if uk_ok or page_gate(t, ru) >= GATE or page_gate(t0, ru) >= GATE or (ACC.ru_only_score(chosen) or 0) >= 40 or fix1(chosen, ru):   # gate on `rus` (0.14 measured on it); rescue as in ocr-layout-mixed.py
+            # A PAGE THE EDITOR RULED IN (2026-10-17, `RULED_IN` in ocr-layout-mixed.py, recorded as `gate_ruled` in the
+            # page's .layout.json): admitted here too (Kosmoglott 1922 PDF 39, whose French read as Cyrillic sank its share).
+            lj = f.replace(".rus.txt", ".layout.json")
+            ruled = os.path.exists(lj) and "gate_ruled" in json.load(open(lj, encoding="utf-8"))
+            if ruled or uk_ok or page_gate(t, ru_i) >= GATE or page_gate(t0, ru_i) >= GATE or (ACC.ru_only_score(chosen, ru_i if ru_i is not ru else None) or 0) >= 40 or fix1(chosen, ru_i):   # gate on `rus` (0.14 measured on it); rescue as in ocr-layout-mixed.py
                 # the text written is the reading the OLD-LETTER RULE chooses (`orus` on pre-reform pages; editor 2026-09-28)
                 # BOTH READINGS where the rule picked `orus` (approved by the editor, 2026-10-03): the rule cannot judge orthography
-                # reliably (an internal record, 2026-10-03, not published: right on 3 of 7), so the modern-model reading is
+                # reliably (a look, an internal record, 2026-10-03, not published: right on 3 of 7), so the modern-model reading is
                 # written too; a name in either is found, and a wrong pick loses nothing.
                 also = f"\n--- rus (modern-model reading, kept beside the pre-reform one) ---\n{t0.rstrip()}\n" \
                     if picked_orus and t0.strip() and t0.strip() != chosen.strip() else ""
-                # THE UKRAINIAN READING (approved by the editor, 2026-10-03: the Cyrillic search file is where it goes): for a text
+                # THE UKRAINIAN READING (approved by the editor, 2026-10-03, who ruled that the Cyrillic search file is where it goes): for a text
                 # the language table lists with Ukrainian, `page-NNNN.ukr.txt` (tools/ocr-ukr-pages.py) is written beside
                 # the Russian-model readings — the Russian model is the wrong reader for Ukrainian.
                 uk = f.replace(".rus.txt", ".ukr.txt")

@@ -5,7 +5,7 @@ its chosen reading, and merge the two word by word.
     tools/ocr-second-model.py --gate OCR-GATE-<tag>.md.json --verdicts OCR-PSM-VERDICTS-<tag>.json \
         --pdfs <list> --root <ocr root> --lang fra [--corpus SUBSTR] [--page-gate N] [--files 6]
 
-WHY A WRAPPER AND NOT `ocr-arbitrate.py` DIRECTLY (2026-09-26, French approved by the editor).
+WHY A WRAPPER AND NOT `ocr-arbitrate.py` DIRECTLY (2026-09-26, approved by the editor for French).
 `ocr-arbitrate.py` renders every page itself at a fixed 300 dpi, greyscale, one segmentation mode
 for the whole document. The pipeline now chooses, PER PAGE, among readings of different images
 (extracted scan · rendered page · text-mask re-read · 300 ppi image-free re-read) and modes (psm 6
@@ -56,8 +56,10 @@ ARB = _mod("arb", "ocr-arbitrate.py")
 MR = _mod("mr", "ocr-mask-reread.py")
 TESS = {"fra": "fr", "deu": "de", "ces": "cs", "pol": "pl", "cat": "ca", "nld": "nl",
         "spa": "es", "swe": "sv", "ita": "it", "dan": "da",
-        "est": "et",   # 2026-09-28: the editor asked for the Estonian OCR model, to attempt ä, õ, ö, ü, with old W read as V
-        "eng": "en"}   # 2026-10-02, approved by the editor (failure map row 5d)
+        "est": "et",   # 2026-09-28: the editor asked for the Estonian OCR model, as an attempt at ä, õ, ö, ü, with W read as V
+        "eng": "en",   # 2026-10-02, approved by the editor (failure map row 5d)
+        "por": "pt",   # 2026-10-14, the editor ruled that the language goes by declaration (cupel11, Brazila Esperantisto)
+        "slk": "sk"}   # 2026-10-12, Slovak added to the gate at the editor's request (cupel9, Gašparíková & Pollák 1987)
 SUF = {"psm6": ".txt", "psm4": ".psm4.txt", "hr6": ".hr.txt", "hr4": ".hr.psm4.txt", "tl": ".tl.txt"}
 
 
@@ -88,14 +90,39 @@ def lexicons(primary, lang):
         one = {w.strip().lower() for w in open(os.path.join(HERE, "lexicons", "ido.txt"),
                                                encoding="utf-8") if w.strip()}
         is1 = ARB.make_is_word(one, agglutinative=False)     # paradigm-generated: full forms
+    elif primary == "volapuk":
+        # VOLAPÜK AS THE BASE (2026-10-17, cupel15: the German model reads Volapükabled about 0.05 better than the
+        # Esperanto one, a measurement recorded in an internal record, 2026-10-17, not published): the list with its compound analyser
+        # (tools/volapuk_analyser.py); the second language's list as it is, not purified against 3.5 M forms
+        sys.path.insert(0, HERE)
+        import volapuk_analyser as VA
+        return VA.is_word, ARB.make_is_word(two, agglutinative=False)
+    elif primary == "latino-sine-flexione":
+        # LATINO SINE FLEXIONE AS THE BASE (2026-10-17, cupel14 G5: Schola et Vita's names in small capitals; the
+        # editor chose c1 provisionally, to be tested as suggested). Without it the base is Esperanto, which would judge
+        # Peano's words wrong and hand them to the second model. Its own list (tools/build-lsf-lexicon.py), full
+        # forms like Ido's; 18 M forms, so run with --files 1 or 2.
+        one = {w.strip().lower() for w in open(os.path.join(HERE, "lexicons", "latino-sine-flexione.txt"),
+                                               encoding="utf-8") if w.strip()}
+        is1 = ARB.make_is_word(one, agglutinative=False)
     else:
         one = ARB.purify(ARB.load("eo"), "eo", two)
         is1 = ARB.make_is_word(one, agglutinative=True)
-    is2 = ARB.make_is_word(ARB.purify(two, code2, one), agglutinative=False)
+    p2 = ARB.purify(two, code2, one)
+    is2 = ARB.make_is_word(p2, agglutinative=False)
+    if lang == "por":
+        # OLD ORTHOGRAPHY (2026-10-21, cupel17, *Portugala Revuo*; the editor expected historical-orthography
+        # issues): *annos*, *commercio*, *portuguez* are not in the modern list, so on a Portuguese page the merge,
+        # which keeps the base word only if it is a word, would hand them to the Esperanto reading. The page's
+        # spelling stays; it counts as a word if its folded form is one (tools/old_orthography.py).
+        import old_orthography as OO
+        F, base2 = {OO.fold_portuguese(x) for x in p2}, is2
+        is2 = lambda w, b=base2: b(w) or (len(re.sub(r"[^\w]", "", w)) >= 4
+                                          and OO.fold_portuguese(re.sub(r"[^\w]", "", w)) in F)
     if lang == "est":
         # OLD ORTHOGRAPHY: Estonian of c. 1908 prints «w» where the modern list has «v» (*wõib*, *weel*,
         # *rahwus*). The Estonian reading keeps the page's «w» — the text stays as printed — but it counts
-        # as a real word if its v-spelling is (the editor's ruling, 2026-09-28).
+        # as a real word if its v-spelling is (the editor's ruling of 2026-09-28: W read as V).
         base2 = is2
         is2 = lambda w, b=base2: b(w) or ("w" in w.lower() and b(re.sub("w", "v", re.sub("W", "V", w))))
     return is1, is2
@@ -375,20 +402,29 @@ def main():
     ap.add_argument("--suffix", default=None,
                     help="with --remerge: write page-NNNN.<w>.<langs>.arb.<SUFFIX>.txt BESIDE the existing merge; replace/remove nothing")
     ap.add_argument("--primary", default=None, help="force the primary language (e.g. ido) — for comparisons")
+    # --main (2026-10-12, approved by the editor, cupel9): read the NAMED items with --lang although it is their MAIN language,
+    # not a second one the gate found. The conversion reads every page with `-l epo`, which mangles a Polish or Slovak
+    # text (Zakrzewski 1906 G4 50.2, Gašparíková & Pollák 1987 G4 52.9). The merge keeps the Esperanto reading as its
+    # base («primary» = esperanto, the model that made it) and takes the --lang word where that is a real word of the
+    # language: so the Esperanto quoted in a Polish book stays as read. Needs --corpus with «=» (exact names).
+    ap.add_argument("--main", action="store_true",
+                    help="the named items' MAIN language is --lang: select them by exact name, merge against Esperanto")
     a = ap.parse_args()
+    if a.main and not (a.corpus and a.corpus.startswith("=")):
+        sys.exit("--main needs --corpus =<exact name>[,<name>…]")
 
     full = {"fra": "french", "deu": "german", "ces": "czech", "pol": "polish", "cat": "catalan",
             "nld": "dutch", "spa": "spanish", "swe": "swedish", "ita": "italian", "dan": "danish",
-            "est": "estonian", "eng": "english"}[a.lang]
+            "est": "estonian", "eng": "english", "slk": "slovak", "por": "portuguese"}[a.lang]
     gate = json.load(open(a.gate, encoding="utf-8"))
-    rows = [r for r in gate if any(x["lang"] == full for x in r["all_seconds"])]
+    rows = [r for r in gate if a.main or any(x["lang"] == full for x in r["all_seconds"])]
     if a.corpus:
         rows = ([r for r in rows if r["corpus"] in set(a.corpus[1:].split(","))] if a.corpus.startswith("=")   # «=a,b,c»: exact names
                 else [r for r in rows if a.corpus.lower() in r["corpus"].lower()])
     verdicts = {v["page"]: v["winner"] for v in json.load(open(a.verdicts, encoding="utf-8"))}
     pdfs = {os.path.splitext(os.path.basename(l.strip()))[0]: l.strip()
             for l in open(a.pdfs, encoding="utf-8") if l.strip()}
-    # DECLARED BEATS DETECTED (approved by the editor, 2026-09-27): the gate only DETECTS, so progreso1 — Ido by
+    # DECLARED BEATS DETECTED (2026-09-27, approved by the editor): the gate only DETECTS, so progreso1 — Ido by
     # rule, detected as Esperanto — was merged with the ESPERANTO lexicon (812 pages). Use the declaration.
     qs = _mod("ocr_quality_scan", "ocr-quality-scan.py")
     # MEASURED EXCEPTION (2026-09-27): progreso1 (1908) prints much ESPERANTO — the debate was argued in
@@ -399,6 +435,8 @@ def main():
     def prim(r):
         if a.primary:
             return a.primary
+        if a.main:
+            return "esperanto"   # the base reading's model (see --main)
         if r["corpus"] in MERGE_PRIMARY:
             return MERGE_PRIMARY[r["corpus"]]
         dcl = qs.declared_for(f"/{r['corpus']}.")

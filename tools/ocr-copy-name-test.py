@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+r"""ocr-copy-name-test — before a second copy is deleted: does the copy kept find every roster name the other finds?
+
+    python3 tools/ocr-copy-name-test.py --keep <item>[,<item>…] --drop <item>[,<item>…] --roster <ROSTER-FULL-….txt> \
+        --out <new .md> [--min-len 4] [--keep-pages 10-25,40-41]
+
+WHY (2026-10-20; the editor at 16:4x, on the doubles review's kind 2, asked whether these had been judged to be of the
+same quality, that being why both Belgian runs had been downloaded; at 16:5x, on the Enciklopedio de Esperanto's scan
+against eventoj.hu, judged it a strong candidate for kind 2 and for removing the PDF, but required testing). Rule 15 had judged «no quality gap» by word share and G4 only;
+an absence claim rests on finding NAMES. So: every name of the venture's roster that the copy to be deleted holds must
+be findable in the copy kept, or deleting it loses a hit.
+
+HOW: each copy's text (an item's born-digital text `<item>.txt` if it has one, else its search text
+`<item>.txt`), the items of a side joined. A roster name (its search key, the part after «|»,
+else its label; keys under --min-len letters skipped as unsearchable) is IN the copy to drop when one of its words
+matches the key exactly once folded (tools/ocr-name-search.py's fold: case, diacritics, OCR digit confusions). Each
+such name is then looked for in the copy kept with ocr-name-search's forgiving find(): line breaks, column splits, one
+or two letters misread. A name in the copy to drop and not found in the copy kept is LOST, with a line of its context.
+Also counted, for information: names exactly in the copy kept and not in the other.
+
+--keep-pages (2026-10-20 17:3x, for an issue held inside a bound volume): the copy kept is searched only on those PDF
+pages (its search text's «=== page N ===» blocks; one keep item only), so a name elsewhere in the volume does not
+count as found.
+
+WRITES only --out (refuses an existing file). Reads only.
+"""
+import argparse, importlib.util, os, re, sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+G = os.path.join(HERE, "..", "published", "heterophony-resources", "geniza")
+_s = importlib.util.spec_from_file_location("ocr_name_search", os.path.join(HERE, "ocr-name-search.py"))
+NS = importlib.util.module_from_spec(_s); _s.loader.exec_module(NS)
+
+
+def text_of(item):
+    for p in (os.path.join(G, "sources", "born-digital-text", item + ".txt"),
+              os.path.join(G, "sources", "ocr-rendersearch", item + ".txt")):
+        if os.path.isfile(p):
+            return p, open(p, encoding="utf-8", errors="ignore").read()
+    sys.exit(f"no text for {item}")
+
+
+def roster(path, minlen):
+    out = []
+    for l in open(path, encoding="utf-8"):
+        if l.startswith("#") or not l.strip():
+            continue
+        label, _, key = l.rstrip("\n").partition("|")
+        key = (key or label).strip()
+        if len(re.sub(r"\W", "", key)) >= minlen:
+            out.append((label.strip(), key))
+    return out
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--keep", required=True); ap.add_argument("--drop", required=True)
+    ap.add_argument("--roster", required=True); ap.add_argument("--out", required=True)
+    ap.add_argument("--min-len", type=int, default=4)
+    ap.add_argument("--keep-pages", default="")
+    a = ap.parse_args()
+    if os.path.exists(a.out):
+        sys.exit(f"exists: {a.out}")
+    side = {}
+    for k in ("keep", "drop"):
+        items = [x.strip() for x in getattr(a, k).split(",") if x.strip()]
+        texts = [text_of(i) for i in items]
+        t = "\n".join(x for _, x in texts)
+        if k == "keep" and a.keep_pages:
+            if len(items) != 1:
+                sys.exit("--keep-pages takes one keep item")
+            want = {n for r in a.keep_pages.split(",") for n in range(int(r.split("-")[0]), int(r.split("-")[-1]) + 1)}
+            parts = re.split(r"(?m)^=== page (\d+) ===\n", t)
+            t = "\n".join(parts[i + 1] for i in range(1, len(parts) - 1, 2) if int(parts[i]) in want)
+        side[k] = (items, [p for p, _ in texts], t, {NS.fold(w) for w in NS.normalise(t).split()})
+    names = roster(a.roster, a.min_len)
+    in_drop, lost, kept_only = [], [], 0
+    for label, key in names:
+        fk = NS.fold(max(key.split(), key=len))
+        if fk in side["drop"][3]:
+            in_drop.append((label, key))
+            if fk not in side["keep"][3] and not NS.find(key, side["keep"][2]):
+                m = re.search(r"[^\n]{0,80}" + re.escape(max(key.split(), key=len)) + r"[^\n]{0,80}", side["drop"][2], re.I)
+                lost.append((label, key, m.group(0).strip() if m else ""))
+        elif fk in side["keep"][3]:
+            kept_only += 1
+    with open(a.out, "w", encoding="utf-8") as o:
+        o.write(f"# Name test: may `{', '.join(side['drop'][0])}` be deleted, `{', '.join(side['keep'][0])}` kept?\n\n")
+        o.write(f"`[GENERATED by tools/ocr-copy-name-test.py; roster {os.path.basename(a.roster)}, {len(names)} names of "
+                f"{a.min_len}+ letters. The copy to drop: {'; '.join(side['drop'][1])}. The copy kept: "
+                f"{'; '.join(side['keep'][1])}{(', PDF pages ' + a.keep_pages + ' only') if a.keep_pages else ''}.]`\n\n")
+        verdict = "PASS: every roster name of the copy to drop is found in the copy kept" if not lost else \
+                  f"FAIL: {len(lost)} roster name(s) of the copy to drop not found in the copy kept"
+        o.write(f"**{verdict}.** Names in the copy to drop: {len(in_drop)}; found in the copy kept: "
+                f"{len(in_drop) - len(lost)}; lost: {len(lost)}. (Names in the copy kept only, for information: {kept_only}.)\n\n")
+        if lost:
+            o.write("| roster label | key | context in the copy to drop |\n|---|---|---|\n")
+            for label, key, ctx in lost:
+                o.write(f"| {label} | {key} | {ctx.replace('|', '/')} |\n")
+    print(f"{verdict} · in drop {len(in_drop)} · lost {len(lost)} · kept only {kept_only} → {a.out}")
+
+
+if __name__ == "__main__":
+    main()

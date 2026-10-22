@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 r"""ocr-ruled-reread — re-read single pages the editor has RULED on (G1 review), as the ruling says.
 
-    tools/ocr-ruled-reread.py RULINGS.tsv [--root <ocr root>] [--dry-run]
+    tools/ocr-ruled-reread.py RULINGS.tsv [--root sources/ocr-rendersearch] [--dry-run]
 
 RULINGS.tsv, one page per line, tab-separated:
     corpus   page   pdf   lang   [rotate=<deg clockwise>] [crop=<x0>,<y0>,<x1>,<y1> as fractions of the page] [only]
 
 The G1 review (2026-09-26) put every page whose text had gone missing in front of the editor. Where
-the ruling was to re-OCR, the ordinary pipeline had already read that page and failed, so this tool
+the ruling was «re-ocr», the ordinary pipeline had already read that page and failed, so this tool
 does NOT repeat the ordinary recipe. It:
 
   1. renders the page at 400 ppi, so a page with no picture in it is not read at a picture's resolution;
   2. applies what the ruling says: a crop to the part of the page to be read (fractions of the
      page AS SCANNED, applied first), then a rotation. Measure the angle rather than trusting an
-     estimate by eye: kongresa.libro.08 p.93 was ruled at 45°, measured 58.5°, and read only at 58.5°;
+     estimate by eye: kongresa.libro.08 p.93 was ruled «45°», measured 58.5°, and read only at 58.5°;
   3. reads it four ways — psm 6 (one block), psm 4 (columns), psm 3 (automatic layout) and
      psm 11 (scattered text: captions, balloons, address panels) — with the page's languages;
   4. keeps the reading with the most recognised words (the word lists in tools/lexicons/).
@@ -88,8 +88,10 @@ def main():
             img = image(pdf, page, work, rotate, crop)
             cands = {}
             for psm in PSMS:
+                # errors="replace" (2026-10-13, approved by the editor; docs/FAILURE-MAP.md R28): tesseract's stderr once held
+                # a byte not UTF-8, and decoding it crashed the run before anything was written
                 r = subprocess.run(["tesseract", img, "-", "-l", lang, "--psm", psm],
-                                   capture_output=True, text=True)
+                                   capture_output=True, text=True, errors="replace")
                 cands[psm] = r.stdout
         score = {p: recognised(t, lex) for p, t in cands.items()}
         best = max(PSMS, key=lambda p: (score[p], p == "6"))

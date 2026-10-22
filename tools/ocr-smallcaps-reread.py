@@ -6,8 +6,8 @@ r"""ocr-smallcaps-reread — re-read the pages that carry SMALL CAPITALS at up t
 
 WHY (G5 re-sample 2026-09-30; failure-map row 5b). Names set in small capitals are misread past finding: «BRÉON» →
 «Bnéow», «H. HODLER» → «H. Hopren». Small capitals are cut at lower-case height, so at scan resolution each letter is
-a few pixels tall. A 3× Tesseract re-read recovered 1 name in 4 in the trial. The editor judged on 2026-09-30 that a
-Tesseract re-read of corpora dense with small caps is reasonable.
+a few pixels tall. A 3× Tesseract re-read recovered 1 name in 4 in the trial. The editor judged on 2026-09-30 (22:5x)
+that a Tesseract re-read of a corpus dense with small caps is reasonable.
 
 WHICH PAGES: small caps cannot be marked name by name (a misread small-caps name often looks like an ordinary word),
 but the PAGES that set them carry TELLTALE misreadings — mixed-case tokens such as «HauGG», «BRéoN», «DELAGRAvE»,
@@ -26,7 +26,11 @@ from PIL import Image
 Image.MAX_IMAGE_PIXELS = None
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 from ocr_page_images import page_images
-TELL = re.compile(r"\b[A-ZÀ-Ž][a-zà-ž]+[A-ZÀ-Ž]{2,}[a-zà-ž]*\b|\b[A-ZÀ-Ž]{2,}[a-zà-ž]{1,2}[A-ZÀ-Ž]+\b")
+# WIDENED 2026-10-08 (approved by the editor; proposal (a) of an internal record, 2026-10-08, not published; failure map R17): the second
+# form may END in up to two lower-case letters («PRivAr» for PRIVAT, cupel5 PDF page 1, was not counted). Measured on all
+# 118,469 preferred pages: pages with >= 3 telltales 8,560 -> 9,051; it only adds matches. Applies from the next batch on
+# (the tool reads only the --pdfs it is given); the older pages are not re-read.
+TELL = re.compile(r"\b[A-ZÀ-Ž][a-zà-ž]+[A-ZÀ-Ž]{2,}[a-zà-ž]*\b|\b[A-ZÀ-Ž]{2,}[a-zà-ž]{1,2}[A-ZÀ-Ž]+[a-zà-ž]{0,2}\b")
 LANG = {"ido": "ido+epo", "esperanto": "epo", "occidental": "epo", "english": "eng+epo"}
 
 
@@ -42,7 +46,7 @@ def main():
     ap.add_argument("--pdfs", required=True); ap.add_argument("--gate", required=True)
     ap.add_argument("--out", required=True); ap.add_argument("--min", type=int, default=3)
     ap.add_argument("--jobs", type=int, default=6)
-    # OFICIALA GAZETO (the editor ruled on 2026-10-02 that it has to be done, even if only in part): --corpora selects items
+    # OFICIALA GAZETO (the editor ruled on 2026-10-02, 10:0x, that it has to be done even if only partial): --corpora selects items
     # by name (regex); with --min 0 every page is read; --render-dpi N renders the page with pdftoppm at N dpi instead of
     # enlarging the image the conversion read (600 dpi recovered about half of the G5-missed Gazeto names).
     ap.add_argument("--corpora", default=None); ap.add_argument("--render-dpi", type=int, default=0)

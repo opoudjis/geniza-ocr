@@ -11,8 +11,8 @@ the text. No lexical measure, no quality score and no page count can separate th
 are identical in the only material those instruments see.
 
 So this one ignores the text entirely. It renders the page and asks whether there is INK on it,
-arranged in the horizontal runs that lines of type make. Ink with line structure and no words
-⇒ **we did not read it**. No ink ⇒ the silence is real and an absence finding over it stands.
+arranged in the horizontal runs that lines of type make. Ink with line structure and no words:
+**we did not read it**. No ink: the silence is real and an absence finding over it stands.
 
 TWO THRESHOLDS, NOT ONE. ÖNB and most library scans are PHOTOGRAPHS OF A BOOK ON A DARK
 BOARD. A single Otsu split separates BOARD from PAGE, not ink from paper, and reports a clean
@@ -23,6 +23,15 @@ which is the only place the question means anything.
 AND THE CLASS IT CANNOT DECIDE. «Ink, but no line structure» is a plate, a stamp, an ornamental
 title page or a cover. That is the right answer — there was nothing for OCR to find — but it is
 not the same as blank, and it is reported separately rather than folded into either verdict.
+
+THE INK CACHE (2026-10-15; the editor, 2026-10-14 18:2x, judged inordinate a chain that spent 15 of its 20 minutes
+here to re-read one page). Every run used to extract and measure every silent page of the corpus again,
+though the measure depends only on the PAGE IMAGE. Now each page's `ink_of()` result is kept, per corpus, in
+`<stem>.json` under the ink cache directory (`CACHE` below), keyed by the PDF's size and modification time: a changed
+or replaced PDF drops its corpus's cache. Only pages not in the cache are extracted and measured. The verdict is
+still made fresh every run, from the cached measure and the CURRENT text (a page re-read since keeps its ink and is
+judged on its new lines). `--no-cache` measures everything again (and rewrites the cache).
+WRITE-SET: `--write` and `--write`.json, as before; the cache files, one per corpus with a silent page.
 """
 import os, re, sys, glob, json, argparse, subprocess, tempfile, shutil, statistics, collections
 import concurrent.futures as fut
@@ -98,11 +107,40 @@ def ink_of(path, maxdim=900):
     return ink, sum(inked) / max(h, 1), bands
 
 
+CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "published", "heterophony-resources",
+                     "geniza", "sources", "ocr-work", "g1-ink-cache.noindex")
+
+
+def _pdf_key(pdf):
+    st = os.stat(pdf)
+    return f"{st.st_size}:{int(st.st_mtime)}"
+
+
+def _cache_load(stem, pdf):
+    f = os.path.join(CACHE, stem + ".json")
+    try:
+        c = json.load(open(f, encoding="utf-8"))
+        if c.get("pdf") == pdf and c.get("key") == _pdf_key(pdf):
+            return {int(k): (tuple(v) if v is not None else None) for k, v in c["ink"].items()}
+    except Exception:
+        pass
+    return {}
+
+
+def _cache_save(stem, pdf, ink):
+    os.makedirs(CACHE, exist_ok=True)
+    f = os.path.join(CACHE, stem + ".json")
+    tmp = f + ".tmp"
+    json.dump({"pdf": pdf, "key": _pdf_key(pdf), "ink": {str(k): v for k, v in sorted(ink.items())}},
+              open(tmp, "w", encoding="utf-8"))
+    os.replace(tmp, f)
+
+
 def test_corpus(job):
     """G1 for one corpus. Top-level so it can run in its own PROCESS: `ink_of` is pure-Python
     pixel counting, and threads cannot run it in parallel (the interpreter lock) — the first
     all-corpus run crawled for 74 minutes on one file at a time (2026-09-26)."""
-    stem, pdf, root, jobs = job
+    stem, pdf, root, jobs, use_cache = job
     d = os.path.join(root, stem)
     if not os.path.isdir(d):
         return None
@@ -118,18 +156,20 @@ def test_corpus(job):
     silent = [n for n, s in pages.items() if med and s < med * .25]
     if not silent:
         return None
+    cached = _cache_load(stem, pdf) if use_cache else {}
+    todo = [n for n in silent if n not in cached]
     work = tempfile.mkdtemp()
     try:
         # The image the conversion read, by the conversion's rule — not «the first image
         # extracted», which on a multi-image page is a fragment (fixed 2026-09-25).
-        byn = page_images(pdf, work, jobs=jobs, pages=silent)
+        byn = page_images(pdf, work, jobs=jobs, pages=todo) if todo else {}
         # A BORN-DIGITAL page (its words stored as text) that also stores ONE small picture — a
         # logo, a photo — is taken by the rule above to BE that picture, so the ink test measured
         # a logo against a page of text and flagged it (G1 sort 2026-09-26: items 231, 358). The
         # texts were never harmed (1,421 of 1,424 such pages carry ≥ 80% of their stored words).
         # So HERE ONLY: a silent page with a text layer of ≥ 20 words is rendered whole. On a
         # scanned page with an OCR'd text layer, rendering gives back the same scan: no harm.
-        for n in silent:
+        for n in todo:
             tl = os.path.join(d, f"page-{n:04d}.tl.txt")
             if os.path.exists(tl) and len(open(tl, encoding="utf-8", errors="ignore").read().split()) >= 20:
                 subprocess.run(["pdftoppm", "-r", "150", "-png", "-f", str(n), "-l", str(n), pdf,
@@ -154,24 +194,30 @@ def test_corpus(job):
         def one(n):
             img = byn.get(n)
             return (n, ink_of(img)) if img else (n, None)
+        measured = dict(cached)
         with fut.ThreadPoolExecutor(max_workers=jobs) as pool:
-            for n, r in pool.map(one, silent):
-                if r is None:
-                    untested += 1; undecided.append(n)
-                elif r[0] < 0.010:
-                    blank += 1; blanks.append(n)
-                elif r[2] >= 3 and text_lines.get(n, 0) < 0.5 * r[2]:
-                    # REFINED 2026-09-26 (the editor ruled: refine first, then look). «Silent» means under a
-                    # quarter of the median text, NOT none — so «ink in line structure» flagged
-                    # every correctly-read half page: all 15 *Progreso* volumes «failed». Unread
-                    # now means FEWER THAN HALF as many lines of text as lines of type. Calibrated
-                    # on those 93 pages: 73 pass (short pages), 20 remain, 8 of them near-empty.
-                    unread += 1; worst.append((n, r[0], r[2]))
-                else:
-                    plate += 1
+            for n, r in pool.map(one, todo):
+                measured[n] = r
+        if todo:
+            _cache_save(stem, pdf, measured)
+        for n in silent:
+            r = measured.get(n)
+            if r is None:
+                untested += 1; undecided.append(n)
+            elif r[0] < 0.010:
+                blank += 1; blanks.append(n)
+            elif r[2] >= 3 and text_lines.get(n, 0) < 0.5 * r[2]:
+                # REFINED 2026-09-26 (on the editor's instruction to refine, then look). «Silent» means under a
+                # quarter of the median text, NOT none — so «ink in line structure» flagged
+                # every correctly-read half page: all 15 *Progreso* volumes «failed». Unread
+                # now means FEWER THAN HALF as many lines of text as lines of type. Calibrated
+                # on those 93 pages: 73 pass (short pages), 20 remain, 8 of them near-empty.
+                unread += 1; worst.append((n, r[0], r[2]))
+            else:
+                plate += 1
     finally:
         shutil.rmtree(work, ignore_errors=True)
-    return {"corpus": stem, "silent": len(silent), "blank": blank, "plate": plate,
+    return {"corpus": stem, "silent": len(silent), "measured": len(todo), "blank": blank, "plate": plate,
             "unread": unread, "untested": untested,
             "pages": [w[0] for w in sorted(worst)],      # ALL flagged pages (the report table shows 12)
             "untested_pages": sorted(undecided),          # pages the ink test could not decide (2026-09-27)
@@ -186,6 +232,7 @@ def main():
     ap.add_argument("--write", default=None)
     ap.add_argument("--jobs", type=int, default=4, help="threads per corpus")
     ap.add_argument("--files", type=int, default=12, help="corpora at once, as processes")
+    ap.add_argument("--no-cache", action="store_true", help="measure every silent page again (rewrites the cache)")
     a = ap.parse_args()
 
     pdfs = {}
@@ -195,19 +242,20 @@ def main():
             pdfs[os.path.splitext(os.path.basename(p))[0]] = p
 
     rows, totals = [], collections.Counter()
-    jobs_ = [(stem, pdf, a.root, a.jobs) for stem, pdf in sorted(pdfs.items())]
+    jobs_ = [(stem, pdf, a.root, a.jobs, not a.no_cache) for stem, pdf in sorted(pdfs.items())]
     with fut.ProcessPoolExecutor(max_workers=a.files) as pool:
         for r in pool.map(test_corpus, jobs_, chunksize=4):
             if not r:
                 continue
-            for k in ("silent", "blank", "plate", "unread", "untested"):
+            for k in ("silent", "measured", "blank", "plate", "unread", "untested"):
                 totals[k] += r[k]
             rows.append(r)
             if r["unread"]:
                 print(f"  ⚠ {r['corpus'][:44]:<46} {r['unread']} unread of {r['silent']} silent",
                       flush=True)
 
-    print(f"\n{totals['silent']:,} silent pages tested across {len(rows)} corpora")
+    print(f"\n{totals['silent']:,} silent pages tested across {len(rows)} corpora "
+          f"({totals['measured']:,} measured now, {totals['silent'] - totals['measured']:,} from the ink cache)")
     print(f"  genuinely BLANK            {totals['blank']:>6,}")
     print(f"  plate, cover, or short page {totals['plate']:>5,}   ink, but text accounts for its lines")
     print(f"  ⚠ INK WITH LINE STRUCTURE  {totals['unread']:>6,}   ← text we did not read")

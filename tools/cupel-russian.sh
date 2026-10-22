@@ -12,8 +12,9 @@
 # Russian (`ru-clean`) of the bi-script pages, run on a SCRATCH ROOT of links to the new items, because `apply` rewrites
 # every bi-script page of the root it is given. The Russian search and the every-reading search are rebuilt by
 # tools/ocr-chain.sh, which follows.
-# WRITE-SET: the new items' folders under the render root $R; the rusfull manifest dir (new). Run from the repo root.
+# WRITE-SET: the new items' folders under the corpus's ocr-rendersearch/ folder; the rusfull manifest dir (new). Run from the repo root.
 set -euo pipefail
+cd "$(dirname "$0")/.."   # to the repo root wherever it is called from (editor 2026-10-11 19:3x, sandbox model decision D)
 NEW="${1:?new pdf list}"; MD="${2:?garbage-filter models dir}"; RF="${3:?rusfull manifest dir}"
 G=published/heterophony-resources/geniza; R=$G/sources/ocr-rendersearch
 [ -f "$MD/ru.json" ] || { echo "no garbage-filter models in $MD (train them: ocr-garbage-filter.py train <root> <gate.json> $MD)"; exit 2; }

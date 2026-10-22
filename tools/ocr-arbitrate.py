@@ -22,7 +22,7 @@ model leaks about a fifth of the accents. Tesseract arbitrates per token, not pe
 The combined model was never capable of protecting a bilingual page.
 
 WHY NOT PER-LINE ARBITRATION. The editor pointed out on 2026-09-23 that there will be lines of
-Esperanto containing French text with diacritics — an Esperanto sentence naming «Délégation» or «Sébert»
+Esperanto that contain French text with diacritics — an Esperanto sentence naming «Délégation» or «Sébert»
 would lose its accents to a line-level vote, because the line is mostly Esperanto. Correct.
 Hence TOKEN level.
 
@@ -72,7 +72,9 @@ ENDINGS = re.compile(r"(ojn|ajn|oj|aj|on|an|en|oj|j|n|o|a|e|i|is|as|os|us|u)$")
 #   built lexicon exists, and say so on stderr rather than silently using the weaker test.
 BUILT = {"eo": "esperanto", "fr": "french", "de": "german", "it": "italian", "es": "spanish",
          "cs": "czech", "sv": "swedish", "nl": "dutch", "pl": "polish", "da": "danish",
-         "ca": "catalan", "ru": "russian_post1918", "et": "estonian", "en": "english"}
+         "ca": "catalan", "ru": "russian_post1918", "et": "estonian", "en": "english",
+         "sk": "slovak",   # 2026-10-12, added to the gate at the editor's request (cupel9)
+         "pt": "portuguese"}   # 2026-10-14, by declaration, on the editor's decision (cupel11)
 
 
 def load(code):
@@ -115,8 +117,8 @@ def purify(primary, primary_code, other):
     subtle once seen. **A corpus lexicon contains whatever the corpus contains**, and
     Esperanto texts quote French:
 
-        president  in Tekstaro yes  in Hunspell —   ← the accent-stripped French form,
-        monsieur · groupe · membres · societe · france, all present in Tekstaro
+        president  in Tekstaro: yes  in Hunspell —   ← the accent-stripped French form,
+        monsieur · groupe · membres · societe · france, all in Tekstaro
         6,768 forms sit in BOTH the Esperanto and the French lexicon
 
     So the arbitrator asked «is the Esperanto reading a real Esperanto word?», `president`
@@ -154,8 +156,8 @@ def purify(primary, primary_code, other):
 
 
 # ESPERANTO IS PRODUCTIVE — AFFIXATION *AND* COMPOUNDING (the editor ruled on 2026-09-26 that,
-# Esperanto being productive, forms must not be discarded too eagerly: compounds can be taken
-# apart, and the Esperanto parser must handle agglutination as well as compounding, e.g. kotizo >
+# Esperanto being productive, forms should not be discarded too eagerly: compounds can be taken
+# apart, and the parser must handle agglutination as well as compounding, e.g. kotizo >
 # kotizaĵo, Ruĝa-Kruco). A dictionary never lists every compound. The old test stripped endings
 # only, so `kotizaĵo`, `enpresaĵo`, `poŝtsignoj`, `superŝatigita` FAILED it — and the merge then
 # took the foreign model's reading, which simply dropped the supersigns: 9,315 hatted Esperanto
@@ -293,8 +295,8 @@ def ocr(img, lang, dpi):
     return t
 
 
-# THE IDO CASE — three arbiters, because three languages need three (the editor proposed fr+io+eo on
-# 2026-09-23, since French is found all over Ido texts, and chunks of Esperanto as well).
+# THE IDO CASE — three arbiters, because three languages need three (the editor observed on
+# 2026-09-23 that French is everywhere in Ido texts, with chunks of Esperanto as well, and proposed fr+io+eo).
 # Tesseract has NO Ido model (checked: 163 languages installed, no `ido`; none upstream either), and
 # the local Ido text — 21 wikitext files, 112 KB — is far too thin for a lexicon beside the 1.3M
 # tokens that gave us Occidental. But an Ido lexicon turns out not to be needed:
@@ -303,7 +305,7 @@ def ocr(img, lang, dpi):
 #   else token is valid French          -> take the French reading         (lexicon)
 #   else (i.e. it is Ido)               -> take whichever reading has NO Esperanto diacritic
 #
-# The third rule is sound in Ido and ONLY in Ido. In the bilingual French
+# The third rule is sound in Ido and ONLY in Ido. The reasoning: in the bilingual French
 # organs «ĉ» is genuinely ambiguous — correct Esperanto 6,000× and broken French 4,000× in the same
 # L'Espérantiste files — so a diacritic heuristic there would be wrong half the time. **In Ido it
 # cannot occur at all**: de Beaufront's reform removed the supersigned letters, so ĉĝĥĵŝŭ in an Ido
@@ -323,7 +325,7 @@ IDO_IMPOSSIBLE = re.compile(r"[ĉĝĥĵŝŭĈĜĤĴŜŬ]")
 #
 # Both outputs were quarantined and the originals were untouched (the never-overwrite rule doing
 # its job). **Before running, read the corpus MANIFEST for the model that produced the existing
-# text.** The Belga Sonorilo manifest (an internal record, not published) says it in as many words — «-l epo for
+# text.** The corpus's MANIFEST (an internal record, not published) says it in as many words — «-l epo for
 # 1902–1908, -l eng+fra+ita for 1910+» — and it was written down before any of this started.
 #
 # Rule: arbitrate a corpus ONLY if its existing text was produced under a model that could not
