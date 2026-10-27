@@ -20,6 +20,9 @@ Re-runnable: a page that already has `.tl.txt` is skipped.
 """
 import os, re, sys, argparse, subprocess
 import concurrent.futures as fut
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cupel_progress import write_new as _write   # run sheet rule 0 (2026-10-23): temp file then rename, so a run killed
+                                                 # mid-write never leaves a half-written file that a restart would skip
 
 
 def one(job):
@@ -39,7 +42,7 @@ def one(job):
         tl = os.path.join(d, f"page-{i:04d}.tl.txt")
         if os.path.exists(tl):
             continue
-        open(tl, "w", encoding="utf-8").write(page)
+        _write(tl, page, True)
         n += 1
     return n
 

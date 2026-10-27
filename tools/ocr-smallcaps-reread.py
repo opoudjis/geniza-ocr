@@ -22,6 +22,9 @@ SEARCH text (never the preferred reading). WRITE-SET: those new files, and <out>
 """
 import os, re, sys, json, glob, argparse, tempfile, shutil, subprocess
 import concurrent.futures as fut
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import cupel_progress as CP   # run sheet rule 0 (2026-10-23): each page written whole (temp file, then renamed); pages that
+                              # have their .sc3x.txt are skipped, so a run started again (with a NEW --out) resumes
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = None
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -50,6 +53,7 @@ def main():
     # by name (regex); with --min 0 every page is read; --render-dpi N renders the page with pdftoppm at N dpi instead of
     # enlarging the image the conversion read (600 dpi recovered about half of the G5-missed Gazeto names).
     ap.add_argument("--corpora", default=None); ap.add_argument("--render-dpi", type=int, default=0)
+    ap.add_argument("--progress", help="rule 0: rewrite this PROGRESS.txt every minute")
     a = ap.parse_args()
     if os.path.exists(a.out): sys.exit(f"--out {a.out} exists: this tool writes its manifest only into a NEW folder")
     avail = subprocess.run(["tesseract", "--list-langs"], capture_output=True, text=True).stdout.split()
@@ -113,19 +117,22 @@ def main():
                 except subprocess.TimeoutExpired:
                     rows.append((c, p, lang, f"{sc:.2f}", "", "timeout")); continue
                 if t.strip():
-                    open(dst, "w", encoding="utf-8").write(t)
+                    CP.write_new(dst, t, True)
                 rows.append((c, p, lang, f"{sc:.2f}", len(t.split()), "written" if t.strip() else "empty"))
         finally:
             shutil.rmtree(work, ignore_errors=True)
         return rows
 
     done = 0
+    P = CP.Progress(a.progress, "C7b.2 small capitals", sum(len(j[2]) for j in jobs), chunk=50) if a.progress else None
     with fut.ThreadPoolExecutor(max_workers=a.jobs) as pool:
         for rows in pool.map(corpus, jobs):
             for r in rows: man.write("\t".join(map(str, r)) + "\n")
             man.flush(); done += len(rows)
+            if P: P.tick(len(rows))
             print(done, "pages done", flush=True)
     man.close(); print("done")
+    if P: P.finish(f"{done} pages")
 
 
 if __name__ == "__main__":

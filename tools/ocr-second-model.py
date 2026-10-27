@@ -45,6 +45,8 @@ os.environ.setdefault("OMP_THREAD_LIMIT", "1")
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from ocr_page_images import page_images, render_page
+import cupel_progress as CP   # run sheet rule 0 (2026-10-23): each file written whole (a temp file, then renamed),
+                              # so a killed run leaves no half-written merge that a restart would take as done
 
 
 def _mod(name, file):
@@ -289,7 +291,7 @@ def do_corpus(job):
                         b2 = b3
             if len(b2) < 0.25 * len(a):
                 return "second reading failed — not merged"   # no merge: retried on a re-run
-            open(f"{base}.{lang}.txt", "w", encoding="utf-8").write(b2)
+            CP.write_new(f"{base}.{lang}.txt", b2, True)
             isA = with_prior(is1, chain)                  # earlier languages are protected too
             which, ea, eb = ARB.page_language(a, b2, isA, is2)
             if eb < gate:
@@ -301,8 +303,7 @@ def do_corpus(job):
                 # (hat guard off for Ido: it has no supersigns, so a hat there is an OCR error)
             # named by the reading it was merged WITH (valid only while that reading is chosen) and
             # by its language chain
-            open(f"{base}.{w}.{'+'.join(chain + [lang])}.arb.txt", "w",
-                 encoding="utf-8").write(merged + "\n")
+            CP.write_new(f"{base}.{w}.{'+'.join(chain + [lang])}.arb.txt", merged + "\n", True)
             return how
         with fut.ThreadPoolExecutor(max_workers=jobs) as pool:
             for how in pool.map(one, todo):
@@ -324,7 +325,7 @@ def write_summary(d, pages, verdicts, corpus, lang, skipped_tl):
     p = os.path.join(d, "SECOND-MODEL.json")
     s = json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
     s[lang] = {"pages": len(pages), "merged": merged, "skipped_text_layer": skipped_tl}
-    json.dump(s, open(p, "w", encoding="utf-8"), indent=1)
+    CP.write_new(p, json.dumps(s, indent=1), True)
 
 
 def remerge_corpus(job):
@@ -383,6 +384,13 @@ def remerge_corpus(job):
 
 
 def main():
+    # ONE MERGE PER INPUT (2026-10-23, failure map R57): the merge's choices depend on the order of Python's sets, which
+    # string hashing randomises per process, so two runs on the same readings gave different merges (13 files of 2
+    # issues; the readings themselves identical). Run with the hash seed fixed: the same readings, the same merge, and a
+    # resumed run byte for byte an uninterrupted one. The pool's workers inherit it.
+    if os.environ.get("PYTHONHASHSEED") != "0":
+        os.environ["PYTHONHASHSEED"] = "0"
+        os.execv(sys.executable, [sys.executable] + sys.argv)
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--gate", required=True)
@@ -409,6 +417,8 @@ def main():
     # language: so the Esperanto quoted in a Polish book stays as read. Needs --corpus with «=» (exact names).
     ap.add_argument("--main", action="store_true",
                     help="the named items' MAIN language is --lang: select them by exact name, merge against Esperanto")
+    ap.add_argument("--progress", help="rule 0: rewrite this PROGRESS.txt every minute, one tick per item done "
+                    "(the pass skips pages already merged, so the same command again resumes)")
     a = ap.parse_args()
     if a.main and not (a.corpus and a.corpus.startswith("=")):
         sys.exit("--main needs --corpus =<exact name>[,<name>…]")
@@ -446,12 +456,15 @@ def main():
              a.page_gate, a.jobs, a.suffix) for r in rows if r["corpus"] in pdfs]
     print(f"{len(jobs)} corpora flagged for {full} · page gate {a.page_gate}", file=sys.stderr, flush=True)
     total = collections.Counter()
+    P = CP.Progress(a.progress, f"second model {a.lang}", len(jobs), chunk=10) if a.progress else None
     with fut.ProcessPoolExecutor(max_workers=a.files) as pool:
         for corpus, t in pool.map(remerge_corpus if a.remerge else do_corpus, jobs):
             total.update(t)
+            if P: P.tick()
             print(f"  {corpus[:50]:<52} " + " · ".join(f"{k} {v}" for k, v in t.items()),
                   file=sys.stderr, flush=True)
     print("done · " + " · ".join(f"{k} {v:,}" for k, v in total.most_common()), file=sys.stderr)
+    if P: P.finish(" · ".join(f"{k} {v:,}" for k, v in total.most_common()) or "nothing to do")
 
 
 if __name__ == "__main__":

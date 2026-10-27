@@ -56,12 +56,15 @@ from multiprocessing import Pool
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 G = os.path.join(HERE, "..", "published", "heterophony-resources", "geniza")
+sys.path.insert(0, HERE)
+import cupel_workers as CW   # the core dial: one slot per worker task while geniza/ocr/CORE-DIAL exists
 S = os.path.join(G, "sources")
 _s = importlib.util.spec_from_file_location("ns", os.path.join(HERE, "ocr-name-search.py"))
 NS = importlib.util.module_from_spec(_s); _s.loader.exec_module(NS)
 sys.path.insert(0, HERE)
 import ocr_index as IX  # noqa: E402
 import born_digital_lines as BDL  # noqa: E402  (the born-digital lists and texts, 2026-10-10)
+import corpus_locks as CL  # noqa: E402  (the dowse's lock against Miles's chain, 2026-10-26: geniza/ocr/locks/)
 _BDSEC = {}   # born-digital item → {¶: section}, filled in main(); its hits cite «¶ N», not a PDF page
 _BDPAGED = {}   # a PAGED born-digital item (a typed PDF, «pages: pdf») → its PDF pages; searched and cited like an OCR text
 
@@ -514,7 +517,7 @@ COPIES = [
                 ('volaspodel_y3_1892-93', None, "temerov's scan (cupel16)"),
                 ('volaspodel_y4_1893-94', None, "temerov's scan (cupel16)")],
      "triangulated": "decided by the editor, 2026-10-20: triangulated over the agreeing shared pages ONLY (87 at the ruling; 85 since 18:0x, when the alignment's new «page paired twice» flag took out archive.org PDF 17 and PDF 89, each paired under several printed numbers) (BOTH, no quality flag, both copies at absence quality, ocr/runs/OCR-COPY-ALIGN-2026-10-20-volaspodel.tsv), listed in «triangulated_pages» as (archive.org item, PDF, temerov item, PDF); NOT the 18 flagged shared pages, the pages only temerov's scans hold, or the unpaired 1888–89 volumes",
-     "pairing_errors": [("volaspodelamont00unkngoog", 17, "paired under printed 8, 20 and 140 (the alignment rerun 18:0x with the «page paired twice» flag): one page, several temerov partners sharing a recurring block; taken out of triangulated_pages"), ("volaspodelamont00unkngoog", 89, "paired under printed 16, 48 and 56: as PDF 17; taken out of triangulated_pages"), ("volaspodelamont00unkngoog", 73, "printed «60» in OCR-COPY-ALIGN-2026-10-20-volaspodel.tsv is a misread number: this page is printed 168 (paired there with volaspodel_y3_1892-93 PDF 172; the rerun shows it paired under printed 60, 92, 108, 124, 156 and 168 in all); its «60» partner, temerov's PDF 64, is a back page of advertisements sharing only the Huebsch advertisement block; no page of its own (checked 2026-10-20 18:0x; the editor: «out of abundance of caution to prevent recurrence»)"), ("volaspodelamont00unkngoog", 52, "printed «71»: no text shared with any page of temerov's yelüp 3; an archive.org-only page"), ("volaspodelamont00unkngoog", 53, "printed «72»: as «71»")],
+     "pairing_errors": [("volaspodelamont00unkngoog", 17, "paired under printed 8, 20 and 140 (the alignment rerun 18:0x with the «page paired twice» flag): one page, several temerov partners sharing a recurring block; taken out of triangulated_pages"), ("volaspodelamont00unkngoog", 89, "paired under printed 16, 48 and 56: as PDF 17; taken out of triangulated_pages"), ("volaspodelamont00unkngoog", 73, "printed «60» in OCR-COPY-ALIGN-2026-10-20-volaspodel.tsv is a misread number: this page is printed 168 (paired there with volaspodel_y3_1892-93 PDF 172; the rerun shows it paired under printed 60, 92, 108, 124, 156 and 168 in all); its «60» partner, temerov's PDF 64, is a back page of advertisements sharing only the Huebsch advertisement block; no page of its own (checked 2026-10-20 18:0x; the editor)"), ("volaspodelamont00unkngoog", 52, "printed «71»: no text shared with any page of temerov's yelüp 3; an archive.org-only page"), ("volaspodelamont00unkngoog", 53, "printed «72»: as «71»")],
      "triangulated_pages": [('volaspodelamont00unkngoog', 10, 'volaspodel_y3_1892-93', 5), ('volaspodelamont00unkngoog', 11, 'volaspodel_y3_1892-93', 6), ('volaspodelamont00unkngoog', 12, 'volaspodel_y3_1892-93', 7), ('volaspodelamont00unkngoog', 13, 'volaspodel_y3_1892-93', 8), ('volaspodelamont00unkngoog', 14, 'volaspodel_y3_1892-93', 9), ('volaspodelamont00unkngoog', 15, 'volaspodel_y3_1892-93', 10), ('volaspodelamont00unkngoog', 16, 'volaspodel_y3_1892-93', 11), ('volaspodelamont00unkngoog', 18, 'volaspodel_y3_1892-93', 25), ('volaspodelamont00unkngoog', 19, 'volaspodel_y3_1892-93', 26), ('volaspodelamont00unkngoog', 20, 'volaspodel_y3_1892-93', 27), ('volaspodelamont00unkngoog', 21, 'volaspodel_y3_1892-93', 28), ('volaspodelamont00unkngoog', 22, 'volaspodel_y3_1892-93', 29), ('volaspodelamont00unkngoog', 23, 'volaspodel_y3_1892-93', 30), ('volaspodelamont00unkngoog', 24, 'volaspodel_y3_1892-93', 31), ('volaspodelamont00unkngoog', 25, 'volaspodel_y3_1892-93', 32), ('volaspodelamont00unkngoog', 26, 'volaspodel_y3_1892-93', 33), ('volaspodelamont00unkngoog', 27, 'volaspodel_y3_1892-93', 34), ('volaspodelamont00unkngoog', 28, 'volaspodel_y3_1892-93', 35), ('volaspodelamont00unkngoog', 29, 'volaspodel_y3_1892-93', 36), ('volaspodelamont00unkngoog', 30, 'volaspodel_y3_1892-93', 37), ('volaspodelamont00unkngoog', 31, 'volaspodel_y3_1892-93', 38), ('volaspodelamont00unkngoog', 32, 'volaspodel_y3_1892-93', 39), ('volaspodelamont00unkngoog', 33, 'volaspodel_y3_1892-93', 40), ('volaspodelamont00unkngoog', 34, 'volaspodel_y3_1892-93', 41), ('volaspodelamont00unkngoog', 35, 'volaspodel_y3_1892-93', 42), ('volaspodelamont00unkngoog', 36, 'volaspodel_y3_1892-93', 43), ('volaspodelamont00unkngoog', 37, 'volaspodel_y3_1892-93', 44), ('volaspodelamont00unkngoog', 38, 'volaspodel_y3_1892-93', 45), ('volaspodelamont00unkngoog', 39, 'volaspodel_y3_1892-93', 46), ('volaspodelamont00unkngoog', 40, 'volaspodel_y3_1892-93', 47), ('volaspodelamont00unkngoog', 41, 'volaspodel_y3_1892-93', 48), ('volaspodelamont00unkngoog', 42, 'volaspodel_y3_1892-93', 65), ('volaspodelamont00unkngoog', 43, 'volaspodel_y3_1892-93', 66), ('volaspodelamont00unkngoog', 44, 'volaspodel_y3_1892-93', 67), ('volaspodelamont00unkngoog', 45, 'volaspodel_y3_1892-93', 68), ('volaspodelamont00unkngoog', 46, 'volaspodel_y3_1892-93', 69), ('volaspodelamont00unkngoog', 49, 'volaspodel_y3_1892-93', 72), ('volaspodelamont00unkngoog', 50, 'volaspodel_y3_1892-93', 73), ('volaspodelamont00unkngoog', 51, 'volaspodel_y3_1892-93', 74), ('volaspodelamont00unkngoog', 54, 'volaspodel_y3_1892-93', 77), ('volaspodelamont00unkngoog', 55, 'volaspodel_y3_1892-93', 78), ('volaspodelamont00unkngoog', 56, 'volaspodel_y3_1892-93', 79), ('volaspodelamont00unkngoog', 57, 'volaspodel_y3_1892-93', 80), ('volaspodelamont00unkngoog', 58, 'volaspodel_y3_1892-93', 81), ('volaspodelamont00unkngoog', 59, 'volaspodel_y3_1892-93', 82), ('volaspodelamont00unkngoog', 60, 'volaspodel_y3_1892-93', 83), ('volaspodelamont00unkngoog', 61, 'volaspodel_y3_1892-93', 84), ('volaspodelamont00unkngoog', 62, 'volaspodel_y3_1892-93', 85), ('volaspodelamont00unkngoog', 63, 'volaspodel_y3_1892-93', 86), ('volaspodelamont00unkngoog', 64, 'volaspodel_y3_1892-93', 87), ('volaspodelamont00unkngoog', 65, 'volaspodel_y3_1892-93', 88), ('volaspodelamont00unkngoog', 66, 'volaspodel_y3_1892-93', 89), ('volaspodelamont00unkngoog', 67, 'volaspodel_y3_1892-93', 90), ('volaspodelamont00unkngoog', 68, 'volaspodel_y3_1892-93', 91), ('volaspodelamont00unkngoog', 69, 'volaspodel_y3_1892-93', 92), ('volaspodelamont00unkngoog', 70, 'volaspodel_y3_1892-93', 93), ('volaspodelamont00unkngoog', 71, 'volaspodel_y3_1892-93', 94), ('volaspodelamont00unkngoog', 72, 'volaspodel_y3_1892-93', 95), ('volaspodelamont00unkngoog', 90, 'volaspodel_y4_1893-94', 18), ('volaspodelamont00unkngoog', 91, 'volaspodel_y4_1893-94', 19), ('volaspodelamont00unkngoog', 92, 'volaspodel_y4_1893-94', 20), ('volaspodelamont00unkngoog', 93, 'volaspodel_y4_1893-94', 21), ('volaspodelamont00unkngoog', 94, 'volaspodel_y4_1893-94', 22), ('volaspodelamont00unkngoog', 95, 'volaspodel_y4_1893-94', 23), ('volaspodelamont00unkngoog', 96, 'volaspodel_y4_1893-94', 24), ('volaspodelamont00unkngoog', 97, 'volaspodel_y4_1893-94', 25), ('volaspodelamont00unkngoog', 98, 'volaspodel_y4_1893-94', 26), ('volaspodelamont00unkngoog', 99, 'volaspodel_y4_1893-94', 27), ('volaspodelamont00unkngoog', 100, 'volaspodel_y4_1893-94', 28), ('volaspodelamont00unkngoog', 101, 'volaspodel_y4_1893-94', 29), ('volaspodelamont00unkngoog', 102, 'volaspodel_y4_1893-94', 30), ('volaspodelamont00unkngoog', 103, 'volaspodel_y4_1893-94', 31), ('volaspodelamont00unkngoog', 105, 'volaspodel_y4_1893-94', 33), ('volaspodelamont00unkngoog', 75, 'volaspodel_y4_1893-94', 35), ('volaspodelamont00unkngoog', 76, 'volaspodel_y4_1893-94', 36), ('volaspodelamont00unkngoog', 77, 'volaspodel_y4_1893-94', 37), ('volaspodelamont00unkngoog', 78, 'volaspodel_y4_1893-94', 38), ('volaspodelamont00unkngoog', 79, 'volaspodel_y4_1893-94', 39), ('volaspodelamont00unkngoog', 80, 'volaspodel_y4_1893-94', 40), ('volaspodelamont00unkngoog', 81, 'volaspodel_y4_1893-94', 41), ('volaspodelamont00unkngoog', 83, 'volaspodel_y4_1893-94', 43), ('volaspodelamont00unkngoog', 84, 'volaspodel_y4_1893-94', 44), ('volaspodelamont00unkngoog', 85, 'volaspodel_y4_1893-94', 45), ('volaspodelamont00unkngoog', 86, 'volaspodel_y4_1893-94', 46), ('volaspodelamont00unkngoog', 87, 'volaspodel_y4_1893-94', 47)],
      "note": "decided by the editor, 2026-10-20 (cupel16 C13, rule 15: ocr/runs/CUPEL16-RULE15-SECOND-COPIES-2026-10-20.md; both copies kept, each holding pages the other lacks); temerov's yelüp 3 fills archive.org's three lacunae"},
     {"work": 'Enciklopedio de Esperanto (Budapest 1933)', "same_text": [['ENCIKLOPEDIO_DE_ESPERANTO_1933_', 'ede-1933-eventoj-1', 'ede-1933-eventoj-a', 'ede-1933-eventoj-aldon', 'ede-1933-eventoj-b', 'ede-1933-eventoj-c', 'ede-1933-eventoj-cx', 'ede-1933-eventoj-d', 'ede-1933-eventoj-e', 'ede-1933-eventoj-f', 'ede-1933-eventoj-g', 'ede-1933-eventoj-h', 'ede-1933-eventoj-i', 'ede-1933-eventoj-j', 'ede-1933-eventoj-k', 'ede-1933-eventoj-l', 'ede-1933-eventoj-m', 'ede-1933-eventoj-n', 'ede-1933-eventoj-o', 'ede-1933-eventoj-p', 'ede-1933-eventoj-q', 'ede-1933-eventoj-r', 'ede-1933-eventoj-s', 'ede-1933-eventoj-sx', 'ede-1933-eventoj-t', 'ede-1933-eventoj-u', 'ede-1933-eventoj-v', 'ede-1933-eventoj-w', 'ede-1933-eventoj-y', 'ede-1933-eventoj-z']], "texts_checked": "checked 2026-10-20 16:5x: one text, the 1933 edition transcribed; the name test (tools/ocr-copy-name-test.py, ocr/runs/OCR-COPY-NAME-TEST-2026-10-20-ede-1933.md) finds every one of the scan's 1,062 roster names in eventoj.hu; the scan's preferred reading 350,712 words, eventoj.hu 347,978",
@@ -742,7 +745,13 @@ COPIES = [
                 ('belgasonorilo.1912.5', None, 'ÖNB, a single issue'),
                 ('belgasonorilo.1912.6', None, 'ÖNB, a single issue'),
                 ('belgasonorilo.1912.8', None, 'ÖNB, a single issue')],
-     "triangulated": "", "note": "decided by the editor, 2026-10-20: every copy kept and read; no copy deleted; no page skipped (not triangulated)"},
+     "triangulated": "", "note": "the editor 2026-10-20 18:4x: every copy kept and read; no copy deleted; no page skipped (not triangulated)"},
+    # Ezri's request through the editor, 2026-10-24 00:4x («Two items in the OCR item table look like one issue scanned
+    # twice … which copy reads better»); checked by Miles 00:5x (ocr/runs/OCR-COPY-ALIGN-2026-10-24-esperanto-ruslando-1905.md)
+    {"work": "Esperanto (St Petersburg, ed. Ostrovskij), 1905, N-ro 1–2 (January)", "same_text": [['EsperantoRuslando.1905.1-2', 'EsperantoRuslando.1905.sennumera']],
+     "copies": [('EsperantoRuslando.1905.1-2', None, "the better copy: 600 ppi, no text layer; the gate's Esperanto side 84.4, Russian side 70.7 (25 pp)"),
+                ('EsperantoRuslando.1905.sennumera', None, "133-ppi JPX with a noise text layer (ScanSoft OmniPage 16); Esperanto 72.4, Russian 54.8 (23 pp); its name «sennumera» is the file's, its masthead reads N-ro 1–2")],
+     "triangulated": "", "note": "one issue, the same printing as far as the pages show: same mastheads, same pages in the same order, the same lines on the same printed pages; printed 1–26 paired, every page in BOTH; the alignment's word shares DISAGREE (< 0.80) on 24 of 26 pages, which is OCR noise in the Cyrillic; the alignment's «other copy better on the cover» was a mispairing (failure map R58): PDF n against PDF n, …1905.1-2 is better on every page, Esperanto and Russian. WITHDRAWN: the editor 2026-10-24 01:17 (ocr/lines/OCR-ACCEPTANCE-LINES-2026-10-24-SIGNED-withdraw-esperanto-ruslando-sennumera.txt); Ezri re-pinned her 243 lines to …1905.1-2 (relayed 2026-10-24 03:0x); …sennumera\'s readings deleted 03:05, off sources/OCR-PDF-LIST-2026-10-24-cupel18a-b.txt; the scan kept."},
 ]
 WITNESSES = COPIES   # the old name, kept for anything that imports it
 
@@ -905,7 +914,8 @@ def search_item(job):
         idx = IX.build(text, words_only=strong)
         for label, forms in people:
             for fm in forms:
-                out[label] += [(rel, p, how, r) for p, how, r in IX.match(fm, idx)]
+                hs = [(rel, p, how, r) for p, how, r in IX.match(fm, idx)]
+                out[label] += strong_hits(hs, forms) if strong else hs
     out["\0size"] = size
     return item, dict(out)
 
@@ -917,6 +927,19 @@ def search_item(job):
 # unchanged: it uses the page only as a key, so the hits and the rule that a name's second form is tried only on pages
 # its first form did not hit are as before, page by page of each item.
 _UNION = None
+_STRONG = False
+# THE STRONG SEARCH KEEPS ITS STRONG TIERS ONLY (2026-10-24; the editor): La Ondo de Esperanto's strong
+# search wrote 11.8 GB of hits, nearly all «translit», a short Latin name against a Russian word at two edits («pugh»
+# against «пеш», «fey» against «день»), a tier tools/dowse-reader-roster.py, the strong search's one reader, never takes
+# (its STRONG: exact, near, confusion). The matching is unchanged (ocr_index.match(), the rule that a name's second form
+# is tried only on pages its first did not hit): only the hits of the other tiers are dropped in the workers, before
+# they are gathered or written, so the readers' roster is the same.
+STRONG_TIERS = {"exact", "near", "confusion"}
+
+
+def strong_hits(hs, forms):
+    tg = {NS.fold(max(re.findall(r"[^\W\d_]+", f), key=len)) for f in forms}
+    return [h for h in hs if tier(h[-2], NS.fold(re.sub(r"\s*…\s*", "", h[-1]).replace(" ", "")), tg, False) in STRONG_TIERS]
 
 
 def build_union(ujobs):
@@ -939,13 +962,26 @@ def build_union(ujobs):
 
 
 def _union_init(ujobs):
-    global _UNION
+    global _UNION, _STRONG
     _UNION = build_union(ujobs)
+    _STRONG = any(strong for _it, _f, strong in ujobs)
 
 
 def search_people(chunk):
     """a share of the roster against the union index: {person: [((item, text, page), how, as read)]}."""
-    return {label: [h for fm in forms for h in IX.match(fm, _UNION)] for label, forms in chunk}
+    out = {label: [h for fm in forms for h in IX.match(fm, _UNION)] for label, forms in chunk}
+    if _STRONG: out = {label: strong_hits(out[label], forms) for label, forms in chunk}
+    return out
+
+
+def search_people_slotted(chunk):
+    with CW.slot():
+        return search_people(chunk)
+
+
+def search_item_slotted(job):
+    with CW.slot():
+        return search_item(job)
 
 
 def read_roster(path):
@@ -1230,7 +1266,7 @@ def main():
             chunks = [people[i::n] for i in range(n)]
             res = {it: {label: [] for label, _ in people} for it, *_ in jobs}   # roster order, as search_item keys them
             with Pool(a.jobs, initializer=_union_init, initargs=(ujobs,)) as pool:
-                for part in pool.imap_unordered(search_people, chunks):
+                for part in pool.imap_unordered(search_people_slotted, chunks):
                     for label, hs in part.items():
                         for (it, rel, p), how, r in hs:
                             res[it][label].append((rel, p, how, r))
@@ -1245,7 +1281,7 @@ def main():
                 res[it]["\0size"] = size
         else:
             with Pool(a.jobs) as pool:
-                res = dict(pool.imap_unordered(search_item, jobs, chunksize=1))
+                res = dict(pool.imap_unordered(search_item_slotted, jobs, chunksize=1))
     secs = (datetime.datetime.now() - t0).seconds
     cpu = resource.getrusage(resource.RUSAGE_CHILDREN).ru_utime + resource.getrusage(resource.RUSAGE_SELF).ru_utime
     sizes = [v.pop("\0size") for v in res.values() if "\0size" in v]
@@ -1714,4 +1750,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # THE DOWSE'S LOCK (2026-10-26; Miles's test chain rebuilt the search text under the redowse search of 2026-10-25s,
+    # 23:38: the editor,): dowse-<pid>.lock for the run, refused while the chain holds
+    # the corpus (tools/corpus_locks.py, its holder named); released however the run ends.
+    with CL.held("dowse"):
+        main()

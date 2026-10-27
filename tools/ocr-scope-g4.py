@@ -27,6 +27,13 @@ import argparse, importlib.util, json, os, statistics, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location("ocr_accept", os.path.join(HERE, "ocr-accept.py"))
 A = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(A)
+# the gate's own folds, at its defaults (set in its main(), not on import), here at import so that
+# tools/ocr-acceptance-lines.py gets them too: the self-check stopped on *Portugala Revuo* 1909 file 53 at cupel17
+# (86.96 against the gate's 90.80), the old Portuguese spellings unfolded
+if A.lex("estonian"):
+    A._LEX["estonian"] = A.FoldedEstonian(A.lex("estonian"), "wv")
+if A.lex("portuguese"):
+    A._LEX["portuguese"] = A.OO.FoldedPortuguese(A.lex("portuguese"))
 PLANNED = [n for n in ("esperanto", "ido", "occidental") if A.lex(n)]
 
 
@@ -43,7 +50,10 @@ def page_hits(root, g):
         if n != g["primary"] and n not in A.TL.NONLATIN and A.lex(n) and n not in {m for m, _ in sec}:
             sec.append((n, A.lex(n)))
     out = {}
+    po = set(g.get("latin_po_pages") or [])   # the pages the gate leaves out of the Esperanto side (bi-script fix (d), 2026-10-24)
     for p, t in A.pages_of(os.path.join(root, g["corpus"]), True).items():
+        if p in po:
+            continue
         toks = [m.group(0).lower() for m in A.WORD.finditer(t)]
         if len(toks) < 60 or sum(1 for x in toks if A.CYRILLIC.search(x)) >= 0.5 * len(toks):
             continue

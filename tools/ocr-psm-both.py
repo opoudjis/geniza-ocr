@@ -32,6 +32,9 @@ choosing is visible and reversible rather than baked into the conversion.
 import os, re, sys, glob, argparse, subprocess, tempfile, shutil, time, threading
 import concurrent.futures as fut
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cupel_progress import write_new as _write   # run sheet rule 0 (2026-10-23): temp file then rename, so a run killed
+                                                 # mid-write never leaves a half-written file that a restart would skip
 from ocr_page_images import page_images, render_page
 
 
@@ -92,7 +95,7 @@ def main():
                         t2 = read(alt)
                         if len(t2) > len(t):
                             t = t2
-                open(f[:-len(".txt")] + ".psm4.txt", "w", encoding="utf-8").write(t)
+                _write(f[:-len(".txt")] + ".psm4.txt", t, True)
                 return n
             with fut.ThreadPoolExecutor(max_workers=a.jobs) as pool:
                 n_done = sum(1 for r in pool.map(one, todo) if r is not None)

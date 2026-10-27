@@ -101,7 +101,16 @@ def main():
             sc = f"SCOPE: absence admissible on pages {lo}–{hi} only ({hi - lo + 1} pp)" + (f" — {lab}" if lab else "") + f"; {kind}"
             if kind == "SECONDARY":
                 sc += " LITERATURE — absence here shows only that this work does not mention X; it is not evidence about the event"
-            out.append(f"{pre} {c} | pp. {lo}–{hi} of {pages} | {k} · {g4f} | {SEARCH[k]} | conditions: {sc}; {cond} | {led} · {a.g5} | {sig}")
+            # an «Esperanto side» row of a bi-script item admitted on its other side only (failure map R64; approved by the editor
+            # 2026-10-24 21:4x, `ocr-biscript-scope.py`): the row's own pages pass on the Esperanto side, so the
+            # item's «… side only» clause would contradict the row; the row says which side it admits
+            rcond = cond
+            if lab.startswith("Esperanto side") and v == "PASS":
+                rcond = re.sub(r"SPECIAL HANDLING \(bi-script\): (.*?) — absence admissible on the (\w+) side only",
+                               lambda m: f"SPECIAL HANDLING (bi-script): item {m[1]}; on pp. {lo}–{hi} the Esperanto side "
+                                         f"passes alone (G4 {sg4:.1f}, bar {bar}) — absence admissible on the ESPERANTO "
+                                         f"side of pp. {lo}–{hi}; the {m[2]} side as the item's own line", cond)
+            out.append(f"{pre} {c} | pp. {lo}–{hi} of {pages} | {k} · {g4f} | {SEARCH[k]} | conditions: {sc}; {rcond} | {led} · {a.g5} | {sig}")
             n[kind] = n.get(kind, 0) + 1
     if under:
         print("NO LINE, SCOPE UNDER THE BAR on its own pages (for the editor):\n  " + "\n  ".join(under))

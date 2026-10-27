@@ -2,6 +2,7 @@
 r"""ocr-page-number-look — Kapis's method: crop the page-number strips and have them READ BY VISION, not Tesseract.
 
     tools/ocr-page-number-look.py build --seq <OCR-PAGE-SEQUENCE-….tsv> --pdfs <list> --out <dir> [--what leads]
+    tools/ocr-page-number-look.py build --what pages --items <file> --pdfs <list> --out <dir>   # every page, batches of 15
     tools/ocr-page-number-look.py judge --out <dir> --returns <file>      # compare the numbers read with scan order
 
 WHY (a method suggested by Kapis of BitArkivo, 2026-09-29 00:03: crop out the part of the page that shows the page
@@ -44,13 +45,13 @@ def leads(seq):
     return out
 
 
-def strip_image(pdf, p, dst, work):
+def strip_image(pdf, p, dst, work, frac=0.14):
     from PIL import Image
     b = os.path.join(work, f"s{p:05d}")
     subprocess.run(["pdftoppm", "-r", "110", "-png", "-singlefile", "-f", str(p), "-l", str(p), pdf, b], capture_output=True)
     if not os.path.exists(b + ".png"):
         return False
-    im = Image.open(b + ".png"); w, h = im.size; k = int(h * 0.14)
+    im = Image.open(b + ".png"); w, h = im.size; k = int(h * frac)
     top, bot = im.crop((0, 0, w, k)), im.crop((0, h - k, w, h))
     out = Image.new("RGB", (w, 2 * k + 12), "white"); out.paste(top, (0, 0)); out.paste(bot, (0, k + 12))
     out.save(dst); return True
@@ -60,7 +61,26 @@ def build(a):
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import ocr_page_images as OPI
     pdfs = {os.path.splitext(os.path.basename(l.strip()))[0]: l.strip() for l in open(a.pdfs) if l.strip()}
-    L = leads(a.seq)
+    per = 24
+    if a.what == "pages":
+        # --what pages --items <file> (2026-10-27, cupel18c C6.4.1, the editor: Internacia Scienca Revuo 1904, no
+        # printed number read on any of its 449 pages): every page of each item named, in batches of 15 strips (the
+        # image-reader caps), so the printed numbers are read by vision where the OCR read none
+        per = 15; L = []
+        for c in (l.strip() for l in open(a.items, encoding="utf-8") if l.strip()):
+            n_ = int(re.search(r"Pages:\s+(\d+)", subprocess.run(["pdfinfo", pdfs[c]], capture_output=True, text=True).stdout).group(1))
+            L.append((f"P{len(L)+1:03d}", [(c, p) for p in range(1, n_ + 1)], "PAGES", "every page"))
+    elif a.what == "list":
+        # --what list --items <file of «item<TAB>PDF page» lines> (2026-10-27, cupel18c): named pages only, in batches of
+        # 15, for the reconcile's weak leads (run sheet C6.4.1: «a small look of the pages between, never dismissed unlooked»)
+        per = 15; L = []
+        for l in open(a.items, encoding="utf-8"):
+            if "\t" in l:
+                c, p = l.rstrip("\n").split("\t")[:2]
+                if not L or L[-1][1][-1][0] != c: L.append((f"P{len(L)+1:03d}", [], "PAGES", "named pages"))
+                L[-1][1].append((c, int(p)))
+    else:
+        L = leads(a.seq)
     os.makedirs(a.out, exist_ok=True)
     key, n, work = [], 0, tempfile.mkdtemp()
     try:
@@ -68,9 +88,9 @@ def build(a):
             for c, p in pages:
                 if c not in pdfs or p < 1:
                     continue
-                n += 1; b = f"b{(n - 1) // 24 + 1:02d}"; os.makedirs(os.path.join(a.out, b), exist_ok=True)
+                n += 1; b = f"b{(n - 1) // per + 1:02d}"; os.makedirs(os.path.join(a.out, b), exist_ok=True)
                 nn = f"{n:03d}"
-                if strip_image(pdfs[c], p, os.path.join(a.out, b, nn + ".png"), work):
+                if strip_image(pdfs[c], p, os.path.join(a.out, b, nn + ".png"), work, a.strip):
                     key.append(f"{nn}\t{b}\t{lid}\t{kind}\t{c}\t{p}\t{detail}")
                 # KEEP THE PAGE IMAGE (the editor ruled 2026-10-04 13:2x that the images of these PDFs be kept too,
                 # since they would otherwise have to be re-extracted if something later went wrong): the strip is cut from a 110 dpi
@@ -137,6 +157,10 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("mode", choices=("build", "judge"))
     ap.add_argument("--seq"); ap.add_argument("--pdfs"); ap.add_argument("--out", required=True)
-    ap.add_argument("--what", default="leads"); ap.add_argument("--returns")
+    ap.add_argument("--what", default="leads", help="leads (the default), or pages: every page of --items"); ap.add_argument("--returns")
+    ap.add_argument("--items", help="--what pages: a file of item names, one a line")
+    # --strip (2026-10-27, cupel18c): ÖNB scans carry a dark border and ÖNB's own footer line, so 14% of the image stops
+    # short of a page number set at the foot of the text (Internacia Scienca Revuo 1904: «— 188 —» at about 87% down)
+    ap.add_argument("--strip", type=float, default=0.14, help="the depth of each strip, a share of the page's height (default 0.14)")
     a = ap.parse_args()
     build(a) if a.mode == "build" else judge(a)

@@ -623,6 +623,9 @@ def main():
         print(line)
         return
     if a.mode == "columns2":
+        # rule 0 (2026-10-23, cupel18a): journaled like blocks; a run started again with the same --journal skips the pages
+        # in it; COLUMNS.json and the line from the records, so a resumed run writes what an uninterrupted one would
+        resuming = bool(a.journal) and os.path.exists(a.journal)
         items = [unicodedata.normalize("NFC", i) for i in json.load(open(a.items, encoding="utf-8"))]
         pdfn = {unicodedata.normalize("NFC", k): v for k, v in pdfs.items()}
         jobs, recs_all = [], {}
@@ -632,7 +635,7 @@ def main():
                 continue
             rec = json.load(open(cj)) if os.path.exists(cj) else {"mode": "columns (round 2 only)", "pages": []}
             recs_all[it] = rec
-            if "round2" in rec:
+            if "round2" in rec and not resuming:
                 sys.exit(f"round 2 done already: {it}/COLUMNS.json")
             cur = current_pages(a.root, it); tried = {r["page"] for r in rec["pages"]}
             for r in rec["pages"]:
@@ -641,24 +644,33 @@ def main():
             for n, t in cur.items():
                 if n not in tried and not os.path.exists(os.path.join(a.root, it, f"page-{n:04d}.cols.txt")):
                     jobs.append((a.root, it, pdfn[it], n, t, "untried"))
-        kept, out = collections.Counter(), collections.defaultdict(list)
-        with fut.ThreadPoolExecutor(max_workers=a.jobs) as ex:
-            for item, n, t, rec in ex.map(round2_page, jobs):
-                out[item].append(rec)
-                if rec["kept"]:
-                    p = os.path.join(a.root, item, f"page-{n:04d}.cols.txt")
-                    if os.path.exists(p):
-                        sys.exit(f"exists: {p}")
-                    open(p, "w", encoding="utf-8").write(t); kept[rec["kept"]] += 1
-        for item, rr in out.items():
-            rec = recs_all[item]; rec["round2"] = sorted(rr, key=lambda r: r["page"])
-            json.dump(rec, open(os.path.join(a.root, item, "COLUMNS.json"), "w"), indent=1)
-        un = sum(1 for j in jobs if len(j) == 6)
-        ku = sum(1 for rr in out.values() for r in rr if r.get("untried") and r["kept"])
-        print(f"round 2: {len(jobs)} pages ({len(jobs) - un} refused in round 1, {un} untried) · kept psm3 {kept['psm3']} "
-              f"({kept['psm3'] - ku} refused before, {ku} untried) · not kept {len(jobs) - sum(kept.values())}")
+        def handle(res, resuming_):
+            item, n, t, rec = res
+            if rec["kept"]:
+                p = os.path.join(a.root, item, f"page-{n:04d}.cols.txt")
+                if os.path.exists(p) and not resuming_:
+                    sys.exit(f"exists: {p}")
+                CP.write_new(p, t, resuming_)
+            return (item, n), dict(rec, item=item)
+        rr, P = run_journaled(a, round2_page, jobs, lambda j: (j[1], j[3]), "C7c.2 columns round 2", handle)
+        out = collections.defaultdict(list)
+        for r in rr:
+            out[r["item"]].append({k: v for k, v in r.items() if k != "item"})
+        for item, v in out.items():
+            rec = recs_all[item]; rec["round2"] = sorted(v, key=lambda r: r["page"])
+            CP.write_new(os.path.join(a.root, item, "COLUMNS.json"), json.dumps(rec, indent=1), True)
+        kept = collections.Counter(r["kept"] for r in rr if r["kept"])
+        un = sum(1 for r in rr if r.get("untried")); ku = sum(1 for r in rr if r.get("untried") and r["kept"])
+        line = (f"round 2: {len(rr)} pages ({len(rr) - un} refused in round 1, {un} untried) · kept psm3 {kept['psm3']} "
+                f"({kept['psm3'] - ku} refused before, {ku} untried) · not kept {len(rr) - sum(kept.values())}")
+        if P:
+            P.finish(line)
+        print(line)
         return
     if a.mode == "columns":
+        # rule 0 (2026-10-23, cupel18a): journaled like blocks (see columns2); the pages a run kept carry .cols.txt and drop
+        # out of the crossing list on a restart, their records coming from the journal
+        resuming = bool(a.journal) and os.path.exists(a.journal)
         items = [unicodedata.normalize("NFC", i) for i in json.load(open(a.items, encoding="utf-8"))]
         pdfn = {unicodedata.normalize("NFC", k): v for k, v in pdfs.items()}
         jobs = []
@@ -669,18 +681,24 @@ def main():
                 if cross_share(t) >= CROSS_MIN:
                     jobs.append((a.root, it, pdfn[it], n, t))
         for it in {j[1] for j in jobs}:
-            if os.path.exists(os.path.join(a.root, it, "COLUMNS.json")):
+            if os.path.exists(os.path.join(a.root, it, "COLUMNS.json")) and not resuming:
                 sys.exit(f"exists: {it}/COLUMNS.json")
-        kept, recs = 0, collections.defaultdict(list)
-        with fut.ThreadPoolExecutor(max_workers=a.jobs) as ex:
-            for item, n, t, rec in ex.map(columns_page, jobs):
-                recs[item].append(rec)
-                if rec["kept"]:
-                    open(os.path.join(a.root, item, f"page-{n:04d}.cols.txt"), "w", encoding="utf-8").write(t); kept += 1
-        for item, rr in recs.items():
-            json.dump({"mode": "columns (psm 3, deu, 400 ppi)", "pages": sorted(rr, key=lambda r: r["page"])},
-                      open(os.path.join(a.root, item, "COLUMNS.json"), "w"), indent=1)
-        print(f"{len(jobs)} pages crossing columns in {len(recs)} items · psm 3 kept on {kept}")
+        def handle(res, resuming_):
+            item, n, t, rec = res
+            if rec["kept"]:
+                CP.write_new(os.path.join(a.root, item, f"page-{n:04d}.cols.txt"), t, resuming_)
+            return (item, n), dict(rec, item=item)
+        rr, P = run_journaled(a, columns_page, jobs, lambda j: (j[1], j[3]), "C7c.1 columns", handle)
+        recs = collections.defaultdict(list)
+        for r in rr:
+            recs[r["item"]].append({k: v for k, v in r.items() if k != "item"})
+        for item, v in recs.items():
+            CP.write_new(os.path.join(a.root, item, "COLUMNS.json"),
+                         json.dumps({"mode": "columns (psm 3, deu, 400 ppi)", "pages": sorted(v, key=lambda r: r["page"])}, indent=1), True)
+        line = f"{len(rr)} pages crossing columns in {len(recs)} items · psm 3 kept on {sum(1 for r in rr if r['kept'])}"
+        if P:
+            P.finish(line)
+        print(line)
         return
     if a.mode == "pages":
         want = [l.rstrip("\n").split("\t")[:2] for l in open(a.list, encoding="utf-8") if l.strip()]

@@ -37,24 +37,37 @@ def _mod(n, p):
     a = sys.argv; sys.argv = [a[0]]; s.loader.exec_module(m); sys.argv = a; return m
 
 RULED = {   # item → (year or None, kind or None, the ruling)
-    # 2026-10-17, cupel14 C10 (the editor approved at 13:0x the three dates put to him, ruling Wilson contemporary and so primary):
-    "ANNO_e0g_19220012": (1972, "SECONDARY", "not a 1922 issue but a typed plan of the run «Plan de aparition de Kosmoglott 1922–1926 e Cosmoglotta 1927–1972», c. 1972, signed F.L. (C1 look 2026-10-16); decided by the editor, 2026-10-16, kept as its own item, SECONDARY by date; 2026-10-17 «yes»"),
-    "wilson.third.esperanto.congress": (1907, "PRIMARY", "Wilson's pamphlet on the Third Esperanto Congress, Cambridge 1907, undated in the tool's reading; decided by the editor, 2026-10-17"),
-    "samuel.interhelpo": (1935, "SECONDARY", "the imprint (Moscow, «Дер Эмес», 1935; C1 look 2026-10-16), not the «1926» of a citation on PDF p. 4 that the tool read; decided by the editor, 2026-10-17"),
-    "devjatnin-malhimno-postcard": (1921, "SECONDARY", "decided by the editor, 2026-10-17; c. 1921 by its "
-                                    "postmark «14. 8. 2[.]» (as read 2026-10-16), not our transcription's 2026"),
-    "Zakrzewski - Historio de Esperanto, 1913": (1913, "SECONDARY", "the editor ruled on 2026-10-09 that it is an "
-                                                "exception: secondary by its genre, an exception before 1914 that "
-                                                "is to be applied explicitly"),
-    "Nova dokumento pri la rilato de Zamenhof al Volapuk": (None, "PRIMARY", "the editor ruled on 2026-10-09: primary, even "
-                                                            "if it yields nothing"),
-    "L_ido_et_l_espéranto_suite_à_l_histori": (1911, "PRIMARY", "decided by the editor, 2026-10-09"),
-    "Esperanto_movado_kaj_homaj_rajtoj": (2016, "SECONDARY", "decided by the editor, 2026-10-09"),
-    # the editor's rulings of 2026-10-09 16:5x, on the pre-1914 histories and studies (an internal record, 2026-10-09, not published):
-    "Historio_kaj_teorio_de_Ido": (None, "PRIMARY", "decided by the editor, 2026-10-09"),
-    "logika bazo de vortfarado en Esperanto": (None, "SECONDARY", "the editor ruled on 2026-10-09: Esperanto linguistics, "
-                                                                  "secondary (with Couturat's Studyo)"),
-    "STUDYO_PRI_LA_DERIVADO": (None, "SECONDARY", "decided by the editor, 2026-10-09 (with "
+    # 2026-10-26 21:5x, born-digital items: Esperanta Stelo (signed by the editor 21:5x),
+    # dated by its masthead («Nº 1ª · 31 JANUARO 1912»), PRIMARY by the rule (Esperanto, 1914 or before); de Beaufront's
+    # Doktoro Louis Couturat, in Ido, 1923: PRIMARY by the Ido cutoff of 1931 (the editor 21:3x on the Coulommiers volume:
+    # the Esperanto cutoff is not for Ido, so it stays primary), where the rule had read it as Esperanto after 1914
+    "esperanta.stelo": (1912, None, "1912: the masthead of n-ro 1, «31 JANUARO 1912» (our transcription by vision, sources/born-digital-text/esperanta.stelo.txt); BPEAPE 3153: Buenos Aires, Jan 1912–1914"),
+    "beaufront-1923-doktoro-louis-couturat": (1923, "PRIMARY", "1923, in Ido: PRIMARY by the Ido cutoff of 1931 (the editor 2026-10-26 21:3x,)"),
+    # 2026-10-26 (the editor 21:2x; Ezri 10:2x: «yes … 1915 for the Coulommiers memorial volume»): the tool read
+    # 1868, Couturat's birth year in the file name, for the volume printed after his death
+    "Louis Couturat_1868-1914": (1915, "PRIMARY", "1915: the memorial volume «Louis Couturat 1868–1914» (Coulommiers 1915), not 1868, the year of his birth in the file name; Ezri 2026-10-26 10:2x, the editor 21:2x. PRIMARY: French with Ido (no «estas», «kaj» in 28,220 words; «esas», «qua»), Ido before the 1931 cutoff; the editor 21:3x"),
+    # 2026-10-24, cupel18a C10 (the editor 11:3x, on the date rule: Koresteno 1932, Ido after 1931, SECONDARY):
+    # 2026-10-24 (the editor 20:4x): the tool read «1900» from a citation («Teubner 1900 ff.»)
+    "rund_um_die_welt_haupenthal_nachwort": (2000, "SECONDARY", "2000: Haupenthal's «Nachwort zum Neudruck» to the reprint «Rund um die Welt. Eine Zeitschrift für Volapükisten und solche, die es werden wollen. 1.-4. Jahrgang April 1888 bis inclusive März 1892», Hildesheim, Zürich, New York: Georg Olms 2000, ISBN 3487101521 (the editor 2026-10-24 20:5x, from https://www.abebooks.com/Rund-Welt-Zeitschrift-Volap%C3%BCkisten-solche-wollen/30922580886/bd); no earlier printing of this afterword, which cites works of 2000 («HAUPENTHAL 2000», «Edition Iltis 2000»)"),
+    "schrey_federn_koresteno.part": (1932, "SECONDARY", "Schrey's Koresteno, 1932 (the editor's four pages); Ido after the 1931 cutoff; cupel18a C10, the editor 2026-10-24 11:3x"),
+    # 2026-10-17, cupel14 C10 (the editor 13:0x, to the three dates put to him):
+    "ANNO_e0g_19220012": (1972, "SECONDARY", "not a 1922 issue but a typed plan of the run «Plan de aparition de Kosmoglott 1922–1926 e Cosmoglotta 1927–1972», c. 1972, signed F.L. (C1 look 2026-10-16); the editor 2026-10-16 21:5x, kept as its own item, SECONDARY by date; confirmed 2026-10-17"),
+    "wilson.third.esperanto.congress": (1907, "PRIMARY", "Wilson's pamphlet on the Third Esperanto Congress, Cambridge 1907, undated in the tool's reading; the editor 2026-10-17 13:0x"),
+    "samuel.interhelpo": (1935, "SECONDARY", "the imprint (Moscow, «Дер Эмес», 1935; C1 look 2026-10-16), not the «1926» of a citation on PDF p. 4 that the tool read; the editor 2026-10-17 13:0x"),
+    "devjatnin-malhimno-postcard": (1921, "SECONDARY", "the editor 2026-10-17 00:0x; c. 1921 by its "
+                                    "postmark «14. 8. 2[.]» (Ezri's reading, 2026-10-16), not our transcription's 2026"),
+    "Zakrzewski - Historio de Esperanto, 1913": (1913, "SECONDARY", "the editor 2026-10-09 13:5x: «zakriweski has to be an "
+                                                "exception, it is secondary, bc of genre. but that exception before 1914 has "
+                                                "to be applied very explicitly»"),
+    "Nova dokumento pri la rilato de Zamenhof al Volapuk": (None, "PRIMARY", "the editor 2026-10-09 13:5x: «primary, even "
+                                                            "if it yields nothing»"),
+    "L_ido_et_l_espéranto_suite_à_l_histori": (1911, "PRIMARY", "the editor 2026-10-09 13:5x to «about 1911, so PRIMARY»"),
+    "Esperanto_movado_kaj_homaj_rajtoj": (2016, "SECONDARY", "the editor 2026-10-09 13:5x to «about 2016, so SECONDARY»"),
+    # the editor 2026-10-09 16:5x, on the pre-1914 histories and studies of ITEM-DATES-FOR-THE-EDITOR § 1:
+    "Historio_kaj_teorio_de_Ido": (None, "PRIMARY", "the editor 2026-10-09 16:5x"),
+    "logika bazo de vortfarado en Esperanto": (None, "SECONDARY", "the editor 2026-10-09 16:5x: «espearnto linguistics, "
+                                                                  "secondary» (with Couturat's Studyo)"),
+    "STUDYO_PRI_LA_DERIVADO": (None, "SECONDARY", "the editor 2026-10-09 16:5x (with "
                                                   "de Saussure's Logika bazo)"),
     # translators' prefaces, items of their own (2026-10-10 17:1x: the editor ruled the three period ones PRIMARY);
     # their texts hold only the preface, so no header dates them

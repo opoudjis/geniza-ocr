@@ -55,8 +55,13 @@ PRESENCE_ONLY_DECLARED = re.compile(r"posta[-_ ]?mundi")
 # Named items ruled PRESENCE ONLY, whatever their OCR; the ruling is the reason given, ahead of any gate
 # failure, because the editor has ruled the failure not worth fixing.
 PRESENCE_ONLY_NAMED = {
-    # cupel16 C13, rule 15 (an internal record, 2026-10-20, not published): temerov's 37-page extract of Couturat–Leau
-    # 1903 (the Volapük chapter), wholly within archive.org's copy and no better read; approved by the editor as proposed, 2026-10-20 14:4x
+    # cupel18c C11: G5 failed on Internacia Scienca Revuo 1904 alone (8 of 40 contradicted, every LOST page this volume's:
+    # its two columns read in alternating blocks); the editor 2026-10-27 13:1x «sign without revuo, then focus on gutter
+    # cut, and have it address both ezri and revuo»: presence only until the gutter cut (run sheet C7c.2b) re-reads it and
+    # G5 passes on it
+    "InternaciaSciencaRevuo_1904": "held out of cupel18c's signature: G5 failed on its pages, its columns read out of order, until the gutter cut re-reads it (editor's ruling, 2026-10-27)",
+    # cupel16 C13, rule 15 (ocr/runs/CUPEL16-RULE15-SECOND-COPIES-2026-10-20.md): temerov's 37-page extract of Couturat–Leau
+    # 1903 (the Volapük chapter), wholly within archive.org's copy and no better read; the editor 2026-10-20 14:4x
     # cupel16 C13, rule 15: temerov's Dutch Volapükabled 1884–85, page for page the same run as ÖNB's `volapükabled`
     # (cupel15, signed), no gap of coverage or quality; the editor ruled on 2026-10-20 15:1x that ÖNB's be kept
     # cupel16, the doubles census (an internal record, 2026-10-20, not published): the Mittheilungen of the Vienna Volapük
@@ -90,8 +95,14 @@ PRESENCE_ONLY_NAMED = {
     "mittheilungen_wwv_wien_1887": "a second copy kept off: page for page the same as mittheilungen_wwv_1887_brefik, no quality gap (rule 15; editor's ruling, 2026-10-20)",
     "vpabled_nedanik_haastert_1884-85": "a second copy kept off: page for page within volapükabled (ÖNB), no quality gap (rule 15; editor's ruling, 2026-10-20)",
     "couturat_leau_histoire_1903": "a second copy kept off: wholly within histoiredelalang00coutuoft, no quality gap (rule 15; editor's ruling, 2026-10-20)",
-    # the editor ruled on 2026-09-28 01:06 that dictionaries are not needed for the prosopography, and that these be
-    # deemed secondary, with no need to fix them at all.
+    "Diskuto pri 'garsono' en Progreso 1913-1914": "a second copy kept off: a one-page archive.org extract of the Garsono discussion, which progreso6 (PDF 653, printed VI p. 533) and progreso7 (PDF 135 and 240, printed VII pp. 99 and 204) hold whole (rule 15; the editor 2026-10-25, by Ezri: to be deleted)",
+    # 2026-10-26, rule 15 (the editor; Ezri 11:2x «You can withdraw louiscouturat at cupel18b's chain»): the
+    # OCR reading of ido-vivo's Word-made PDF of de Beaufront's Doktoro Louis Couturat (1923), now the signed born-digital
+    # item beaufront-1923-doktoro-louis-couturat (its typed text; ocr/lines/BORN-DIGITAL-LINES-2026-10-26-SIGNED-beaufront-couturat.txt)
+    "louiscouturat": "a second copy kept off: the OCR reading of a typed PDF whose own text is the signed born-digital item beaufront-1923-doktoro-louis-couturat (rule 15; the editor 2026-10-26)",
+    "EsperantoRuslando.1905.sennumera":"a second copy kept off: page for page the same issue (N-ro 1–2, January 1905) as EsperantoRuslando.1905.1-2, which reads better on every page, Esperanto and Russian (rule 15; editor's ruling, 2026-10-24)",
+    # editor 2026-09-28 01:06: «we don't need dictionaries for the prosopography. deem these secondary,
+    # not pressing to fix these at all.»
     "matematikal": "secondary — a two-language dictionary (editor's ruling, 2026-09-28)",
     "rusalibrovortaro": "secondary — a two-language dictionary (editor's ruling, 2026-09-28)",
     "ukraina": "secondary — a two-language dictionary (editor's ruling, 2026-09-28)",
@@ -163,6 +174,21 @@ FALSE_BISCRIPT = {
 # the names marked unfindable re-run through tools/ocr-name-search.py, and every empty page seen on the image
 # (vision batches q01–q10: all blank). A G4 fail is then cleared; any other reason still counts.
 NAMELIST_CHECKED = {
+    # cupel18b, Tutmonda Jarlibro Esperantista 1904–1909, directories of Esperantists and societies, PRESENCE ONLY on G4
+    # alone (54–61); the editor 2026-10-26 16:5x (C10: whole-item PRIMARY, lines if C11's name check clears
+    # them): a G5 of their pages on name recall (sources/cupel-batch-18b/g5-lists/, seed 2610262, class ledger-presence-g4):
+    # 40 pages, 0 contradicted, 383/385 names found, none LOST
+    "ANNO_e4d_19040005": "the yearbook's directories (1904); G5 on name recall 2026-10-26: 383/385 names found over 1904–1909, 19/20 on this volume's 2 pages",
+    "ANNO_e4d_19050005": "the yearbook's directories (1905); G5 on name recall 2026-10-26: 383/385 names found over 1904–1909, 70/70 on this volume's 7 pages",
+    "ANNO_e4d_19060005": "the yearbook's directories (1906); G5 on name recall 2026-10-26: 383/385 names found over 1904–1909, 110/111 on this volume's 12 pages",
+    "ANNO_e4d_19070005": "the yearbook's directories (1907); G5 on name recall 2026-10-26: 383/385 names found over 1904–1909, 130/130 on this volume's 13 pages",
+    "ANNO_e4d_19080005": "the yearbook's directories (1908); G5 on name recall 2026-10-26: 383/385 names found over 1904–1909, 14/14 on this volume's 2 pages",
+    "ANNO_e4d_19090005": "the yearbook's directories (1909); G5 on name recall 2026-10-26: 383/385 names found over 1904–1909, 40/40 on this volume's 4 pages",
+    # cupel18a, Svisa Espero's December issues with the society's members' list (the editor 2026-10-24 15:1x: «we have precedent
+    # for admitting name lists on name recall, right. ok»): a G5 of their pages on name recall
+    # (sources/cupel-batch-18a/g5-lists/, seed 2410244, class ledger-presence-g4): 40 pages, 0 contradicted, 369/369 names found
+    "ANNO_e5a_19060112": "the S. E. S. members' list (1906, 277 lines in Esperanto form); G5 on name recall 2026-10-24: 369/369 names found over both issues",
+    "ANNO_e5a_19070112": "the S. E. S. members' list (1907, in French form); G5 on name recall 2026-10-24: 369/369 names found over both issues",
     "Nomaro de la kongresanoj 1905": "631 names on 33 text pages, 1 unfindable (p.7 «M. Fichot (Auxerre)»); 32 empty pages blank",
     "Adresaro de la kongresanoj en Boulogne-sur-Mer 1905": "365 names on 20 text pages, 0 unfindable by the search; empty pages blank",
     # approved by the editor, 2026-10-01 00:28, for the three below (checks recorded in an internal record, 2026-09-30, not published;
@@ -303,6 +329,14 @@ ADS_EXCLUDED = {   # the editor ruled on 2026-10-02 11:1x that the 18 are unambi
     # the editor ruled on 2026-10-20 12:4x that all seven be excluded
     *(('volkswohl_weltsprachliches_1899', p) for p in (19, 30, 50)),
     *(('vom_guten_das_beste_1897-99', p) for p in (17, 29, 35, 60)),
+    # cupel17 (ocr/runs/CUPEL-BATCH-17-ADLOOK-2026-10-23.md): Vespera Horo 1910, the two pages of the 8 looked at that are
+    # trade advertising only (Swiss and German firms: mouthwash, bedding, tonics, prams, Ovomaltine, soap, corsets); the
+    # editor 2026-10-23 13:0x
+    *(('ONB_e1n_19100402', p) for p in (8, 9)),
+    # cupel18a (ocr/runs/CUPEL-BATCH-18A-ADLOOK-2026-10-24.md): Svisa Espero 1911 file 104 PDF 20, the one page of the 13
+    # looked at that is trade advertising only (Zurich alcohol-free restaurants and boarding house; the Kuz-Globo globe and
+    # atlas, with an order form); the editor 2026-10-24 11:5x
+    ('ANNO_e5a_19110104', 20),
 }
 # A PART exception (approved by the editor, 2026-10-08 02:4x, on a proposal, an internal record, 2026-10-08, not published, (b)): a block
 # on a page that is not in the text, while the rest of the page is (cupel5: a hand-lettered advertisement among kept
@@ -325,6 +359,19 @@ COLUMN_RISK = {   # E5, the editor ruled at 13:3x that they be kept, with a note
     f"KaukazaEsperantisto.1910.{n}" for n in ("1", "2", "3", "5", "6", "7", "8", "9", "10-11", "12")}
 
 
+def _ranges(ps):
+    """[1, 2, 3, 7, 9, 10] → «1–3,7,9–10»"""
+    out, ps = [], sorted(ps)
+    i = 0
+    while i < len(ps):
+        j = i
+        while j + 1 < len(ps) and ps[j + 1] == ps[j] + 1:
+            j += 1
+        out.append(f"{ps[i]}–{ps[j]}" if j > i else str(ps[i]))
+        i = j + 1
+    return ",".join(out)
+
+
 def reclassify(c, exc):
     """The class of an item that is neither PRESENCE ONLY nor PENDING, from its notes: (class, notes)."""
     if c in SCOPED:
@@ -338,9 +385,10 @@ def reclassify(c, exc):
         notes.append(e)
     handling, cleared, excluded = [], [], []
     for e in notes:
-        if "Russian scored alone" in e or "both sides pass" in e or (c in RUSSIAN_DOMINANT and "RUSSIAN side only" in e):
+        if "Russian scored alone" in e or "both sides pass" in e or (c in RUSSIAN_DOMINANT and "RUSSIAN side only" in e) \
+                or re.match(r"the Latin reading of \d+ Cyrillic page\(s\) p\.", e):
             handling.append(e)
-        elif "cleared by the IMAGE CHECK" in e:
+        elif "cleared by the IMAGE CHECK" in e or e.startswith("NAME LIST checked on NAME RECALL"):
             cleared.append(e)
         elif re.fullmatch(r"\d+ bi-script page\(s\): [A-Za-z/-]+ PRESENCE ONLY; Esperanto gated alone", e) \
                 and c in RUSSIAN_DOMINANT:
@@ -381,6 +429,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--gate", required=True); ap.add_argument("--g1", required=True); ap.add_argument("--out", required=True)
     ap.add_argument("--pdfs", required=True, help="the PDF list G1 was run over: a corpus in it but absent from the G1 report had NO silent pages")
+    ap.add_argument("--lift", action="append", default=[], help="build as if the editor's named PRESENCE ONLY ruling for this item "
+                    "were lifted: for a TEST ledger only (an item held out until a re-read is sampled again, e.g. Internacia Scienca "
+                    "Revuo 1904 after the gutter cut, 2026-10-27); the header says so; never the CURRENT ledger")
     a = ap.parse_args()
     gate = {r["corpus"]: r for r in json.load(open(a.gate))}
     g1 = {r["corpus"]: r for r in json.load(open(a.g1))}
@@ -552,6 +603,16 @@ def main():
                              .replace("RUSSIAN side only", f"{L.upper()} side only"))
                 exc[:] = [_bg(e) for e in exc]
                 why = _bg(why)
+        # THE LATIN READING OF THE CYRILLIC PAGES (bi-script fix (d), the editor 2026-10-24 21:2x;
+        # geniza/ocr/method/BISCRIPT-GATE-FIX-2026-10-24.md): the gate scored the Esperanto side without the pages the Russian
+        # step accepted (`latin_po_pages`); their Latin reading is PRESENCE ONLY, never discarded. A handling note (it
+        # excludes no page from the Russian side), and the item's absence claims search every reading (below), so a
+        # Latin-script name printed inside the Cyrillic text is searched until the Latin readings join the search text
+        # (point 1, with the small-capitals recupel: one redowse list).
+        lpo = r.get("latin_po_pages") or []
+        if lpo:
+            exc.append(f"the Latin reading of {len(lpo)} Cyrillic page(s) p.{_ranges(lpo)}: PRESENCE ONLY, "
+                       "the Esperanto side scored without them (editor's ruling 2026-10-24)")
         # A SHORT ITEM THAT FAILS G4 MAY BE CLEARED BY THE IMAGE CHECK — with a hard edge (approved by the editor,
         # 2026-09-28 01:57, on *oficiala aldono* 5a/6a: Esperanto glossed in six
         # languages, so G4 fails on structure, not on reading). ALL of: at most 4 pages, so every page was
@@ -565,17 +626,24 @@ def main():
                     and all("well read" in n and "mostly" not in n and "garbled" not in n for n in ns):
                 exc.append(f"{why} — cleared by the IMAGE CHECK of every page (≤ 4 pages, all NOTHING, well read; editor's ruling 2026-09-28)")
                 why = ""
-        if why.startswith("fails G4") and c in NAMELIST_CHECKED:   # a name list cleared by the name check (above)
-            why = ""
+        if c in NAMELIST_CHECKED:   # a name list judged by the name check (above), and its line says so (the editor
+            # 2026-10-24 20:3x, who asked that the earlier instance say so too); no «;» in
+            # the note (the conditions are split on it)
+            g4f = why.startswith("fails G4")
+            exc.append("NAME LIST checked on NAME RECALL, by the images (" + NAMELIST_CHECKED[c].replace(";", ",") + ")"
+                       + (f": {why}, cleared by the NAME CHECK" if g4f else "") + " (editor's ruling 2026-10-01)")
+            if g4f: why = ""
         if not why and PRESENCE_ONLY_DECLARED.search((c + " " + src.get(c, "")).lower()):   # name OR folder («40» lives in posta-mundi-40/)
             why = "secondary — presence only by the editor's ruling (Posta Mundi, 2026-09-27)"
-        if c in PRESENCE_ONLY_NAMED:
+        if c in PRESENCE_ONLY_NAMED and c not in a.lift:
             why = PRESENCE_ONLY_NAMED[c] + (f" [gate: {why}]" if why else "")
         if why: k = "PRESENCE ONLY"
         elif pend: k = "PENDING"
         else: k, exc = reclassify(c, exc)
-        if k == "SPECIAL HANDLING":
-            # the editor chose (a) on 2026-10-02 22:5x, the extra readings being there for this: the absence search on these items
+        if k == "SPECIAL HANDLING" or (k == "WITH EXCEPTIONS" and any(re.match(r"the Latin reading of \d+ Cyrillic", e) for e in exc)):
+            # (2026-10-24, bi-script fix (d)): also a WITH EXCEPTIONS item with Cyrillic pages, so a Russian-side absence
+            # claim reads their Latin reading too (Drezen 1928, Bulgara Esperantisto 1907)
+            # editor 2026-10-02 22:5x: the absence search on these items
             # reads EVERY reading on disk (G5 on 10-02c: missed names were in psm4 / rus / rusfull, not in the text searched)
             exc = exc + ["SEARCH EVERY READING: an absence claim searches sources/ocr-rendersearch-all/<item>.txt "
                          "(every reading of each page, tools/ocr-search-all-readings.py)"]
@@ -584,6 +652,8 @@ def main():
     rows.sort(key=lambda x: (x[3], x[0].lower()))
     with open(a.out + ".tsv", "w", encoding="utf-8") as f:
         f.write(f"# GENERATED by tools/ocr-absence-ledger.py from {os.path.basename(a.gate)} + {os.path.basename(a.g1)}. Do not hand-edit — re-run it. SIGNS NOTHING.\n")
+        if a.lift:
+            f.write(f"# A TEST LEDGER, NEVER CURRENT: the editor's named PRESENCE ONLY ruling lifted for {', '.join(a.lift)}, to sample it again.\n")
         f.write("corpus\tpages\tG4\tclass\twhy presence only\twhy pending\texceptions (excluded from absence findings)\n")
         for x in rows:
             f.write("\t".join(map(str, x)) + "\n")

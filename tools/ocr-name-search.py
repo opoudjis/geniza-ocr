@@ -183,6 +183,13 @@ def close(t, target, cap):
     # still found by the joins, which compare the pieces joined.
     if len(t) <= 2:
         return t == target
+    # ... AND A NAME of two letters or fewer likewise (2026-10-24; the editor): the rule above held for the word
+    # on the page only, so a short name went through the transliteration rule at c + 1 and matched nearly every short
+    # Russian word («ro» against «род», «o» against «от»): La Ondo de Esperanto's strong search, 25.3 million hits,
+    # 17.5 million of them from 584 such names. The ruling of 2026-10-06 was the name's: «we are not going to be
+    # searching two-letter names … and if we ever did we wd have to insist on exact anyway».
+    if len(target) <= 2:
+        return t == target
     if edits(t, target, cap) <= cap:
         return True
     tc, gc = is_cyr(t), is_cyr(target)

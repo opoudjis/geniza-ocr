@@ -28,6 +28,16 @@ SM = importlib.util.module_from_spec(_s); _s.loader.exec_module(SM)   # best_mer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ocr_russian_reading as RR   # the old-letter rule: `orus` or `rus` per page
 
+
+def write_whole(path, text):
+    """Each file whole: to a temporary name beside it, then renamed over it, so no reader (a dowse, the gate) ever opens
+    a half-written file (2026-10-26 00:4x, after the chain of 2026-10-25 23:38 ran under Ezri's redowse search; Ezri:
+    «writing to a temporary name and then renaming covers every other reader of the texts»)."""
+    tmp = f"{path}.tmp-{os.getpid()}"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    os.replace(tmp, path)
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -135,8 +145,16 @@ def main():
             blocks = pages[n][:-len(".txt")] + ".blocks.txt"
             if os.path.exists(blocks) and n not in russian:
                 src, recipe = blocks, "blocks"
-            # A FRAKTUR RE-READ (`page-NNNN.frk.txt`, tools/ocr-reocr-best.py fraktur, 2026-10-18, on the editor's ruling that
-            # pages left open must be resolved): a German page in Fraktur read with frk+deu; outranks the column re-read.
+            # THE GUTTER CUT (`page-NNNN.gutter.txt`, tools/ocr-gutter-cut.py, C7c.2b, 2026-10-27, the editor «hold, recut, build
+            # the bloody thing»): a page in columns cut at its gutters band by band, each column read top to bottom; written only
+            # where no worse; outranks the column and block re-reads it was made to replace (the Revuo's blocks read alternately)
+            gutter = pages[n][:-len(".txt")] + ".gutter.txt"
+            gutter_prev = None
+            if os.path.exists(gutter) and n not in russian:
+                gutter_prev = src                             # the reading it replaces: appended to the SEARCH text (below)
+                src, recipe = gutter, "gutter"
+            # A FRAKTUR RE-READ (`page-NNNN.frk.txt`, tools/ocr-reocr-best.py fraktur, 2026-10-18, the editor «if they are open,
+            # then surely they need to be rsolved»): a German page in Fraktur read with frk+deu; outranks the column re-read.
             frk = pages[n][:-len(".txt")] + ".frk.txt"
             if os.path.exists(frk) and n not in russian:
                 src, recipe = frk, "frk"
@@ -201,7 +219,7 @@ def main():
             # conversion's own reading (`page-NNNN.txt`), that reading is APPENDED to the SEARCH text, as a boosted reading is
             # (below): the re-read (column-aware) first, then the words it lost (1889 file 59 PDF 1: 617 against 1,302 words, two
             # names lost; Le Volapük 1889.07 PDF 9: 512 against 658). The PREFERRED text keeps the re-read alone.
-            if recipe.split("+")[0] in ("cols", "reocr", "frk", "blocks"):
+            if recipe.split("+")[0] in ("cols", "reocr", "frk", "blocks", "gutter"):
                 base_t = open(pages[n], encoding="utf-8", errors="ignore").read()
                 nb, nr = len(re.findall(r"[^\W\d_]{2,}", base_t)), len(re.findall(r"[^\W\d_]{2,}", text))
                 if nb >= 40 and nr < 0.8 * nb:
@@ -209,6 +227,12 @@ def main():
                     recipe += "+c4-add"
             # SECOND READINGS (2026-10-18, on the editor's ruling to keep both readings; tools/ocr-reocr-best.py adds): a refused Fraktur re-read
             # (`.frk-add.txt`, «ſ» folded) and a refused psm 3 re-read (`.cols-add.txt`) are APPENDED to the SEARCH text only.
+            # THE READING THE GUTTER CUT REPLACED (2026-10-27): appended to the SEARCH text, as the editor's has
+            # it for the column re-reads: the blind comparison on 20 Jarlibro pages found the cut better on order 20 of 20 but
+            # on coverage 12, the held reading 5 (names and headings split at the cut); the PREFERRED text keeps the cut alone
+            if recipe.split("+")[0] == "gutter" and gutter_prev and os.path.exists(gutter_prev):
+                text = text.rstrip("\n") + "\n" + open(gutter_prev, encoding="utf-8", errors="ignore").read()
+                recipe += "+gutter-prev"
             for kind in ("frk", "cols"):
                 ap_ = pages[n][:-len(".txt")] + f".{kind}-add.txt"
                 if os.path.exists(ap_) and recipe.split("+")[0] not in ("hand", "ruled"):
@@ -264,8 +288,9 @@ def main():
             # SMALL-CAPS RE-READ (`page-NNNN.sc3x.txt`, 3× Tesseract, 2026-09-30) join the SEARCH text of EVERY page that has
             # one — search only; the PREFERRED reading is unchanged. FIXED 2026-09-30 23:0x: the layout reading had joined
             # search only on the partly-read pages (triangulation, above), so on the 2,913 pages that have one, 16,232 real
-            # Esperanto words it holds were in no searched text (the editor ruled that the gap be closed).
-            for kind in ("layout", "sc3x"):
+            # Esperanto words it holds were in no searched text (editor).
+            # (2026-10-24: and the NAME SNIPPETS read by vision, `page-NNNN.names.txt`, tools/ocr-name-crops.py: search only too)
+            for kind in ("layout", "sc3x", "names"):
                 xf = pages[n][:-len(".txt")] + f".{kind}.txt"
                 if os.path.exists(xf) and os.path.abspath(xf) != os.path.abspath(src):
                     t_ = open(xf, encoding="utf-8", errors="ignore").read()
@@ -319,15 +344,14 @@ def main():
             # in a tree of its OWN, beside the search tree, so no search over `<root>/*.txt` meets a page twice
             proot = os.path.join(os.path.dirname(os.path.abspath(a.root).rstrip("/")), "ocr-preferred")
             os.makedirs(proot, exist_ok=True)
-            open(os.path.join(proot, corpus + ".txt"), "w", encoding="utf-8").write("".join(body_pref))
-            with open(os.path.join(d, "PREFERRED.tsv"), "w", encoding="utf-8") as pf:
-                pf.write("page\tpreferred\tfiles\tsecond_script\tsearch_text_recipe\n")
-                pf.writelines(f"{n}\t{pr}\t{fs}\t{ss}\t{sr}\n" for n, pr, fs, ss, sr in prefrows)
+            write_whole(os.path.join(proot, corpus + ".txt"), "".join(body_pref))
+            write_whole(os.path.join(d, "PREFERRED.tsv"), "page\tpreferred\tfiles\tsecond_script\tsearch_text_recipe\n"
+                        + "".join(f"{n}\t{pr}\t{fs}\t{ss}\t{sr}\n" for n, pr, fs, ss, sr in prefrows))
         if a.preferred_only:
             changed += 1
             continue
         if not a.dry_run:
-            open(out, "w", encoding="utf-8").write("".join(body))
+            write_whole(out, "".join(body))
             c = [f"# CANONICAL — which reading is in the combined text, per page\n",
                  "**GENERATED by `tools/ocr-rebuild-combined.py`. Do not hand-edit — re-run it.**\n",
                  f"`{corpus}` · {len(pages)} pages · "
@@ -346,7 +370,7 @@ def main():
             for n, recipe, why, e6, e4 in rows:
                 mark = f"**{recipe}**" if recipe != "psm6" else "psm6"
                 c.append(f"| {n} | {mark} | {why} | {e6} | {e4} |")
-            open(os.path.join(d, "CANONICAL.md"), "w", encoding="utf-8").write("\n".join(c) + "\n")
+            write_whole(os.path.join(d, "CANONICAL.md"), "\n".join(c) + "\n")
         changed += 1
     print(f"{changed} corpora rebuilt · {tally:,} pages took a reading other than psm 6"
           + (" (DRY RUN — nothing written)" if a.dry_run else ""))

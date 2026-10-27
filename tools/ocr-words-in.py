@@ -50,6 +50,9 @@ def page_words(item):
     return _cache[item]
 
 
+_KIND = lambda item: ""                                    # set in main(): the item table's kind of an item
+
+
 def signed_words(signed):
     tot, missing = {"PRIMARY": 0, "SECONDARY": 0, "UNSCOPED": 0}, []
     for item, (_, _, lines) in signed.items():
@@ -60,6 +63,12 @@ def signed_words(signed):
             cond = " | ".join(x)
             m = SCOPE.search(cond)
             kind = ("PRIMARY" if "; PRIMARY" in cond else "SECONDARY" if "SECONDARY LITERATURE" in cond else "UNSCOPED")
+            # a line that names no kind takes its item's kind from the item table, as the born-digital count does (2026-10-27:
+            # the lines signed before scope files carry no «PRIMARY», and 50,032,372 words were reported «without a kind»
+            # though every item but one has its kind in the table; the editor: «this is the FIRST TIME that lines have had no
+            # kind recorded»)
+            if kind == "UNSCOPED":
+                kind = {"PRIMARY": "PRIMARY", "SECONDARY": "SECONDARY"}.get(_KIND(item), "UNSCOPED")
             tot[kind] += sum(n for p, n in pw.items() if not m or int(m.group(1)) <= p <= int(m.group(2)))
     return tot, missing
 
@@ -107,6 +116,8 @@ def main():
         before = D.signed_lines()
     finally:
         D.glob.glob = real_glob
+    global _KIND
+    _KIND = bd_kinds()
     (ta, ma), (tb, mb) = signed_words(after), signed_words(before)
     print("| signed pages, words | before the round | after | added |\n|---|---:|---:|---:|")
     for k in ("PRIMARY", "SECONDARY", "UNSCOPED"):

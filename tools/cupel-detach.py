@@ -11,8 +11,10 @@ command and keeps a helper of its own asserting on the command's behalf (`pmset 
 behalf of …»), so --pid gets THE COMMAND'S pid: `kill <pid>` stops the run, and the assertion ends with it. Prints the pid
 and returns at once. Refuses an existing --log or --pid. Tested 2026-10-22 on 20 pages of cupel17's blocks list: killed
 after 6 journaled pages, resumed («6 of 20 already done»), the outputs byte for byte those of an uninterrupted run.
+Runs only `python3|bash <tools>/<script> …` with <script> on approved_scripts in ~/.claude/hooks/sandbox-lists.json (the
+box-free cupel, 2026-10-24: this tool is on that list, so it must not carry past the gate a command the gate would ask for).
 """
-import os, sys, argparse
+import os, sys, json, argparse
 
 ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 ap.add_argument("--log", required=True); ap.add_argument("--pid", required=True)
@@ -21,6 +23,11 @@ a = ap.parse_args()
 cmd = a.cmd[1:] if a.cmd[:1] == ["--"] else a.cmd
 if not cmd:
     sys.exit("no command")
+L = json.load(open(os.path.expanduser("~/.claude/hooks/sandbox-lists.json")))
+s = os.path.realpath(cmd[1]) if len(cmd) > 1 else ""
+if (os.path.basename(cmd[0]) not in ("python3", "bash") or os.path.dirname(s) != os.path.realpath(L["tools_dir"])
+        or os.path.basename(s) not in L["approved_scripts"]):
+    sys.exit(f"refusing: runs only python3|bash <tools>/<approved script>, not {' '.join(cmd[:2])}")
 for p in (a.log, a.pid):
     if os.path.exists(p):
         sys.exit(f"exists: {p}")
@@ -34,4 +41,7 @@ fd = os.open(os.devnull, os.O_RDONLY); os.dup2(fd, 0)
 lg = os.open(a.log, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644); os.dup2(lg, 1); os.dup2(lg, 2)
 open(a.pid, "x").write(f"{os.getpid()}\n")
 os.write(w, f"{os.getpid()}".encode()); os.close(w)
+# the core dial (tools/cupel_workers.py): any detached run reads tesseract and pdftoppm through tools/shims, which wait
+# for a slot while geniza/ocr/CORE-DIAL exists and run at once while it does not
+os.environ["PATH"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shims") + os.pathsep + os.environ.get("PATH", "")
 os.execvp("caffeinate", ["caffeinate", "-i", "-s"] + cmd)

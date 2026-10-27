@@ -31,8 +31,9 @@ def main():
     a = ap.parse_args()
     if os.path.exists(a.out): sys.exit(f"--out {a.out} exists: write only into a NEW folder")
     want = set(a.classes.split(","))
+    # and any item whose notes call for it (2026-10-24, bi-script fix (d): a WITH EXCEPTIONS item with Cyrillic pages)
     items = [r[0] for r in (l.rstrip("\n").split("\t") for l in open(a.ledger, encoding="utf-8") if not l.startswith("#"))
-             if len(r) > 3 and r[3] in want]
+             if len(r) > 3 and (r[3] in want or "SEARCH EVERY READING" in "\t".join(r[4:]))]
     rus = os.path.join(os.path.dirname(os.path.abspath(a.root)), "ocr-rendersearch-rus")
     os.makedirs(a.out); n_items = n_pages = 0; kinds = collections.Counter()
     for c in items:

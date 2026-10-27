@@ -291,7 +291,13 @@ DECLARED = {
     # cupel17, 2026-10-21 (accepted by the editor 00:3x): main languages outside the planned three; also DECLARED in
     # tools/ocr-text-languages-table.py (an internal record, 2026-10-21, not published)
     "/ANNO_e0d_": "german",    # Rund um die Welt 1909–14: German beside Esperanto
-    "/ANNO_e6g_": "french",    # Lingua Internationale 1911–12: French
+    "/ANNO_e6g_": "latino-sine-flexione",    # Lingua Internationale 1911–12: mostly Latino sine flexione, with French (re-declared 2026-10-23)
+    # cupel18a, 2026-10-23 (the editor 16:2x; geniza/ocr/runs/CUPEL18A-C5-DECLARATIONS-PROPOSAL-2026-10-23.md)
+    "/couturat_pour_la_langue_internationale_1906.": "french",   # Couturat 1906, 4th ed.: French
+    # cupel18c, 2026-10-26 (the editor 22:2x; geniza/ocr/runs/CUPEL18C-C5-DECLARATIONS-PROPOSAL-2026-10-26.md)
+    "/ONB_e3k_": "italian",     # Itala Esperanto-Revuo 1913–14: Italian wins 210 of 354 pages, Esperanto 138
+    "/ANNO_e7s_": "italian",    # Itala Esperantisto 1911–14: Italian wins 244 of 344 pages, Esperanto 99
+    "/Louis Couturat_1868-1914.": "french",   # the Coulommiers memorial volume (1915): French with Ido passages
 }
 
 
@@ -353,7 +359,7 @@ def measures(text, path=""):
     if len(toks) < 200:
         return None
     words = WORD.findall(text)
-    junk = sum(1 for t in toks if not WORD.fullmatch(t.strip(".,;:!?()[]«»\"'—–-"))
+    junk = sum(1 for t in toks if not WORD.fullmatch(t.strip(".,;:!?[]«»\"'—–-"))
                and not re.fullmatch(r"[\d.,/–—-]+", t))
     short = sum(1 for w in words if len(w) <= 2)
     lines = text.splitlines()

@@ -76,7 +76,7 @@ BPEAPE = [
     (r"^belgaesperantisto", 852, "Belga Esperantisto", "Antwerpen, first period Nov 1908–1914; files 1908–1914"),
     (r"^KatalunaEsperantisto\.", 7758, "Kataluna Esperantisto", "KEF organ, first epoch Sabadell; files 1910–1916"),
     (r"^KovnoEsperanto[._]", 8397, "Kovno-Esperanto", "Kovno, Nov 1911–Jun 1914; the 1911 nos. 1–4 may be its forerunner, n-ro 1637 (check)"),
-    (r"^InternaciaSciencaRevuo_", 6775, "Internacia Scienca Revuo", "organ of the Internacia Scienca Oficejo, Paris; files 1906–1911"),
+    (r"^InternaciaSciencaRevuo_", 6775, "Internacia Scienca Revuo", "organ of the Internacia Scienca Oficejo, Paris; files 1904 (the year's volume, ÖNB, cupel18c), 1906–1911"),
     (r"^BohemaRevuoEsperantista_", 2389, "Ĉasopis Českých Esperantistů (Bohema Revuo Esperantista)", "B.U.E. monthly, Praha (Kühnl); files 1907–1914"),
     (r"^bohemaesperantisto[._]", 1036, "Bohema Esperantisto", "Praha; the entry names a second epoch Oct 1908–1914; files from 1903 (first epoch: check)"),
     (r"^EsperantoTriumfonta\.", 4199, "Esperanto Triumfonta", "weekly, first series; files 1921–1922"),
@@ -138,6 +138,32 @@ BPEAPE = [
     (r"^InternaciaMedicino\.", 6714, "Internacia Medicino", "TEKA's monthly, Dresden, Jan–Feb 1911, 2 n-roj; file 1911.1"),
     (r"^LaDekSepa\.", 2549, "La Dek-Sepa", "the bulletin of the Paris group's 17th-arrondissement section; file 1914, April"),
     (r"^KK_1912_", 8088, "Kongresa Bulteno (8th UK, Kraków 1912)", "daily during the congress, 11–17 Aug 1912, 5 issues; the file holds nos. 1–5"),
+    # cupel17 (signed 2026-10-23; Ezri's request through the editor, 14:3x: titles before any is dowsed), matched by Miles
+    # against bpeape-entries.tsv: the entry's place and years against the files' years
+    (r"^ANNO_e7a_", 541, "Antaŭen Esperantistoj", "Lima, Perua Esperanto Societo (Villaréal); first epoch Jul 1903–Jun 1910, second Jul 1913–1916; files 1903–1914"),
+    (r"^ANNO_e0d_", 2465, "Ĉirkaŭ la Mondo / Rund um die Welt", "Prague-Weinberge, Wolfenbüttel, Dresden (Schramm, Lederer), Sep 1909–1914; files 1909–1914"),
+    (r"^ANNO_e1w_", 11946, "Scienca Gazeto", "Paris, the ISAE organ (Verax), Jan 1912–Jul/Aug 1914; files 1912–1914"),
+    (r"^ANNO_e1v_", 11745, "Rondiranto", "Plovdiv, Klubo «Stelo» (Oreŝkov), Feb 1902–1904/05, bilingual; the same paper is also BPEAPE 11740; files 1902–1904"),
+    (r"^ANNO_e0h_", 2549, "La Dek-Sepa", "the bulletin of the Paris group's 17th-arrondissement section, Dec 1910–Jul 1914; files 1910–1914"),
+    (r"^ANNO_e5e_", 11027, "Portugala Revuo", "Porto, Esperantista Grupo de Porto; first series Mar–Jul 1909, second Jan 1913–Jul 1914; files 1909, 1913–1914"),
+    (r"^ANNO_e6g_", 8972, "Lingua Internationale", "Bruxelles (Meysmans), monthly 1911–1912, 12 n-roj; files 1911–1912"),
+    (r"^ONB_e1n_", 13819, "Vespera Horo / Abendstunde", "Huttwil, Bern, weekly organ for German Switzerland, Apr–Sep 1910; files 1910"),
+    # cupel18a (signed 2026-10-24), matched by Miles against bpeape-entries.tsv: the entry's place and years against the
+    # files' years
+    (r"^ANNO_e5a_", 12675, "Svisa Espero", "Genève, the Svisa Esperanto-Societo's organ, first series Jan 1903–1920; files 1904–1916"),
+    (r"^ANNO_e3s_", 4818, "Franca Esperantisto", "Paris (de Ménil, Grosjean-Maupin), first series Dec 1908–Dec 1912; files 1908–1912"),
+    (r"^ANNO_e4h_", 1231, "Bulgara Esperantisto", "Sofia, printed in Pleven, Jan–Jul 1907, 3 n-roj, mostly in Bulgarian (not the 1919– organ, 1232); files 1907"),
+    (r"^esperanta\.stelo$", 3153, "Esperanta Stelo", "Buenos Aires, the organ of the Esperanto group «Casal Català», Jan 1912–1914, cyclostyled by hand; the 1912 file, our transcription by vision (born-digital)"),
+    # cupel18c (signed 2026-10-27), matched by Miles against bpeape-entries.tsv, the entry's place and years against the files'
+    (r"^ANNO_e7p_", 2512, "Danubo", "Bucureşti, the Romanian and Bulgarian Esperantists' monthly (Robin), Oct 1910–Jul 1912, 19 numbers; files 1910–1912"),
+    (r"^ANNO_e7s_", 7031, "Itala Esperantisto", "the Federazione Esperantista Italiana's bilingual monthly, Palermo, Genova, Milano, Jul–Aug 1910–Aug 1914; files 1911–1914"),
+    (r"^ANNO_e1k_", 5787, "Informaj Raportoj", "Wien, the organ of the Verband der deutschsprachigen Esperanto-Gruppen in Österreich, Mar 1908–Dec 1910; files 1908–1910"),
+    (r"^ANNO_e7i_", 7186, "Jarlibro de Tutmonda Esperantista Kuracista Asocio (T.E.K.A.)", "Kötzschenbroda 1909, Dresden 1910 (Thalwitzer), the doctors' association's yearbook; files 1909–1910"),
+    (r"^117C5F54_pdf_1-76$", 10472, "Oficiala Bulteno de TEKA", "Paris, Aug 1911–Jul 1914, 8 numbers (Dor); the ÖNB file 1911–1912 (117C5F54)"),
+    (r"^ANNO_e7r_", 11713, "Roma Esperantisto", "Roma, the Società Esperantista Romana's bilingual monthly (Giambene), from Jan 1907; files 1908"),
+    (r"^ANNO_e6w_", 12441, "Stelo Kataluna", "Barcelona and Igualada, Jan–Jun 1908, 6 numbers; files 1908"),
+    (r"^ONB_e3k_", 3488, "Esperanto, L'", "S. Vito al Tagliamento (Paolet), the Cattedra Italiana di Esperanto's fortnightly, first period Jan 1913–Dec 1922 (ÖNB files it as «Itala Esperanto-revuo»); files 1913–1914"),
+    (r"^ANNO_e4d_", 13128, "Tutmonda Jarlibro Esperantista", "Paris (Hachette), with Zamenhof's address lists, first series 1904–1910 (the Aldono of 1913–14 is n-ro 288); files 1904–1910"),
 ]
 
 # Outside BPEAPE: the editor ruled on 2026-10-08 11:5x that Helvetia is Occidental, and that Ido, Novial and Occidental
@@ -152,6 +178,34 @@ OUTSIDE = [
     (r"^posta[-_]mundi[-_]", "an inter-IAL newsletter (page 1 of posta_mundi_32: «Jurnal inter IAL», 2020)"),
 ]
 LANG_OUTSIDE = {"ido": "Ido", "occidental": "Occidental", "novial": "Novial", "latino-sine-flexione": "Latino sine flexione"}
+# A TITLE FOR A RUN BPEAPE DOES NOT NAME (2026-10-24, the editor 22:2x on La Genizo's OSR page, its list of the signed
+# periodicals built from this table's titles: the item table has no titles for some runs, which needs fixing, and he
+# asked whether 74 checked periodicals were all). By the title_key; only where no BPEAPE row gave a title, and no
+# BPEAPE number is set or implied. The Volapük and Ido runs (outside BPEAPE) and runs BPEAPE has but no row matches yet.
+TITLE_BY_KEY = {
+    "anno_e2s": "Volapükabled", "levolapuk": "Le Volapük", "kosmopolan": "Kosmopolan", "el_volapuk": "El Volapük",
+    "cogabled": "Cogabled", "mulapenad_nebolitik": "Mulapenad nebolitik", "nuns_blefik": "Nuns blefik",
+    "nunel_valemik": "Nunel valemik", "volapukisten": "Volapükisten", "vp_monthly_boston": "The Volapük Monthly",
+    "vpaflen_jveizik": "Volapükaflen jveizik", "vpaklubs": "Vpaklubs", "sionsharfe": "Sionsharfe",
+    "labelgasonorilo": "La Belga Sonorilo", "anno_e4a": "Espero Katolika", "esperokatolika": "Espero Katolika",
+    "anno_e1t": "Nederlanda Katoliko", "anno_e3g": "Brazila Esperantisto", "bultenoliberapenso": "Bulteno de Libera Penso",
+    "liberapenso": "Libera Penso", "scholaetvita": "Schola et Vita", "anno_e1e": "Helvetia", "anno_e0g": "Kosmoglott",
+    "mondo": "Mondo", "ido_saluto": "Ido-Saluto", "ido-saluto": "Ido-Saluto", "suisian.idisto": "Suisian Idisto",
+    "romanal": "Romanal", "esperantista_movado": "Esperantista Movado", "espero.pacifista": "Espero Pacifista",
+    "oficialajarlibro": "Oficiala Jarlibro", "lingvo.internacia.literatura.aldono": "Lingvo Internacia: Literatura Aldono",
+    "esperantouea": "Esperanto (UEA)", "lalumo": "La Lumo", "lesperanto": "L’Esperanto",
+    "the australian esperantist": "The Australian Esperantist",
+    # the editor 22:4x (signed 2026-10-02)
+    "novialiste": "Novialiste",
+}
+TITLE_BY_ITEM = [   # (2026-10-24 23:0x) the Volapük runs of cupel15–16 filed by volume, named as the source register names them
+    (r"^nogan_vpik_yelod", "Nogan volapükik"), (r"^volaspodel", "Volaspodel"), (r"^vpan_nolik_", "Volapükan nolik"),
+    (r"^nunal[._]nulik", "Nunal nulik"), (r"^jveizapot", "Jveizapot"), (r"^volapükan\.melopik|^volapukan\.melopik", "Volapükan Melopik"),
+    (r"^rund_um_die_welt_y\d", "Rund um die Welt (Volapük)"), (r"^mittheilungen_", "Mittheilungen der Weltsprache-Vereine"),
+    (r"^vom_guten_das_beste", "Vom Guten das Beste"), (r"^vpagased_lostanik", "Volapükagased lostanik"),
+    (r"^vpabled_talik|^Volapukabled_talik", "Volapükabled tälik"), (r"^volapuk_journal_london", "Volapük Journal"),
+    (r"^kosmopolan_contents", "Kosmopolan"), (r"^vpaflen_jveizik", "Volapükaflen jveizik"),
+]
 
 # ORIGIN (as the proposal on citable hits asks, an internal record, 2026-10-08, not published: the source's own names,
 # not only ours): where a file came from, only as a record states it.
@@ -243,7 +297,13 @@ def primary_languages():
 
 # A dotted title's label, once checked: "month" or "issue". Empty until each is checked against a cover or a
 # catalogue; each entry to say how it was checked.
-DOTTED = {   # "month", "month+issue" (numbered by month: «N-ro» = the month, seen), "issue" or "part" (a 50-page part of a volume, as the ÖNB split it); checked 2026-10-08: page 1 of three files per title (a worksheet, an internal record, 2026-10-08, not published)
+# A dotted label that names no issue, with the issue its masthead prints (stem → (issue, month, why)); the file keeps its
+# name (renaming a source is the editor's ruling), the row says what it is.
+LABEL_READ = {
+    "EsperantoRuslando.1905.sennumera": ("1-2", "1", "the label «sennumera» (unnumbered) is the file's: its masthead reads N-ro 1–2, January 1905; "
+                                         "a second copy of EsperantoRuslando.1905.1-2 (COPIES in tools/ocr-dowse.py; Ezri, 2026-10-24)"),
+}
+DOTTED = {   # "month", "month+issue" (numbered by month: «N-ro» = the month, seen), "issue" or "part" (a 50-page part of a volume, as the ÖNB split it); checked 2026-10-08 by Miles: page 1 of three files per title (geniza/sources/ocr-work/item-table-draft-2026-10-08/DOTTED-LABEL-CHECK-1.txt)
     "juna.esperantisto": "month+issue", # 1907.08, 1909.12, 1912.03: the cover's month (and its N-ro) = the label
     "ondodeesperanto": "month",         # 1911.01, 1912.11, 1914.05: the cover's month = the label
     "gentoesperanto": "month",          # 1913.3, .6, .11: the cover's month = the label
@@ -252,6 +312,7 @@ DOTTED = {   # "month", "month+issue" (numbered by month: «N-ro» = the month, 
     "esperanto": "month+issue",         # La Esperantisto 1891.1, 1891.10: «Nro» and the month = the label (only its dotted files are numeric)
     "esperantotriumfonta": "issue",     # labels 039–090 (a weekly): issue numbers
     "katalunaesperantisto": "issue",    # 1911.15 prints «N-ro 15»; labels run past 12
+    "esperantoruslando": "issue",       # 1905.1-2 prints «N-ro 1–2», January 1905 (Miles 2026-10-24, Ezri's request; the run's two files)
     "kovnoesperanto": "issue",          # labels 13–36: issue numbers
     "lasunohispana": "issue",           # labels 1–78: issue numbers
     "kaukazaesperantisto": "issue",     # labels to 14 within 1910 (a semi-monthly): issue numbers
@@ -340,6 +401,17 @@ ANNO_TITLES = {
     "e1c": "pola-esperantisto", "e1a": "germana-esperantisto", "e2s": "volapukabled", "e0a": "la-esperantisto",
     # ANNO files the run as one title; its 1907 mastheads read «BRAZILA REVUO ESPERANTISTA», later «BRAZILA ESPERANTISTO»
     "e3g": "brazila-esperantisto",
+    # cupel17 (signed 2026-10-23), the codes as Ezri matched them by their mastheads (relayed 2026-10-23 14:3x); e0d is
+    # the Esperanto paper «Ĉirkaŭ la mondo» (Schramm), German title «Rund um die Welt», not Schleyer's Volapük paper
+    "e7a": "antauen-esperantistoj", "e0d": "cirkau-la-mondo", "e1w": "scienca-gazeto", "e1v": "rondiranto",
+    "e0h": "la-deksepa", "e5e": "portugala-revuo", "e6g": "lingua-internationale",
+    # cupel18a (signed 2026-10-24), by the mastheads seen at its C1
+    "e5a": "svisa-espero", "e3s": "franca-esperantisto", "e4h": "bulgara-esperantisto",
+    # cupel18b (signed 2026-10-26), by the title pages and running heads seen at its C1 and C6 looks
+    "e4d": "tutmonda-jarlibro-esperantista",
+    # cupel18c (signed 2026-10-27), by the mastheads and title pages seen at its C1 and C6 looks
+    "e7p": "danubo", "e7s": "itala-esperantisto", "e1k": "informaj-raportoj", "e7i": "teka-jarlibro",
+    "e7r": "roma-esperantisto", "e6w": "stelo-kataluna",
 }
 # By the folder the PDF is in (relative to geniza/sources/): the work all its files belong to.
 FOLDER_PREFIX = {
@@ -354,9 +426,10 @@ FOLDER_PREFIX = {
 }
 # By name, each read from the file's first page or its record (2026-10-16):
 KEY_PINNED.update({
-    "10B83C47_pdf_1-291": "cart-vocabulaire-francais-esperanto-1907-onb-10b83c47",   # Cart's dictionary, 5th ed. 1907 (ÖNB 10B83C47)
-    "LM_1931-07c": "literatura-mondo-1931-07c",                                      # Literatura Mondo, the Kabe item
-    "mat_0769-3206_1994_num_34_1_402776": "panteleiev-1994-materiaux-histoire-34",   # Panteleiev, Matériaux … 34 (1994), Persée
+    "117C5F54_pdf_1-76": "oficiala-bulteno-de-teka-1911-1912-onb-117c5f54",          # _INVENTORY: the Oficiala Bulteno de T.E.K.A. 1911–1912 (ÖNB 117C5F54)
+    "10B83C47_pdf_1-291": "cart-vocabulaire-francais-esperanto-1907-onb-10b83c47",   # _INVENTORY: Cart's dictionary, 5th ed. 1907 (ÖNB 10B83C47)
+    "LM_1931-07c": "literatura-mondo-1931-07c",                                      # _INVENTORY: Literatura Mondo, the Kabe item
+    "mat_0769-3206_1994_num_34_1_402776": "panteleiev-1994-materiaux-histoire-34",   # _INVENTORY: Panteleiev, Matériaux … 34 (1994), Persée
     "LLZ-Bio-En": "korzhenkov-2009-zamenhof-life-works-ideas-en",                    # p. 1: Korzhenkov, «Zamenhof: The Life, Works, and Ideas …», tr. Richmond, ESF 2009
     "agi": "kauling-agi-dil-apostoli",                                               # p. 1: «Agi dil Apostoli … tradukita da L. Kauling» (ido-vivo.info)
     "kgd": "beaufront-kompleta-gramatiko-detaloza-ido",                              # p. 1: «Kompleta gramatiko detaloza di la linguo internaciona Ido da L. de Beaufront»
@@ -383,6 +456,10 @@ def work_key(it, folder):
     if m:
         t = ANNO_TITLES.get(m.group(1))
         if t: return f"{t}-{m.group(2)}-anno-{m.group(3)}" + (f"-{m.group(4)}" if m.group(4) else "")
+    m = re.match(r"^ONB_e1n_(1[89]\d\d)(\d\d)(\d\d)$", it)  # cupel17: Vespera Horo / Abendstunde 1910, ÖNB, by date
+    if m: return f"vespera-horo-{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    m = re.match(r"^ONB_e3k_(1[89]\d\d)(\d\d)(\d\d)$", it)  # cupel18c: L'Esperanto (S. Vito al Tagliamento), ÖNB's «Itala Esperanto-revuo», by date
+    if m: return f"l-esperanto-s-vito-{m.group(1)}-{m.group(2)}-{m.group(3)}"
     m = re.match(r"^jbc\.bj\.uj\.edu\.pl\.NDIGCZAS(\d+)_(.+)$", it)
     if m: return f"pola-esperantisto-jbc-{m.group(1)}-{slug(m.group(2))}"
     m = re.match(r"^dlibra\.kul\.pl\.(\d+)$", it)
@@ -572,6 +649,10 @@ def parse(stem):
             r["notes"] = "; ".join(x for x in (r["notes"], "a 50-page part of the year's volume as the ÖNB delivered it, not an issue") if x)
         elif lab and meaning == "issue" and re.fullmatch(r"\d+(-\d+)*", lab):
             r["issue"] = "-".join(str(int(x)) for x in lab.split("-"))
+        elif stem in LABEL_READ:               # a label that is not the issue, read from the masthead (2026-10-24)
+            r["issue"], r["month"], why = LABEL_READ[stem]
+            r["label_as_filed"] = lab
+            r["notes"] = "; ".join(x for x in (r["notes"], why) if x)
         elif lab:
             r["label_as_filed"] = lab
         r["parsed_by"] = "B"; return r
@@ -676,6 +757,18 @@ def main():
     prim, lang_table = primary_languages()
     ids = archive_ids()
     pm = from_page_map()
+    # THE SIGNED KIND WINS (2026-10-24, the editor 20:4x, on the kind column contradicting signed lines: «that isn't going
+    # to take long, surely»). The date rule above knows 1914 / 1931 only, not a batch's scope rulings (cupel15: the
+    # Volapük press before 1887 SECONDARY; modern afterwords SECONDARY). Where an item's signed lines all carry one kind,
+    # that kind is the column's; the date rule's, if different, is named in written_from. Lines of both kinds (scoped
+    # stretches): the date rule's kind stays, and the note says so.
+    _sd = importlib.util.spec_from_file_location("ocr_dowse", os.path.join(HERE, "ocr-dowse.py"))
+    _D = importlib.util.module_from_spec(_sd); _sd.loader.exec_module(_D)
+    signed_kind = {}
+    for it, (sf, _, xs) in _D.signed_lines().items():
+        ks = {"PRIMARY" if "; PRIMARY" in " | ".join(x) else "SECONDARY" if "SECONDARY LITERATURE" in " | ".join(x) else ""
+              for x in xs}
+        signed_kind[it] = (ks, sf)
     dt = {}
     dfs = sorted(glob.glob(os.path.join(os.path.dirname(PAGE_MAP), "OCR-ITEM-DATES-*.tsv")))
     for l in (open(dfs[-1], encoding="utf-8") if dfs else []):
@@ -693,6 +786,17 @@ def main():
             cut = 1931 if prim.get(r["item"]) in ("ido", "occidental", "novial", "latino-sine-flexione") else 1915   # the Ido/Occidental/Novial cutoff, and Peano's Interlingua (approved by the editor, 2026-10-11 03:1x); Esperanto 1914 inclusive (2026-10-10 18:1x)
             r["kind"] = ("PRIMARY" if int(y0.group(0)) < cut else "SECONDARY") if y0 else ""
             if y0 and cut == 1931 and 1915 <= int(y0.group(0)) < 1931: r["written_from"] += " (Ido/Occidental/Novial cutoff 1931)"
+        if r["item"] in signed_kind:
+            ks, sf = signed_kind[r["item"]]
+            if len(ks) == 1 and "" not in ks:
+                k = next(iter(ks))
+                if k != r["kind"]:
+                    r["written_from"] = (r["written_from"] + "; " if r["written_from"] else "") + \
+                        f"kind as signed ({sf})" + (f", the date rule gives {r['kind']}" if r["kind"] else "")
+                    r["kind"] = k
+            elif ks >= {"PRIMARY", "SECONDARY"}:
+                r["written_from"] = (r["written_from"] + "; " if r["written_from"] else "") + \
+                    f"signed in both kinds by scope ({sf})"
         if r["item"] in pm:
             r["first_text_page"], r["pagination"] = pm[r["item"]]
         if r["parsed_by"] == "BD":
@@ -706,6 +810,11 @@ def main():
         else:
             for pat, o in ORIGIN_STATED:
                 if re.search(pat, r["item"]): r["origin"] = o; break
+        if not r["title"] and r.get("title_key") in TITLE_BY_KEY:   # overridden below where a BPEAPE row matches
+            r["title"] = TITLE_BY_KEY[r["title_key"]]
+        if not r["title"]:   # runs filed volume by volume, whose title_key differs per volume: by the item's name
+            for pat, t in TITLE_BY_ITEM:
+                if re.search(pat, r["item"], re.I): r["title"] = t; break
         for pat, n, title, why in BPEAPE:
             if re.search(pat, r["item"], re.I):
                 r["title"] = title

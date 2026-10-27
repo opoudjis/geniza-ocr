@@ -464,7 +464,23 @@ def main():
                 sec_lex.append((n, lex(n)))
         hits = []
         cyr_pages = 0
+        # THE ESPERANTO SIDE ON ITS OWN PAGES (bi-script fix (d), the editor 2026-10-24 21:2x;
+        # geniza/ocr/method/BISCRIPT-GATE-FIX-2026-10-24.md): a page the Russian step ACCEPTED (`RUSSIAN.json`, the Russian
+        # model read it as Cyrillic) is Cyrillic, and its Latin reading is the Cyrillic misread; scored, it dragged the
+        # Esperanto side of *Bulgara Esperantisto* 1907 under the bar (37 against its Esperanto pages' 66–87). Segregated,
+        # such a page is left out of the Esperanto side's G4, and its Latin reading is PRESENCE ONLY (`latin_po_pages`:
+        # the ledger says so), never discarded: 11 of 25 sampled Cyrillic pages print Latin-script names in the Cyrillic text.
+        ru_accept, latin_po = set(), []
+        if a.script_segregated:
+            try:
+                ru_accept = {q["page"] for q in json.load(open(os.path.join(d, "RUSSIAN.json"), encoding="utf-8")).get("pages", [])
+                             if str(q.get("verdict", "")).startswith("accept")}
+            except (OSError, ValueError):
+                pass
         for p, t in pg.items():
+            if p in ru_accept:
+                cyr_pages += 1; latin_po.append(p)
+                continue
             toks = [m.group(0).lower() for m in WORD.finditer(t)]
             if len(toks) < 60:
                 continue
@@ -510,7 +526,7 @@ def main():
             if s is not None:
                 rus.append(s)
         ru_only = round(statistics.median(rus), 1) if rus else None
-        # G2 AS SPECIFIED: «second language present ⇒ arbitration has run» (checked from
+        # G2 AS SPECIFIED: «second language present arbitration has run» (checked from
         # 2026-09-26; before, any second language simply blocked acceptance for ever). The record is
         # `<stem>/SECOND-MODEL.json`, written by tools/ocr-second-model.py: a language is handled
         # when ≥ 95% of pages carry a merge in it, pages whose chosen reading is the PDF's own text
@@ -567,6 +583,7 @@ def main():
                      "primary": pname, "g2_rule": rule, "g2_pending": pending, "g2_unarbitrated": unarb,
                      "g2_by_vision": by_vision, "g2_not_carried": not_carried, "g2_neighbour": neighbour_notes,
                      "ru_only": ru_only, "ru_pages": len(rus), **({"cyr_side": cyr_side} if cyr_side != "russian" else {}),
+                     **({"latin_po_pages": sorted(latin_po)} if latin_po else {}),
                      "second": second, "second_density": best,
                      "all_seconds": [{"lang": n, "density": round(v, 2)} for n, v in seconds]})
 

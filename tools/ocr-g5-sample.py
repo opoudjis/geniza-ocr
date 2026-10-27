@@ -40,7 +40,7 @@ _s = importlib.util.spec_from_file_location("ns", os.path.join(HERE, "ocr-name-s
 NS = importlib.util.module_from_spec(_s); _s.loader.exec_module(NS)
 CLEARING = {"g1-blank", "g1-plate", "rot-upright", "rot-reread", "ru-rejected", "ru-accepted",
             "ledger-admissible", "ledger-both", "ledger-eo", "ledger-ru", "ledger-short", "ledger-special", "ledger-exceptions",
-            "ledger-eo-side", "ledger-eo-side-primary"}
+            "ledger-eo-side", "ledger-eo-side-primary", "ledger-presence-g4"}
 
 
 def pages(path):
@@ -126,7 +126,8 @@ def build(a):
             elif r[3] == "SPECIAL HANDLING": cls, side = "ledger-special", "both"
             else:
                 cls = "ledger-exceptions"
-                side = ("ru" if "RUSSIAN side only" in t else
+                # (2026-10-24: Bulgarian and Ukrainian sides too, named so in the ledger since 2026-10-17)
+                side = ("ru" if re.search(r"(RUSSIAN|BULGARIAN|UKRAINIAN) side only", t) else
                         "eo" if ("ESPERANTO side only" in t or "Russian/Armenian/Georgian PRESENCE ONLY" in t) else "both")
             pool[cls] += [(c, p, side) for p, x in pg.items() if p not in ex and p not in kh
                           and (scope is None or p in scope) and (allowed is None or p in allowed[c]) and len(x.split()) >= 80]
@@ -148,7 +149,19 @@ def build(a):
                      ("ledger-eo", "eo") if "ESPERANTO side only" in t else ("ledger-short", "eo") if "IMAGE CHECK" in t else (None, None))
         if cls:
             pool[cls] += [(c, p, side) for p, x in pg.items() if p not in ex and len(x.split()) >= 80]
-    # THE RE-SAMPLE (2026-09-30, approved by the editor): only the classes named (--classes), and FRESH pages, avoiding every page of
+    # PRESENCE ONLY ON G4 ALONE (2026-10-24, the editor on Svisa Espero's December members' lists: «we have precedent for
+    # admitting name lists on name recall, right. ok»): the pages of the --items that are PRESENCE ONLY for no other reason
+    # than «fails G4» (a list of names and addresses holds few dictionary words, however well it is read), judged on NAME
+    # RECALL like the ledger classes, in a class of their own, drawn only when --classes names ledger-presence-g4
+    if a.items and "ledger-presence-g4" in (a.classes or ""):
+        for r in rows:
+            r += [""] * (7 - len(r))
+            # the reason is column 5 («why presence only»); column 7 holds the exceptions, which are no reason for the class
+            # (2026-10-26, cupel18b: 1904 and 1906's «LOST p.4» had kept them out of the pool)
+            if r[0] in want_i and r[3] == "PRESENCE ONLY" and re.fullmatch(r"fails G4 \(\d+\)", r[4].strip()):
+                pool["ledger-presence-g4"] += [(r[0], p, "eo") for p, x in pages(os.path.join(R, r[0] + ".txt")).items()
+                                               if len(x.split()) >= 80]
+    # THE RE-SAMPLE (2026-09-30, editor): only the classes named (--classes), and FRESH pages, avoiding every page of
     # an earlier sample (--avoid <its KEY.tsv>). A class with no more pages than N (rot-reread: 5 in all) is re-judged whole,
     # since there is nothing fresh to draw; the point is then whether its pages have been fixed.
     want = set(a.classes.split(",")) if a.classes else None

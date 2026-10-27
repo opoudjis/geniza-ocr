@@ -300,8 +300,53 @@ DECLARED.update({
     "ANNO_e0h_": (("esperanto", "french"), _C17("La Deksepa (Paris, 1910–14): Esperanto; French mastheads and notices")),
     "ANNO_e5e_": (("esperanto", "portuguese"), _C17("Portugala Revuo (1909–14): Esperanto and Portuguese")),
     "ANNO_e1v_": (("esperanto", "bulgarian"), _C17("Rondiranto (1902–04): Esperanto beside Bulgarian in pre-reform Cyrillic; the Bulgarian-only route of 2026-10-17 (orus, scored against the Bulgarian list through the old spelling)")),
-    "ANNO_e6g_": (("french", "occidental"), _C17("Lingua Internationale (1911–12): French articles on the international language, specimens in naturalistic projects (occidental in the table's sense: any generic naturalistic auxlang); Latin quoted")),
+    # Lingua Internationale RE-DECLARED 2026-10-23 (the editor: it looked half French and half
+    # Latino sine flexione, to be found out; approved): scored against the word lists, 71 of 84 pages in four
+    # 1911 issues read best as Latino sine flexione, 12 as French; the cupel17 C1 look (1911 PDF 10) had seen a French page.
+    "ANNO_e6g_": (("latino-sine-flexione", "french"), _C17("Lingua Internationale (1911–12): mostly Latino sine flexione (Peano's Interlingua), with French articles; Latin quoted; re-declared 2026-10-23 from the word-list scores (71 of 84 pages Latino sine flexione)")),
     "ONB_e1n_": (("esperanto", "german"), _C17("Vespera Horo / Abendstunde (1910): Esperanto and German in parallel columns")),
+})
+_C18A_OK = ("editor 2026-10-23 16:2x (the declarations spelled out per title in geniza/ocr/runs/CUPEL18A-C5-DECLARATIONS-PROPOSAL-2026-10-23.md: languages in order, the main first; the evidence, the C1 look of 2026-10-23, ten pages, cupel-batch-18a/c1-look/, and the page check ocr/runs/OCR-PAGE-LANGUAGES-2026-10-23-cupel18a.md; the effect, the list that scores it and the passes licensed)")
+_C18A = lambda seen: f"cupel18a, C1 look 2026-10-23 ({seen}); " + _C18A_OK
+DECLARED.update({
+    # cupel18a: Svisa Espero, Franca Esperantisto, Bulgara Esperantisto (ÖNB/ANNO) and three Ido-era books (archive.org)
+    "ANNO_e5a_": (("esperanto", "german", "french"), _C18A("Svisa Espero (1903–16): Esperanto, with German and French running text in the group reports; pages won 1,394 / 134 / 42 of 1,573")),
+    "ANNO_e3s_": (("esperanto", "french"), _C18A("Franca Esperantisto (1908–12): two columns, French notices beside Esperanto; pages won 692 / 331 of 1,023")),
+    "ANNO_e4h_": (("esperanto", "bulgarian"), _C18A("Bulgara Esperantisto (1907): Esperanto beside Bulgarian in pre-reform Cyrillic; the Bulgarian-only route (orus), as for Rondiranto")),
+    "couturat_pour_la_langue_internationale_1906": (("french",), _C18A("Couturat, Pour la langue internationale, 4th ed. 1906: French throughout, 30 of 30 pages")),
+    "talmey_filologiala_temi_1923": (("ido", "english-cited"), _C18A("Talmey, Filologiala temi (1923): Ido, 40 of 45 pages; English only in the trilingual grammatical key, PDF pp. 4–5")),
+    "schrey_federn_koresteno.part": (("ido",), _C18A("Schrey and Federn, Koresteno (1932), the title and pp. 13, 15, 16: Ido")),
+})
+_C18B_OK = ("editor 2026-10-26 11:3x (the declarations spelled out per volume in geniza/ocr/runs/CUPEL18B-C5-DECLARATIONS-PROPOSAL-2026-10-26.md: "
+            "the languages in order, the main first; the evidence, the C1 look of 2026-10-26 and the page languages; the effect)")
+_C18B = lambda seen: f"cupel18b, C1 look 2026-10-26 ({seen}); " + _C18B_OK
+DECLARED.update({
+    # cupel18b: Tutmonda Jarlibro Esperantista 1904–1910 (ÖNB/ANNO), directories of societies and Esperantists
+    "ANNO_e4d_19040005": (("esperanto", "french"), _C18B("Tutmonda Jarlibro 1904: Esperanto entries, French in their descriptions; pages won 217 / 16 of 242")),
+    "ANNO_e4d_19050005": (("esperanto", "french"), _C18B("Tutmonda Jarlibro 1905: pages won Esperanto 375, French 22 of 414")),
+    "ANNO_e4d_19060005": (("esperanto", "french"), _C18B("Tutmonda Jarlibro 1906: pages won Esperanto 482, French 34, Spanish 15 of 543")),
+    "ANNO_e4d_19070005": (("esperanto", "french"), _C18B("Tutmonda Jarlibro 1907: pages won Esperanto 386, French 41 of 454")),
+    "ANNO_e4d_19080005": (("esperanto",), _C18B("Tutmonda Jarlibro 1908: pages won Esperanto 207 of 215, French 2")),
+    "ANNO_e4d_19090005": (("esperanto",), _C18B("Tutmonda Jarlibro 1909: pages won Esperanto 237 of 248, French 4")),
+    "ANNO_e4d_19100005": (("esperanto",), _C18B("Tutmonda Jarlibro 1910: pages won Esperanto 222 of 237, French 6")),
+})
+_C18C_OK = ("editor 2026-10-26 22:2x (the declarations spelled out per title in geniza/ocr/runs/CUPEL18C-C5-DECLARATIONS-PROPOSAL-2026-10-26.md: "
+            "the languages in order, the main first; the evidence, the C1 look of 2026-10-26 and the page languages; the effect)")
+_C18C = lambda seen: f"cupel18c, C1 look 2026-10-26 ({seen}); " + _C18C_OK
+DECLARED.update({
+    # cupel18c: the rest of the cupel18 slice (ÖNB/ANNO) and de Beaufront's Louis Couturat (1914)
+    "ANNO_e7p_": (("esperanto",), _C18C("Danubo 1910–12: pages won Esperanto 642 of 642; Romanian, Bulgarian only in names")),
+    "InternaciaSciencaRevuo_1904": (("esperanto",), _C18C("Internacia Scienca Revuo 1904: pages won Esperanto 431 of 440; French, German, English cited")),
+    "ONB_e3k_": (("italian", "esperanto"), _C18C("Itala Esperanto-Revuo 1913–14: pages won Italian 210, Esperanto 138 of 354; Italian the main in 34 of 37 issues, three tied")),
+    "ANNO_e7s_": (("italian", "esperanto"), _C18C("Itala Esperantisto 1911–14: pages won Italian 244, Esperanto 99 of 344; Italian the main in every issue")),
+    "ANNO_e1k_": (("esperanto", "german"), _C18C("Informaj Raportoj 1908–10: pages won Esperanto 201, German 27 of 228")),
+    "ANNO_e7i_": (("esperanto",), _C18C("the TEKA Jarlibro 1909–10: pages won Esperanto 178 of 178")),
+    "117C5F54_pdf_1-76": (("esperanto",), _C18C("the Oficiala Bulteno de T.E.K.A. 1911–12: pages won Esperanto 73 of 73; French cited")),
+    "ANNO_e7r_": (("esperanto", "italian"), _C18C("Roma Esperantisto 1908: parallel columns; pages won Esperanto 118, Italian 47 of 165")),
+    "ANNO_e6w_": (("esperanto", "spanish"), _C18C("Stelo Kataluna 1908: parallel columns; pages won Esperanto 89, Spanish 11 of 100; Catalan cited")),
+    "beaufront.couturat.1914": (("ido", "french"), _C18C("de Beaufront, Louis Couturat (Paris 1914): Ido and French on facing pages; pages won Ido 6, French 5 of 11")),
+    # outside the batch, put with it: the Coulommiers memorial volume (signed 2026-10-02), «esperanto, french» from the gate before
+    "Louis Couturat_1868-1914": (("french", "ido"), "the text French with Ido passages (no «estas», «kaj» in 28,220 words; «esas», «qua»); page languages 2026-10-26 22:2x: French 64, Ido 3 of 67; " + _C18C_OK),
 })
 RULED = {"StSl2017_XIV": (("arabic-script",), None,
                           "decided by the editor, 2026-10-04: the PDF text layer garbles a transliteration "
@@ -317,10 +362,18 @@ RULED = {"StSl2017_XIV": (("arabic-script",), None,
          "NOVIALISTE.": (("occidental",), "novial", "the gate has no Novial model and reports Occidental (Novial «me/lo/vud/sal» against Occidental «yo/it/quel», 2026-10-10 17:4x); decided by the editor, 2026-10-10, confirmed that the language table say Novial for these three")}
 # cupel17 Before C0 (2026-10-20 21:5x): the rebuilt table added «esperanto» from the gate to four Russian cupel16 items; the editor kept them as confirmed
 RULED.update({
-    "drezen_za_vseobshchim_yazykom_1928": (("esperanto",), None, "decided by the editor, 2026-10-20, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
-    "nov_bulgakov_vp": (("esperanto",), None, "decided by the editor, 2026-10-20, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
-    "nov_gruzintsev_vp": (("esperanto",), None, "decided by the editor, 2026-10-20, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
-    "nov_anonsy_knig_bika": (("esperanto",), None, "decided by the editor, 2026-10-20, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
+    "drezen_za_vseobshchim_yazykom_1928": (("esperanto",), None, "editor 2026-10-20 21:5x, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
+    "nov_bulgakov_vp": (("esperanto",), None, "editor 2026-10-20 21:5x, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
+    "nov_gruzintsev_vp": (("esperanto",), None, "editor 2026-10-20 21:5x, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
+    "nov_anonsy_knig_bika": (("esperanto",), None, "editor 2026-10-20 21:5x, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
+    # cupel17 C7 (2026-10-23): the table rebuilt for the Lingua Internationale re-declaration added «russian» to Rondiranto
+    "ANNO_e1v_": (("russian", "russian?"), None, "editor 2026-10-23, on the language table rebuilt after cupel17's chain: Rondiranto's pre-reform Bulgarian, read with the Russian model, gives Russian-list words on 8 of 12 pages (lex); it stays Esperanto and Bulgarian, the Bulgarian-only route"),
+})
+# cupel18c C5 (2026-10-26 22:2x): the Coulommiers volume's «esperanto» came from the gate and the look of 2026-09-26/10-03
+# («French, with Esperanto examples»): the examples are Ido; the editor confirmed «french, ido» (on
+# geniza/ocr/runs/CUPEL18C-C5-DECLARATIONS-PROPOSAL-2026-10-26.md)
+RULED.update({
+    "Louis Couturat_1868-1914": (("esperanto",), None, "editor 2026-10-26 22:2x («french, ido»): the look's «Esperanto examples» are Ido (no «estas», «kaj» in 28,220 words; «esas», «qua»)"),
 })
 NOT_A_LANGUAGE = re.compile(r"-(names|addresses|romanised|lacinka|show-through)$|^(not-stated|not-verifiable|latin-only|"
                             r"latin-unspecified|examples-several-languages|auxlang-.*|ipa|languages_seen)$")
@@ -405,10 +458,16 @@ def main():
         if n(r, "bel"):
             add("belarusian", f"auth:{n(r, 'bel')}")
         other_cyr = any(k in L for k in ("ukrainian", "bulgarian", "belarusian"))
-        # lex alone needs >= 5 pages: *Mondo* 1924 has 2 such pages and no Russian (the editor ruled on 2026-10-01 00:44
-        # that there is no Russian in Mondo, the apparent Russian being poor-quality OCR; ocr-absence-ledger.py FALSE_BISCRIPT)
+        # lex alone needs >= 5 pages: *Mondo* 1924 has 2 such pages and no Russian (editor 2026-10-01 00:44, «There IS no
+        # Russian in Mondo, that was poor quality OCR»; ocr-absence-ledger.py FALSE_BISCRIPT)
+        # Beside Bulgarian, Ukrainian or Belarusian, the Russian model's word counts are not evidence of Russian: their words
+        # overlap the Russian list (*Rondiranto*, cupel17, 2026-10-23: pre-reform Bulgarian, Russian-list words on 8 of 12
+        # pages). Russian there needs its own letters (rw); the editor 2026-10-23.
         if "russian" in L:
             pass                                          # a look saw it
+        elif other_cyr and lex and not rw:
+            notes.append(f"Russian-list words on {lex} page(s) of the Russian-model reading not counted: "
+                         f"{', '.join(k for k in ('bulgarian', 'ukrainian', 'belarusian') if k in L)} shown, whose words overlap the Russian list")
         elif lex >= 5:
             add("russian", f"lex:{lex}")
         elif cyr and (rw or (lex and not other_cyr)):
@@ -534,10 +593,15 @@ def main():
         # declared esperanto, the gate ido), the gate MEASURED, so its order stands and the row is listed for the editor.
         decl = next((d for p, (d, _) in sorted(DECLARED.items(), key=lambda kv: -len(kv[0])) if item.startswith(p)), None)
         dmain = next((x for x in decl if not x.endswith("-cited")), None) if decl else None
+        # Nor where the gate has no model for the declared main (Lingua Internationale, re-declared 2026-10-23 on the
+        # editor's: Latino sine flexione, which the gate cannot report, so it said French).
         if dmain and dmain in L and next(iter(L)) != dmain:
             if SCRIPT_OF.get(dmain, "latin") != "latin":
                 L.move_to_end(dmain, last=False)
                 notes.append(f"the declared main language ({dmain}) leads: the gate cannot judge a {SCRIPT_OF[dmain]}-script item")
+            elif dmain in ("latino-sine-flexione",):
+                L.move_to_end(dmain, last=False)
+                notes.append(f"the declared main language ({dmain}) leads: the gate has no model for it")
             else:
                 MAIN_CONFLICTS.append((item, next(iter(L)), dmain))
         langs = [x for x in L if x != "cyrillic-unspecified" or len([y for y in L if SCRIPT_OF.get(y.rstrip('?')) == 'cyrillic']) == 1]

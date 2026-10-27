@@ -43,6 +43,9 @@ rather than guessing at the join.
 """
 import os, re, sys, glob, json, shutil, argparse, subprocess, tempfile, collections
 import concurrent.futures as fut
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cupel_progress import write_new as _write   # run sheet rule 0 (2026-10-23): temp file then rename, so a run killed
+                                                 # mid-write never leaves a half-written file that a restart would skip
 
 
 # ⚡ ONE THREAD PER TESSERACT (2026-09-25). We parallelise across PAGES; Tesseract by default
@@ -215,19 +218,19 @@ def main():
                     texts[p] = t2
                     retried += 1
         for p, t in texts.items():
-            with open(os.path.join(outdir, f"page-{p:04d}.txt"), "w", encoding="utf-8") as fh:
-                fh.write(t)
+            _write(os.path.join(outdir, f"page-{p:04d}.txt"), t, True)
         done = [(p, len(t)) for p, t in texts.items()]
         if retried:
             print(f"  {retried} pages rescued by the other method", file=sys.stderr)
         # ---- 4. Combine with page markers, so a hit traces back to a page.
         combined = os.path.join(a.out, stem + ".txt")
-        with open(combined, "w", encoding="utf-8") as fh:
-            for p in range(1, n + 1):
-                q = os.path.join(outdir, f"page-{p:04d}.txt")
-                if os.path.exists(q) and os.path.getsize(q):
-                    fh.write(f"\n=== page {p} ===\n")
-                    fh.write(open(q, encoding="utf-8", errors="ignore").read())
+        parts = []                # the combined file is the item's «done» mark (cupel-convert.sh skips an item that has it):
+        for p in range(1, n + 1):  # written last and whole, never half
+            q = os.path.join(outdir, f"page-{p:04d}.txt")
+            if os.path.exists(q) and os.path.getsize(q):
+                parts.append(f"\n=== page {p} ===\n")
+                parts.append(open(q, encoding="utf-8", errors="ignore").read())
+        _write(combined, "".join(parts), True)
         chars = sum(c for _, c in done)
         print(f"  {len(done)}/{n} pages · {chars:,} chars → {combined}", file=sys.stderr)
     finally:

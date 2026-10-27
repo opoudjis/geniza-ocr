@@ -106,6 +106,74 @@ def _cands(idx, kind, lens):
     return dict.fromkeys(f for k in keys for f in idx.buckets.get((kind,) + k, ()))
 
 
+# THE PRE-FILTER (2026-10-24; the editor, on La Ondo de Esperanto's strong search still running after an hour: the name
+# search was too slow, and name indexing should have taken care of it; the fix approved). The
+# index saves reading the text once per name, but every name's spellings (up to 64, the measured confusions) were still
+# put through close() against every form of its length buckets, one Python call each: on a poor OCR with Russian in it
+# that is most of the hours. Each rule of close() matches only where an edit distance on some form of the two words is
+# within an allowance: the words (c), their Russian stems (c), a Cyrillic word transliterated, whole or stemmed, against
+# the Latin one (c + 1), the small-capital folds (c), a word's part before a glued function word (c), the Polish stems
+# (1). So a form none of those distances admits for any spelling cannot match, and the distances are taken for all the
+# forms of a bucket at once (rapidfuzz's cdist, in C). What passes still goes through close(), the judge: the hits are
+# the same by construction (checked: tools/ocr-index-check.py, and the strong search of a source against its record).
+try:
+    import numpy as _np
+    from rapidfuzz import process as _RP
+    from rapidfuzz.distance import Levenshtein as _LV
+except ImportError:
+    _RP = None
+
+
+def _glue_prefixes(t):
+    return [t[:k] for k in range(1, len(t)) if t[k:] in NS._GLUE]
+
+
+def _forms_of(idx, key):
+    """a bucket's forms and their transforms, computed once per index."""
+    if not hasattr(idx, "_tf"): idx._tf = {}
+    if key not in idx._tf:
+        B = idx.buckets.get(key, [])
+        gp, go = [], []
+        for i, f in enumerate(B):
+            for p in _glue_prefixes(f): gp.append(p); go.append(i)
+        idx._tf[key] = {"w": B, "stem": [NS.stem(f) for f in B], "tl": [NS.translit(f) for f in B],
+                        "tls": [NS.translit(NS.stem(f)) for f in B], "sc": [f.translate(NS._SC) for f in B],
+                        "ls": [NS.lstem(f) for f in B], "gp": gp, "go": _np.array(go, dtype=_np.int64)}
+    return idx._tf[key]
+
+
+def _admit(queries, caps, choices, extra=0):
+    """the choices within its allowance (+ extra) of at least one query: a boolean array over the choices."""
+    if not choices or not queries: return _np.zeros(len(choices), dtype=bool)
+    caps = _np.asarray(caps) + extra
+    m = _RP.cdist(queries, choices, scorer=_LV.distance, score_cutoff=int(caps.max()), dtype=_np.int32)
+    return (m <= caps[:, None]).any(axis=0)
+
+
+def _prefilter(idx, kind, lens, targets):
+    """the forms of the buckets that some rule of close() may admit for some target (a superset of the matches)."""
+    if _RP is None: return None
+    q = [tg for tg, _, c in targets]; cs = [c for tg, _, c in targets]
+    qs = [NS.stem(tg) for tg in q]; qsc = [tg.translate(NS._SC) for tg in q]; ql = [NS.lstem(tg) for tg in q]
+    qt = [NS.translit(tg) for tg in q] + [NS.translit(NS.stem(tg)) for tg in q]; ct = cs + cs
+    keep = set()
+    for k in lens:
+        T = _forms_of(idx, (kind,) + k)
+        B = T["w"]
+        if not B: continue
+        ok = _admit(q, cs, B)
+        ok |= _admit(qs, cs, T["stem"])
+        ok |= _admit(q, cs, T["tl"], 1) | _admit(q, cs, T["tls"], 1)
+        ok |= _admit(qt, ct, B, 1)
+        ok |= _admit(qsc, cs, T["sc"])
+        ok |= _admit(ql, [1] * len(ql), T["ls"])
+        if T["gp"]:
+            g = _admit(q, cs, T["gp"])
+            ok[T["go"][g]] = True
+        keep.update(B[i] for i in _np.flatnonzero(ok))
+    return keep
+
+
 def match(name, idx):
     """[(page, how, as read)] — what find(name, page text) returns, over every page of the indexed text."""
     out, done = [], set()
@@ -120,13 +188,17 @@ def match(name, idx):
 
         lens = _lengths(targets)
         hits = collections.defaultdict(list)
+        keep = _prefilter(idx, "w", lens, targets)   # None: no rapidfuzz, every form to close() as before
         for form in _cands(idx, "w", lens):
+            if keep is not None and form not in keep: continue
             w = near(form)
             if w is not None:
                 for p, r in idx.words[form]:
                     hits[p].append(("word" + w, r))
         part_hit = {}
+        keep = _prefilter(idx, "p", lens, targets) if idx.parts else set()
         for form in _cands(idx, "p", lens):
+            if keep is not None and form not in keep: continue
             w = near(form)
             if w is None:
                 continue
@@ -135,7 +207,9 @@ def match(name, idx):
                     part_hit[occ] = (p, k, w, r)
         for p, k, w, r in part_hit.values():
             hits[p].append(("part of a hyphenated word" + w, r))
+        keep = _prefilter(idx, "j", lens, targets) if idx.pairs else set()
         for form in _cands(idx, "j", lens):
+            if keep is not None and form not in keep: continue
             w = near(form)
             if w is not None:
                 for p, r in idx.pairs[form]:

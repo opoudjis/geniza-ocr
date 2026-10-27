@@ -23,7 +23,8 @@ prompt  Prints the write-mode prompt: the transcriber may use only the Read and 
 file    Files a return: `page-NNNN.vision.txt` in the item's folder for every block that is not «NONE», NEVER over a
         hand-keyed or ruled reading (`page-NNNN.hand.txt`, `.ruled.txt`); the returned text VERBATIM, with the batch's
         key, appended to --record; a line in `<run dir>/FILED.tsv`. A batch with no return is logged in
-        `FAILED-BATCHES.txt`.
+        `FAILED-BATCHES.txt`. --as-add: as `page-NNNN.vision-add.txt` instead, appended to the OCR, for a return that
+        cut text to «[...]» (a reader's output limit): a partial page must not stand in for the whole.
 """
 import os, re, sys, argparse, tempfile, shutil, collections
 import concurrent.futures as fut
@@ -40,6 +41,14 @@ def render(a):
     paths = {os.path.splitext(os.path.basename(l.strip()))[0]: (l.strip() if l.strip().startswith("/") else os.path.join(ROOT, l.strip()))
              for l in open(a.pdfs) if l.strip()}
     jobs = [l.rstrip("\n").split("\t") for l in open(os.path.join(a.dir, "KEY-ALL.tsv")) if l.strip()]
+    # each batch's own KEY.tsv (tag · corpus · page), which `prompt` and `file` read; written when absent (2026-10-24:
+    # until then made by hand, and cupel18a's run had none, so `file` stopped)
+    keys = collections.defaultdict(list)
+    for b, tag, c, p, *_ in jobs: keys[b].append(f"{tag}\t{c}\t{p}\n")
+    for b, rows in keys.items():
+        os.makedirs(os.path.join(a.dir, b), exist_ok=True)
+        k = os.path.join(a.dir, b, "KEY.tsv")
+        if not os.path.exists(k): open(k, "x", encoding="utf-8").write("".join(rows))
     by = collections.defaultdict(list)
     for b, tag, c, p, *_ in jobs:
         if not os.path.exists(os.path.join(a.dir, b, f"{tag}.boost.png")): by[c].append((b, tag, int(p)))
@@ -85,7 +94,10 @@ def file_return(a):
         if body.strip() == "NONE": nones.append(tag); continue
         _, c, p = key[tag][:3]; p = int(p); d = os.path.join(R, c)
         if os.path.exists(os.path.join(d, f"page-{p:04d}.hand.txt")) or os.path.exists(os.path.join(d, f"page-{p:04d}.ruled.txt")): continue
-        open(os.path.join(d, f"page-{p:04d}.vision.txt"), "w", encoding="utf-8").write(body.strip() + "\n"); wrote += 1
+        # --as-add (2026-10-25, small capitals round 1b, b010): a return that cut the prose to «[...]» (a reader's output
+        # limit) is no whole page: it is filed as `page-NNNN.vision-add.txt`, appended to the chosen reading, the OCR kept
+        kind = "vision-add" if a.as_add else "vision"
+        open(os.path.join(d, f"page-{p:04d}.{kind}.txt"), "w", encoding="utf-8").write(body.strip() + "\n"); wrote += 1
     if not os.path.exists(a.record):
         open(a.record, "w", encoding="utf-8").write(f"# Vision transcriptions — {os.path.basename(os.path.abspath(a.dir))}\n\n"
                                                     "Returned text verbatim, batch by batch (tools/ocr-vision-batch.py file).\n\n")
@@ -100,6 +112,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("mode", choices=("render", "prompt", "file")); ap.add_argument("--dir", required=True)
     ap.add_argument("--pdfs"); ap.add_argument("--jobs", type=int, default=6); ap.add_argument("--batch"); ap.add_argument("--record")
+    ap.add_argument("--as-add", action="store_true", help="file: as page-NNNN.vision-add.txt (lines added to the OCR), for a return that cut text to «[...]»")
     a = ap.parse_args()
     if a.mode == "render" and not a.pdfs: sys.exit("render needs --pdfs")
     if a.mode in ("prompt", "file") and not a.batch: sys.exit(f"{a.mode} needs --batch")

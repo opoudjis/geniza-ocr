@@ -26,6 +26,9 @@ page among all four, and `ocr-rebuild-combined.py` assembles. A page already re-
 """
 import os, re, sys, glob, argparse, subprocess, tempfile, shutil, collections, time
 import concurrent.futures as fut
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cupel_progress import write_new as _write   # run sheet rule 0 (2026-10-23): temp file then rename, so a run killed
+                                                 # mid-write never leaves a half-written file that a restart would skip
 
 os.environ.setdefault("OMP_THREAD_LIMIT", "1")
 
@@ -108,7 +111,7 @@ def main():
             for psm, suf in (("6", ".hr.txt"), ("4", ".hr.psm4.txt")):
                 t = subprocess.run(["tesseract", hit[0], "stdout", "-l", a.lang, "--psm", psm,
                                     "--oem", "1"], capture_output=True, text=True).stdout or ""
-                open(os.path.join(d, f"page-{p:04d}{suf}"), "w", encoding="utf-8").write(t)
+                _write(os.path.join(d, f"page-{p:04d}{suf}"), t, True)
             os.remove(hit[0])
             return 1
         try:
