@@ -9,6 +9,7 @@ This is a **frozen release**: the version the methods document describes. It is 
 - `v1.2` (6 October 2026): v1.1's confusions corrected: a spelling made by a measured confusion no longer gets the full allowance of misread letters on top, which had made whole-corpus searches for short names flood (`METHOD.md`, section 6, «Release v1.2»). Short names tightened: a word of two letters or fewer matches only exactly, and a name of four letters or fewer gets a Russian ending or a misread letter, not both. Use this release, not v1.1. It also adds the search tools of `docs/SEARCHING.md`: `ocr-dowse.py`, `ocr_index.py` (with its check, `ocr-index-check.py`) and `ocr-corpus-lexicon.py` — reading each item by its strongest match, page counts, image checks within a practical limit, a judgement file, and people who share a surname.
 - `v1.3` (22 October 2026): the whole pipeline as run on the batches of 7 to 22 October (`METHOD.md`, section 6, «Release v1.3»): pages in columns, text blocks and second readings; Fraktur; declared second languages honoured, with old Portuguese spelling recognised; new word lists (Slovak, Latino sine flexione, Volapük); copies of one text aligned and tested; holdings censused and pages dated; long runs that save page by page and resume. `RUNBOOK.md` is the current run sheet, and `docs/FAILURE-MAP.md` runs to row R50. 56 tools updated or added.
 - `v1.4` (27 October 2026): the runbooks published (`METHOD.md`, section 6, «Release v1.4»): the cupel run sheet as of 27 October, and the dowse and smelt runbooks for the first time, in `runbooks/`. Each runbook has an undated file, always a copy of its newest dated version, and its earlier dated versions kept; `RUNBOOK.md` now points there. The tools brought up to the run sheet (30 updated, 16 added, among them the gutter cut for pages in columns, `tools/ocr-gutter-cut.py`), and `docs/FAILURE-MAP.md` to row R70.
+- `v1.5` (27 October 2026): the tools of the dowse and smelt runbooks (`METHOD.md`, section 6, «Release v1.5»): 62 added, so that every tool the three runbooks name is here.
 
 ## What is here
 
@@ -38,7 +39,7 @@ Tesseract 5.5.3 with the 4.1.0 language models and the `orus` model (see `tools/
 
 ## Citing
 
-The Geniza of Esperanto, *geniza-ocr: the OCR quality-assurance method*, release `v1.4` (2026), https://github.com/opoudjis/geniza-ocr.
+The Geniza of Esperanto, *geniza-ocr: the OCR quality-assurance method*, release `v1.5` (2026), https://github.com/opoudjis/geniza-ocr.
 
 ## Licence
 
