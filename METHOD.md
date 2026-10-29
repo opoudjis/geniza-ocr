@@ -396,6 +396,17 @@ v1.4 publishes the procedures the project runs, as they stand on 27 October 2026
 
 v1.4 published the dowse and smelt runbooks but not their tools. v1.5 adds them: 62 tools, among them the facts assembler (`tools/dowse-facts-assemble.py`), the harvest that builds the profiles (`tools/harvest-facts.py`), the brief filler, the undated pass, the triage and the recall sample of the dowse (`tools/dowse-*.py`), the fact groups, labels and lines (`tools/fact-*.py`), the smelt's periods, views and checks (`tools/smelt-*.py`), and the sigla (`tools/sigla.py`, `tools/sigla-propose.py`). Every tool the three runbooks name is now here. As in v1.4, the code is as run, and only comments and notes were edited, with the editor's words given as paraphrases; a check of each file's syntax tree against the working copy proved it, for all 170 tools. The runbooks and the method are unchanged.
 
+### Release v1.6: the OCR confusions register (29 October 2026)
+
+What Tesseract writes in place of each printed letter, for every letter rather than only the accented ones, capitals apart from small letters, and letter groups (*rn* for *m*, *ii* for *ü*). It is measured on 25,249 pages whose text is known (22,728 born-digital pages against their own text layer, 2,518 pages transcribed by vision, 3 keyed by hand): 8,343,819 word pairs, old and modern print apart, each confusion ranked by its share of the letter, not by its count. The release adds:
+
+- `docs/OCR-CONFUSIONS-SURVEY-2026-10-29b.tsv`: everything Tesseract wrote in place of a letter at least twice (3,439 rows);
+- `docs/OCR-CONFUSIONS-2026-10-29b.tsv` and `.md`: the register, the confusions of the survey seen at least five times, at least 1% of the letter, and changing what the name search sees (267 rows), with its report;
+- `docs/OCR-CONFUSIONS-FRA-2026-10-29.tsv`, `.md` and `docs/OCR-CONFUSIONS-FRA-SURVEY-2026-10-29.tsv`: the same measure for the French model's reading (5,088 pages, 94 rows; the survey 1,274), which shows what that model writes for the Esperanto letters;
+- `tools/ocr-confusions.py`, which builds them (`--reading` picks the reading measured); `tools/ocr-confusions-g5.py`, which scores the name search with both tables on every signed G5 sample; `tools/ocr-confusion-snippets.py`, which cuts the printed word from the page image, for the examples on the project's site.
+
+The name search keeps the table of release v1.1: of 14,789 names judged in the G5 samples it finds 14,317 with that table and 14,315 with the register, since one confusion is one wrong letter and the search already allows for that. The register is for where no such allowance is possible, such as matching a printed town to exactly one place in a long gazetteer. `tools/ocr-name-search.py` gains only an argument, so that `ocr-confusions-g5.py` can load the other table. As before, the code is as run and only comments were edited; the syntax-tree check against the working copy passed for the four tools.
+
 ## 7. Vision, only where a check shows a problem
 
 "Vision" here means transcription of a page image by an AI vision model rather than by OCR. It is used only where a check has shown a quality problem, never as the default, and the quota is finite (`tools/ocr-vision-batch.py`, header; RUNBOOK.md § 2, rule 10). At intake, new items are converted by OCR (C4), and vision on their pages comes only after the image sort, on the editor's word (RUNBOOK.md § 1a, "Where each test runs").

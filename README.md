@@ -10,6 +10,7 @@ This is a **frozen release**: the version the methods document describes. It is 
 - `v1.3` (22 October 2026): the whole pipeline as run on the batches of 7 to 22 October (`METHOD.md`, section 6, «Release v1.3»): pages in columns, text blocks and second readings; Fraktur; declared second languages honoured, with old Portuguese spelling recognised; new word lists (Slovak, Latino sine flexione, Volapük); copies of one text aligned and tested; holdings censused and pages dated; long runs that save page by page and resume. `RUNBOOK.md` is the current run sheet, and `docs/FAILURE-MAP.md` runs to row R50. 56 tools updated or added.
 - `v1.4` (27 October 2026): the runbooks published (`METHOD.md`, section 6, «Release v1.4»): the cupel run sheet as of 27 October, and the dowse and smelt runbooks for the first time, in `runbooks/`. Each runbook has an undated file, always a copy of its newest dated version, and its earlier dated versions kept; `RUNBOOK.md` now points there. The tools brought up to the run sheet (30 updated, 16 added, among them the gutter cut for pages in columns, `tools/ocr-gutter-cut.py`), and `docs/FAILURE-MAP.md` to row R70.
 - `v1.5` (27 October 2026): the tools of the dowse and smelt runbooks (`METHOD.md`, section 6, «Release v1.5»): 62 added, so that every tool the three runbooks name is here.
+- `v1.6` (29 October 2026): the OCR confusions register (`METHOD.md`, section 6, «Release v1.6»): what Tesseract writes in place of every printed letter, measured on 25,249 pages of known text, and the three tools that build, test and illustrate it.
 
 ## What is here
 
@@ -22,6 +23,7 @@ This is a **frozen release**: the version the methods document describes. It is 
 | `docs/FAILURE-MAP.md` | Every way the pipeline failed, how it was found, and what fixed it. |
 | `docs/OCR-ACCENT-SURVEY-2026-10-05.md` (and `.tsv`) | What OCR writes in place of each accented Latin letter and each Cyrillic letter, measured on 27,308 pages of known text, old and modern print apart (release v1.1). |
 | `tools/ocr-name-search-confusions.tsv` | The measured confusions the name search tries, generated from the survey (release v1.1). |
+| `docs/OCR-CONFUSIONS-2026-10-29b.tsv` (and `.md`) | The OCR confusions register: what Tesseract writes in place of each printed letter, every letter, capitals apart, letter groups, ranked by share of the letter, measured on 25,249 pages of known text (267 rows; release v1.6). The whole measure: `docs/OCR-CONFUSIONS-SURVEY-2026-10-29b.tsv` (3,439 rows). The same for the French model: `docs/OCR-CONFUSIONS-FRA-2026-10-29.*`. |
 | `docs/SEARCHING.md` | How the corpus is searched for people: a roster against a journal run (the way the project searches), or one name against the whole corpus; the tools, how to read their results and when to stop, people who share a surname, what a silence means, and how long it takes (release v1.2). |
 | `tools/` | The tools that implement the method (Python and shell), in the state the documents describe. |
 | `tools/lexicons/hunspell/SOURCE.md` | Where the word lists come from, and their licences. |
@@ -39,7 +41,7 @@ Tesseract 5.5.3 with the 4.1.0 language models and the `orus` model (see `tools/
 
 ## Citing
 
-The Geniza of Esperanto, *geniza-ocr: the OCR quality-assurance method*, release `v1.5` (2026), https://github.com/opoudjis/geniza-ocr.
+The Geniza of Esperanto, *geniza-ocr: the OCR quality-assurance method*, release `v1.6` (2026), https://github.com/opoudjis/geniza-ocr.
 
 ## Licence
 

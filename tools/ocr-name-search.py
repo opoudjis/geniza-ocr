@@ -63,9 +63,10 @@ def fold(w):
     return re.sub(r"ъ$", "", w).replace("ъ", "ь")
 
 
-def _confusions():
-    """letter → what OCR writes in its place, most frequent first (old and modern print together)."""
-    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ocr-name-search-confusions.tsv")
+def _confusions(p=None):
+    """letter → what OCR writes in its place, most frequent first (old and modern print together). `p`: another table of
+    the same columns (letter, written, share), for a comparison only (tools/ocr-confusions-g5.py, 2026-10-29)."""
+    p = p or os.path.join(os.path.dirname(os.path.abspath(__file__)), "ocr-name-search-confusions.tsv")
     if not os.path.exists(p):
         return {}
     best = {}
