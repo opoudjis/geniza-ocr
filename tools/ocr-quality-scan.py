@@ -359,7 +359,7 @@ def measures(text, path=""):
     if len(toks) < 200:
         return None
     words = WORD.findall(text)
-    junk = sum(1 for t in toks if not WORD.fullmatch(t.strip(".,;:!?[]«»\"'—–-"))
+    junk = sum(1 for t in toks if not WORD.fullmatch(t.strip(".,;:!?()[]«»\"'—–-"))
                and not re.fullmatch(r"[\d.,/–—-]+", t))
     short = sum(1 for w in words if len(w) <= 2)
     lines = text.splitlines()

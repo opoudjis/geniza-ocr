@@ -42,7 +42,7 @@ def chapters(text):
         m = re.match(r"=== page (\d+) ===", l)
         if m: p = int(m.group(1)); continue
         lines.append((p, l.strip()))
-    caps = lambda s: 6 <= len(s) <= 80 and re.fullmatch(r"[A-ZĈĜĤĴŜŬÀ-ÞĀ-ſ ,.:;–\-—«»']+", s) and sum(c.isalpha() for c in s) >= 5
+    caps = lambda s: 6 <= len(s) <= 80 and re.fullmatch(r"[A-ZĈĜĤĴŜŬÀ-ÞĀ-ſ ,.:;–\-—()«»']+", s) and sum(c.isalpha() for c in s) >= 5
     running = {re.sub(r"^\d+\s+|\s+\d+$", "", s) for _, s in lines if re.search(r"^\d+\s+\S|\S\s+\d+$", s)}
     for pg, s in lines:
         if caps(s) and not re.search(r"\d", s) and s in running and s not in seen: heads.append((pg, s)); seen.add(s)

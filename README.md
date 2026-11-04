@@ -11,13 +11,14 @@ This is a **frozen release**: the version the methods document describes. It is 
 - `v1.4` (27 October 2026): the runbooks published (`METHOD.md`, section 6, «Release v1.4»): the cupel run sheet as of 27 October, and the dowse and smelt runbooks for the first time, in `runbooks/`. Each runbook has an undated file, always a copy of its newest dated version, and its earlier dated versions kept; `RUNBOOK.md` now points there. The tools brought up to the run sheet (30 updated, 16 added, among them the gutter cut for pages in columns, `tools/ocr-gutter-cut.py`), and `docs/FAILURE-MAP.md` to row R70.
 - `v1.5` (27 October 2026): the tools of the dowse and smelt runbooks (`METHOD.md`, section 6, «Release v1.5»): 62 added, so that every tool the three runbooks name is here.
 - `v1.6` (29 October 2026): the OCR confusions register (`METHOD.md`, section 6, «Release v1.6»): what Tesseract writes in place of every printed letter, measured on 25,249 pages of known text, and the three tools that build, test and illustrate it.
+- `v1.7` (4 November 2026): the dowse runbook split in two (`METHOD.md`, section 6, «Release v1.7»): the dowse itself, up to the readers' returns, in `runbooks/DOWSE-RUNBOOK.md`, streamlined; and a new runbook for the dress, from the returns to the harvested profiles, `runbooks/DRESS-RUNBOOK.md`. 20 tools added, so that every tool the runbooks name is here again; two published tools corrected to the code as run.
 
 ## What is here
 
 | | |
 |---|---|
 | `METHOD.md` | The methods document: the tests (G1 to G5), the classes, the measured recall, what the method does not claim, and the lessons. **Start here.** |
-| `runbooks/` | The runbooks, each as an undated latest file and its dated versions: `CUPEL-RUN-SHEET.md`, bringing a new batch of scans or PDFs through the method, step by step; `DOWSE-RUNBOOK.md`, reading the facts about people out of a source; `SMELT-RUNBOOK.md`, a person's facts grouped, checked and written up (a draft) (release v1.4). |
+| `runbooks/` | The runbooks, each as an undated latest file and its dated versions: `CUPEL-RUN-SHEET.md`, bringing a new batch of scans or PDFs through the method, step by step; `DOWSE-RUNBOOK.md`, reading the facts about people out of a source; `DRESS-RUNBOOK.md`, the readers' returns made into checked and dated fact lines and harvested into profiles (release v1.7); `SMELT-RUNBOOK.md`, a person's facts grouped, checked and written up (a draft) (release v1.4). |
 | `RUNBOOK.md` | A pointer to `runbooks/`; in v1.3 it held the run sheet. |
 | `docs/REPLICATION.md` | The replication record: the pipeline stage by stage, with commands, parameters and the reasons for each. |
 | `docs/FAILURE-MAP.md` | Every way the pipeline failed, how it was found, and what fixed it. |
@@ -41,7 +42,7 @@ Tesseract 5.5.3 with the 4.1.0 language models and the `orus` model (see `tools/
 
 ## Citing
 
-The Geniza of Esperanto, *geniza-ocr: the OCR quality-assurance method*, release `v1.6` (2026), https://github.com/opoudjis/geniza-ocr.
+The Geniza of Esperanto, *geniza-ocr: the OCR quality-assurance method*, release `v1.7` (2026), https://github.com/opoudjis/geniza-ocr.
 
 ## Licence
 
