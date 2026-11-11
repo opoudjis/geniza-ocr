@@ -179,7 +179,7 @@ def load_hits(path, items):
 
 def load_one(path, keys, h):
     with open(path, encoding="utf-8") as fh:
-        rows = csv.reader((l for l in fh if l.startswith("person\titem\t") or any(k in l[:300] for k in keys)), delimiter="\t")
+        rows = csv.reader((l for l in fh if l.startswith("person\titem\t") or any(k in l[:300] for k in keys)), delimiter="\t", quoting=csv.QUOTE_NONE)   # 2026-11-10: the roster bug
         hd = next(rows); ix = {k: i for i, k in enumerate(hd)}
         for r in rows:
             if len(r) < len(hd) or r[ix["tier"]] not in ("exact", "near", "confusion") or not r[ix["page"]].isdigit(): continue

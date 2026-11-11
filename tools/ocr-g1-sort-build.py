@@ -13,6 +13,8 @@ WRITES <out>/bNN/NNN.png + NNN.txt (batches of 20), <out>/KEY.tsv (NNN, batch, c
 The key is copied to `geniza/ocr/runs/OCR-G1-SORT-KEY-<tag>.tsv` once the sort is filed.
 """
 import os, re, sys, glob, json, argparse, subprocess
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ocr_withdrawn as WD
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GENIZA = os.path.join(HERE, "..", "published", "heterophony-resources", "geniza")
@@ -37,7 +39,10 @@ def main():
     ap.add_argument("--force", action="store_true", help="send --list pages even if an earlier sort has a verdict (a re-read may have fixed them)")
     ap.add_argument("--gate", default=None, help="gate json: every page of a TOO-SHORT-TO-SCORE item is added (the editor's ruling, 2026-09-27: an image check)")
     a = ap.parse_args()
-    pdfs = {os.path.splitext(os.path.basename(l.strip()))[0]: l.strip() for l in open(a.pdfs) if l.strip()}
+    # the list's older entries are relative to the repo root (cupel21, 2026-11-04: 43 of 73 pages rendered nothing when run
+    # from another folder, and the failures passed silently)
+    pdfs = {os.path.splitext(os.path.basename(l.strip()))[0]:
+            l.strip() if os.path.isabs(l.strip()) else os.path.join(HERE, "..", l.strip()) for l in open(a.pdfs) if l.strip()}
     seen = done_before(); todo = []
     for r in (json.load(open(a.g1)) if a.g1 != "-" else []):
         for p in r.get("untested_pages", []):
@@ -59,16 +64,19 @@ def main():
                     m = re.fullmatch(r"page-(\d+)\.txt", os.path.basename(f))
                     if m and (r["corpus"], int(m.group(1))) not in seen:
                         todo.append((r["corpus"], int(m.group(1)), "too-short"))
+    todo = [x for x in todo if x[1] not in WD.pages(x[0])]   # a duplicate page withdrawn (2026-10-30): nothing to sort
     first = {}
     for c, p, why in todo:
         first.setdefault((c, p), why)   # a page listed twice keeps its first reason
     todo = sorted((c, p, w) for (c, p), w in first.items())
     os.makedirs(a.out, exist_ok=True); key = []
-    cache = {}
+    cache = {}; failed = []
     for i, (c, p, why) in enumerate(sorted(todo), 1):
         b = f"b{(i - 1) // 20 + 1:02d}"; n = f"{i:03d}"; bd = os.path.join(a.out, b); os.makedirs(bd, exist_ok=True)
         subprocess.run(["pdftoppm", "-r", "110", "-png", "-singlefile", "-f", str(p), "-l", str(p), pdfs[c],
                         os.path.join(bd, n)], capture_output=True)
+        if not os.path.exists(os.path.join(bd, n + ".png")):
+            failed.append(n); print(f"NOT RENDERED {n} {c} p.{p}: {pdfs[c]}", file=sys.stderr)
         if c not in cache:
             t = open(os.path.join(ROOT, c + ".txt"), encoding="utf-8", errors="ignore").read() if os.path.exists(os.path.join(ROOT, c + ".txt")) else ""
             parts = re.split(r"\n=== page (\d+) ===\n", "\n" + t); cache = {c: dict(zip(map(int, parts[1::2]), parts[2::2]))}
@@ -78,6 +86,9 @@ def main():
         for k in key: f.write("\t".join(map(str, k)) + "\n")
     kinds = {w: sum(1 for k in key if k[4] == w) for w in ("undecided", "flagged", "too-short", "reread")}
     print(f"{len(key)} pages in {len({k[1] for k in key})} batches {kinds}; already sorted and skipped: {len(seen)}")
+    if failed:
+        print(f"NOT RENDERED: {len(failed)} page(s), no image to sort: {' '.join(failed)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

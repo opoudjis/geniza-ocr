@@ -97,23 +97,23 @@ def prep(tag):
         cfg = json.load(open(os.path.join(G, "dowse", source, "brief-config.json"), encoding="utf-8"))
         texts = " kaj ".join(f"`{os.path.join(G, x)}`" for x in cfg["texts"])
         out = [f"# La ripara legado (smelt S5): {source} ({tag})", "",
-               f"`[tools/smelt-fix.py --prep {tag}: {sum(len(v[4]) for v in items.values())} linioj de {len(items)} faŭltoj, kiujn la legiloj de smelt trovis kaj Ezri juĝis riparendaj en la linioj (smelt/FAULTS-TRIAGE-{tag}.tsv). La smelt-gvidlibro, S5, paŝo 4.]`", "",
+               f"`[tools/smelt-fix.py --prep {tag}: {sum(len(v[4]) for v in items.values())} linioj de {len(items)} difektoj, kiujn la legiloj de smelt trovis kaj Ezri juĝis riparendaj en la linioj (smelt/FAULTS-TRIAGE-{tag}.tsv). La smelt-gvidlibro, S5, paŝo 4.]`", "",
                "## La briefo", "",
                "Vi riparas faktoliniojn de esplora projekto pri la historio de la internaciaj helplingvoj. Uzu nur la ilon Read. Rulu neniujn ŝelajn komandojn, faru neniujn retajn serĉojn, skribu neniujn dosierojn. Via fina mesaĝo estas via raporto. Skribu ĝin en Esperanto.",
                "",
                f"**La fonto:** {cfg['source']}. La teksto: {texts}. Por ĉiu linio **relegu la paĝon** de ĝia lokindiko en la teksto (la paĝoj estas markitaj «=== page N ===» aŭ «=== ¶ N ===»): riparu laŭ la paĝo, neniam nur laŭ la linio.",
                f"**La specoj de fakto:** `{os.path.join(G, 'ocr', 'method', 'EVENT-KINDS-PROPOSAL-2026-10-13.md')}`, la sekcio «The list in force». **La formo de linio:** {tpl_line}, kiel en `{os.path.join(G, 'ocr', 'method', 'DOWSE-TEMPLATE-FACTS-READING-BRIEF-EO-2026-10-13.md')}`, «La linio»; la ankro ses aŭ pli da vortoj de la paĝo, laŭvorte; la lokindiko kiel en la malnova linio.",
                "",
-               "**Por ĉiu faŭlto** sube: la problemo kaj la riparo, kiun la triado proponas (en la angla), kaj la linioj. Por ĉiu linio decidu unu el tri:",
-               "- **ANSTATAŬIGU:** skribu la ĝustan linion, aŭ, por linio, kiu diras du faktojn, la du (aŭ pli) liniojn, ĉiun plena kaj staranta sola. La kapon (NOMO) lasu, kiel en la malnova linio, krom se la faŭlto estas ĝuste ĝi.",
+               "**Por ĉiu difekto** sube: la problemo kaj la riparo, kiun la triado proponas (en la angla), kaj la linioj. Por ĉiu linio decidu unu el tri:",
+               "- **ANSTATAŬIGU:** skribu la ĝustan linion, aŭ, por linio, kiu diras du faktojn, la du (aŭ pli) liniojn, ĉiun plena kaj staranta sola. La kapon (NOMO) lasu, kiel en la malnova linio, krom se la difekto estas ĝuste ĝi.",
                "- **FORIGU:** la linio estas la sumo de aliaj linioj aŭ ne estas fakto; diru, kiuj linioj jam diras ĝin.",
                "- **SAMA:** la paĝo montras, ke la linio estas ĝusta; diru kial.",
                "Linio, kiu venas el kopio (⟦kopio el NOMO⟧), estas riparata en sia originalo: skribu la linion sub la originala kapo (NOMO de la kopio-marko).",
-               "**La aliaj linioj de la sama paĝo** estas listigitaj sub ĉiu faŭlto, ĉiuj personoj: antaŭ ol dividi aŭ reskribi linion, kontrolu, ke neniu el ili jam diras la fakton, eĉ sub alia persono; se jes, FORIGU (aŭ ne skribu la duan linion) kaj nomu ĝin.",
+               "**La aliaj linioj de la sama paĝo** estas listigitaj sub ĉiu difekto, ĉiuj personoj: antaŭ ol dividi aŭ reskribi linion, kontrolu, ke neniu el ili jam diras la fakton, eĉ sub alia persono; se jes, FORIGU (aŭ ne skribu la duan linion) kaj nomu ĝin.",
                "",
                "**La formo de la raporto:**", "", "```", "### bourlet-F1", "- L8: ANSTATAŬIGU", "- $$$ BOURLET $$$ **…** · {…} · … · … · … · [?] · 📣 (…)", "- $$$ BOURLET $$$ **…** · {…} · … · … · … · [?] · 📣 (…)", "- L9: FORIGU (= L12 kaj L13)", "- L10: SAMA (la paĝo diras …)", "```", "",
                f"Fine, en du paŝoj: (1) la tuta raporto kiel unu mesaĝo; (2) en la sama mesaĝo, post la raporto, legu `{os.path.join(G, 'dowse', '_FINO.txt')}` kaj respondu nur per la linio, kiun ĝi petas.",
-               "", "## La faŭltoj", ""]
+               "", "## La difektoj", ""]
         # the source's other lines at the same item and place, every person (2026-10-18, the editor; Li kaj
         # ni's doubles 40 → 44: a reader splitting De Beaufront's L188 and L189 wrote again two doubts of Zamenhof the page
         # already had under ZAMENHOF, which its brief did not show)

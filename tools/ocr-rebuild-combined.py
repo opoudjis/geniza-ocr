@@ -27,6 +27,8 @@ _s = importlib.util.spec_from_file_location("sm", os.path.join(os.path.dirname(o
 SM = importlib.util.module_from_spec(_s); _s.loader.exec_module(SM)   # best_merge(): one rule, two tools
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ocr_russian_reading as RR   # the old-letter rule: `orus` or `rus` per page
+import onb_footer as OF            # the ÖNB viewer's footer out of both texts (2026-11-03)
+import apostrophe_supersign as AS  # an apostrophe for a supersign, in named titles, in both texts (2026-11-06)
 
 
 def write_whole(path, text):
@@ -62,13 +64,29 @@ def main():
     # as good as our OCR on 96% of sampled pages), so it joins the SEARCH text. On a SCAN (image ≥ 50%) the layer is a
     # library's OCR (ours better on 54%, theirs on 21%): it is NOT added to the search text, triangulation included.
     # Where adjudication CHOSE a scan's layer as the page's reading (26 Sep rule, «just another image»), that choice stands.
-    tlk = os.path.join(os.path.dirname(os.path.abspath(a.root)), "ocr-text-layer-2026-09-30", "tl-kind.tsv")
+    # the NEWEST table (2026-11-03: `tools/ocr-tl-kind.py` extends it to the items added since 2026-09-30, into a new
+    # `ocr-text-layer-<date>/` folder; `ocr-dowse.py born_digital()` reads the newest so too)
+    tlks = sorted(glob.glob(os.path.join(os.path.dirname(os.path.abspath(a.root)), "ocr-text-layer-*", "tl-kind.tsv")))
+    tlk = tlks[-1] if tlks else ""
     born = set()
     if os.path.exists(tlk):
         for l in open(tlk, encoding="utf-8"):
             x = l.rstrip("\n").split("\t")
             if len(x) >= 4 and float(x[3]) < 0.5:
                 born.add((x[0], int(x[1])))
+    # A SCAN'S LAYER PREFERRED AS A BORN-DIGITAL PAGE'S IS (the editor, 2026-11-07 10:3x,, an exception to the above,
+    # this item only; failure map R112): Dulichenko 1990 prints Latin and Cyrillic on one line; its ABBYY layer reads both, and our
+    # one-model readings turn one into garbage of the other. The 90% guard below still applies, and our readings stay in the search.
+    LAYER_PREFERRED = {"dulichenko-1990-mezhdunarodnye-vspomogatelnye-yazyki"}
+    # A LISTED PAGE KEEPS THE PLAIN READING (the same word; tools/ocr-entry-pages.py): a numbered list whose column readings
+    # part the numbers from their entries; those readings join the search text only
+    plain_list = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(a.root))), "ocr", "method", "PLAIN-OVER-COLUMNS.tsv")
+    PLAIN = set()
+    if os.path.exists(plain_list):
+        for l in open(plain_list, encoding="utf-8"):
+            x = l.split("\t")
+            if len(x) > 1 and x[1].isdigit():
+                PLAIN.add((x[0], int(x[1])))
 
     # real words (3+ letters, in any lexicon) — the guard on the born-digital preferred reading (below)
     LEXW = set()
@@ -91,6 +109,8 @@ def main():
                 pages[int(m.group(1))] = f
         if not pages:
             continue
+        if corpus in LAYER_PREFERRED:
+            born |= {(corpus, n) for n in pages}
         rows, body, body_pref, prefrows = [], [], [], []
         rj = os.path.join(d, "RUSSIAN.json")
         russian = ({p["page"] for p in json.load(open(rj, encoding="utf-8"))["pages"]
@@ -98,7 +118,8 @@ def main():
                     and os.path.exists(os.path.join(d, f"page-{p['page']:04d}.rus.txt"))}
                    if os.path.exists(rj) else set())
         for n in sorted(pages):
-            w = win.get((corpus, n))
+            plain = (corpus, n) in PLAIN
+            w = None if plain else win.get((corpus, n))
             src = pages[n]
             recipe = "psm6"
             # winner ∈ psm6 · psm4 · hr6 · hr4 (hr = re-read at the text MASK's resolution)
@@ -138,20 +159,20 @@ def main():
             # A COLUMN RE-READ (`page-NNNN.cols.txt`, tools/ocr-reocr-best.py columns, 2026-10-18, on the editor's decision to
             # measure psm 3 first): psm 3, written only where it reads the columns apart and is no worse; outranks the re-OCR it replaces.
             cols = pages[n][:-len(".txt")] + ".cols.txt"
-            if os.path.exists(cols) and n not in russian:
+            if os.path.exists(cols) and n not in russian and not plain:
                 src, recipe = cols, "cols"
             # THE LAYOUT CUT BY TESSERACT'S BLOCKS (`page-NNNN.blocks.txt`, tools/ocr-reocr-best.py blocks, 2026-10-18): where
             # psm 3 was refused, its blocks read one by one; written only where no worse, so it stands where `.cols` does not
             blocks = pages[n][:-len(".txt")] + ".blocks.txt"
-            if os.path.exists(blocks) and n not in russian:
+            if os.path.exists(blocks) and n not in russian and not plain:
                 src, recipe = blocks, "blocks"
             # THE GUTTER CUT (`page-NNNN.gutter.txt`, tools/ocr-gutter-cut.py, C7c.2b, 2026-10-27, the editor «hold, recut, build
             # the bloody thing»): a page in columns cut at its gutters band by band, each column read top to bottom; written only
             # where no worse; outranks the column and block re-reads it was made to replace (the Revuo's blocks read alternately)
             gutter = pages[n][:-len(".txt")] + ".gutter.txt"
             gutter_prev = None
-            if os.path.exists(gutter) and n not in russian:
-                gutter_prev = src                             # the reading it replaces: appended to the SEARCH text (below)
+            if os.path.exists(gutter) and n not in russian and not plain:
+                gutter_prev = src                            # the reading it replaces: appended to the SEARCH text (below)
                 src, recipe = gutter, "gutter"
             # A FRAKTUR RE-READ (`page-NNNN.frk.txt`, tools/ocr-reocr-best.py fraktur, 2026-10-18, the editor «if they are open,
             # then surely they need to be rsolved»): a German page in Fraktur read with frk+deu; outranks the column re-read.
@@ -284,13 +305,29 @@ def main():
                 if t_.strip() and t_ not in text:
                     text = text.rstrip("\n") + "\n" + t_
                     recipe += "+tl-born"
+            # ANY OTHER PAGE'S LAYER WHERE IT IS THE ONLY TEXT (the editor 2026-10-25 12:3x: the C1 rule on the born-digital text layer
+            # stands, except where there is no other text layer; built 2026-11-03, the build queue's item 10): a
+            # page not born-digital (a scan, or a page tl-kind.tsv does not list) joins its layer to the SEARCH text where no
+            # reading of ours holds 5 real words and the layer holds 10. Measured when built: 14 such pages in 10 items (Bohema
+            # Esperantisto 1904 pp. 1, 2, 27, 28 among them, our readings noise and the layer its Czech text), every one of
+            # them already reading the layer as adjudication's choice; so no page changed, and this is the backstop for a
+            # page where adjudication does not choose it.
+            elif os.path.exists(tlf) and os.path.abspath(tlf) != os.path.abspath(src) and realwords(text) < 5:
+                ours = [f for f in glob.glob(pages[n][:-len(".txt")] + ".*.txt") + [pages[n]]
+                        if not f.endswith((".tl.txt", ".tl-emended.txt"))]
+                if all(realwords(open(f, encoding="utf-8", errors="ignore").read()) < 5 for f in ours):
+                    t_ = open(tlf, encoding="utf-8", errors="ignore").read()
+                    if realwords(t_) >= 10 and t_ not in text:
+                        text = text.rstrip("\n") + "\n" + t_
+                        recipe += "+tl-only"
             # THE COLUMN-BY-COLUMN LAYOUT READING (`page-NNNN.layout.txt`, tools/ocr-layout-mixed.py, 27–28 Sep) and the
             # SMALL-CAPS RE-READ (`page-NNNN.sc3x.txt`, 3× Tesseract, 2026-09-30) join the SEARCH text of EVERY page that has
             # one — search only; the PREFERRED reading is unchanged. FIXED 2026-09-30 23:0x: the layout reading had joined
             # search only on the partly-read pages (triangulation, above), so on the 2,913 pages that have one, 16,232 real
             # Esperanto words it holds were in no searched text (editor).
             # (2026-10-24: and the NAME SNIPPETS read by vision, `page-NNNN.names.txt`, tools/ocr-name-crops.py: search only too)
-            for kind in ("layout", "sc3x", "names"):
+            # (2026-11-07: and a spread's layer cut to the page, `.tl-add.txt`, tools/ocr-layer-split.py; and a PLAIN page's column readings)
+            for kind in ("layout", "sc3x", "names", "tl-add") + (("cols", "blocks", "gutter") if plain else ()):
                 xf = pages[n][:-len(".txt")] + f".{kind}.txt"
                 if os.path.exists(xf) and os.path.abspath(xf) != os.path.abspath(src):
                     t_ = open(xf, encoding="utf-8", errors="ignore").read()
@@ -328,11 +365,31 @@ def main():
             for kind, f in supp:
                 pref = pref.rstrip("\n") + "\n" + open(f, encoding="utf-8", errors="ignore").read()
                 pref_recipe += "+" + kind; pref_files.append(os.path.basename(f))
-            # A PAGE JUDGED BLANK (`page-NNNN.blank`; the editor ruled on 2026-09-30 that a page decided as blank must not
-            # assert garbage characters as content, so it is blank): the PREFERRED reading is empty, so no
-            # show-through or OCR noise is handed over as the page's text. The SEARCH text keeps every reading.
+            # A PAGE JUDGED BLANK (`page-NNNN.blank`; editor 2026-09-30: a page judged blank stays blank,
+            # never garbage characters asserted as its content): the PREFERRED reading is empty, so no
+            # show-through or OCR noise is handed over as the page's text. CHANGED 2026-10-28 (the editor 13:1x: a blank page's
+            # search text emptied too, as a set-off's): until then the SEARCH text kept every reading, a guard against a page
+            # wrongly judged blank; but each of the nine `.blank` pages was judged twice on the whole image and ruled, and
+            # their garbage (two are show-through in mirror) stood where the fuzzy name matching reads.
             if os.path.exists(pages[n][:-len(".txt")] + ".blank"):
                 pref, pref_recipe, pref_files = "", "blank", [os.path.basename(pages[n][:-len(".txt")] + ".blank")]
+                text, recipe = "", "blank"
+            # A SET-OFF PAGE (`page-NNNN.setoff`, tools/ocr-setoff-check.py; the editor, 2026-10-28 12:1x: the garbage OCR of
+            # such pages kept out of the search text): the page carries only the facing page's ink in mirror (the blank inside
+            # of a wrapper, *Dia Regno* 1912 PDF 2 and 11), so every reading of it is garbage, and in the SEARCH text the fuzzy
+            # matching of garbled names could take that garbage for a name. BOTH texts are empty; the readings stay on disk.
+            # As `.blank` (above) since 2026-10-28.
+            so = pages[n][:-len(".txt")] + ".setoff"
+            if os.path.exists(so):
+                pref, pref_recipe, pref_files = "", "setoff", [os.path.basename(so)]
+                text, recipe = "", "setoff"
+            # THE ÖNB FOOTER («…data.onb.ac.at/rep/… Seite N von M»; the editor 2026-11-03: out, it is the library's
+            # metadata) leaves both texts; the readings on disk keep it (tools/onb_footer.py)
+            pref, text = OF.strip(pref), OF.strip(text)
+            # THE APOSTROPHE FOR A SUPERSIGN, in the titles named there (the editor 2026-11-06: normalised, for the texts'
+            # use by others; the readings on disk keep the print as read; tools/apostrophe_supersign.py)
+            if AS.applies(corpus):
+                pref, text = AS.normalise(pref), AS.normalise(text)
             body_pref.append(f"\n=== page {n} ===\n" + pref)
             prefrows.append((n, pref_recipe, " + ".join(pref_files), second_script, recipe))
             body.append(f"\n=== page {n} ===\n" + text)

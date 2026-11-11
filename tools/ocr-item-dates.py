@@ -15,20 +15,23 @@ HOW, strongest evidence first; the first that gives a year wins:
   name       a year in the file name
   imprint    a year on the first 4 or the last PDF page on a line with an imprint word (©, Copyright, ISBN, eldonis,
              eldonejo, presejo, Verlag, Druck, Imprimerie …; not a city alone): the LATEST such year
-  page       a year alone on a title page line (first 4 PDF pages): the latest
+  page       a year alone on a title page line (first 4 PDF pages): the latest. For both, a library's cover sheet
+             withdrawn from the readings (2026-11-03) is read from the store, `ocr_withdrawn.library_texts()` (the
+             editor 2026-11-04: the library pages stay out of the data, their metadata is retained)
   none       nothing found: for a look
 A part of a work filed in pieces (ENCYCL_ / ANTOL_ / COUVERTURE parts) takes the year its parts agree on.
-KIND: written in 1914 or before → PRIMARY, 1915 or later → SECONDARY, except where RULED names it (1914 INCLUSIVE: the
-editor ruled on 2026-10-10, 18:1x, that the limit for Esperanto be 1914 inclusive, and that for Ido it stay 1931
-exclusive; the rule had been «before 1914»). WRITTEN, not published,
-decides (the editor ruled on 2026-10-09, 14:1x, that pieces written, not published, before the cutoff are primary; no separate ruling).
-For Idists the cutoff is 1931, the relaunch of Progreso (the editor deferred this at 14:1x): NOT YET
+KIND: written before 1887 → SECONDARY (the floor, 2026-10-18; in this tool since 2026-11-03), 1887 to 1914 → PRIMARY,
+1915 or later → SECONDARY, except where RULED names it (1914 INCLUSIVE, the
+editor 2026-10-10 18:1x, geniza/QUEUE.md; it was the years before 1914). WRITTEN, not published,
+decides (the editor 2026-10-09 14:1x; no separate ruling).
+For Idists the cutoff is 1931, the relaunch of Progreso (the editor 14:1x): NOT YET
 applied. A year found is a year of
 PUBLICATION; a later edition of earlier writing (letters, documents, records) is flagged «documents?» for a ruling,
 since the rule is the date of WRITING.
 WRITE-SET: --out only, refused if it exists (choose a new name; the item table reads the newest).
 """
 import os, re, sys, glob, argparse, importlib.util, collections, csv
+import ocr_withdrawn as WD   # the withdrawn library pages' metadata (2026-11-04)
 
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 G = os.path.join(HERE, "..", "published", "heterophony-resources", "geniza")
@@ -37,13 +40,35 @@ def _mod(n, p):
     a = sys.argv; sys.argv = [a[0]]; s.loader.exec_module(m); sys.argv = a; return m
 
 RULED = {   # item → (year or None, kind or None, the ruling)
-    # 2026-10-26 21:5x, born-digital items: Esperanta Stelo (signed by the editor 21:5x),
+    # 2026-11-11, dates fixed (Miles): the text heading read a member's number as a year (1806, 1943); the bulletin's year
+    # by the pages' own dates, as its signed siglum ICAEA records («∴ 1898»; the Frau Schäffer entry, «bis 1. December 1898»)
+    "icaea-p185": (1898, None, "Icaea p. 185: the pages' dates (SIGLA.tsv ICAEA, «∴ 1898»)"),
+    "icaea-p210": (1898, None, "Icaea p. 210: the pages' dates (SIGLA.tsv ICAEA, «∴ 1898»)"),
+    # 2026-11-03, a date fixed, not a kind ruled (Miles, found when the floor of 1887 came in: the text's first line had
+    # given 1870, which the floor would have made SECONDARY): the issue's own date, in its name; the kind follows the rule
+    "daily-witness-1906-05-04": (1906, None, "the issue of 4 May 1906, its date in its name (the text's first line gave «1870»)"),
+    "medikokontrevole": (1926, None, "Jules Gross's Ido translation of Molière, imprint Saint-Dié 1926 (PDF p. 1; «1622», Molière's birth, had been taken as the year written)"),
+    # 2026-10-26 21:5x, born-digital items: Esperanta Stelo (signed 21:5x, ruled by the editor),
     # dated by its masthead («Nº 1ª · 31 JANUARO 1912»), PRIMARY by the rule (Esperanto, 1914 or before); de Beaufront's
     # Doktoro Louis Couturat, in Ido, 1923: PRIMARY by the Ido cutoff of 1931 (the editor 21:3x on the Coulommiers volume:
     # the Esperanto cutoff is not for Ido, so it stays primary), where the rule had read it as Esperanto after 1914
     "esperanta.stelo": (1912, None, "1912: the masthead of n-ro 1, «31 JANUARO 1912» (our transcription by vision, sources/born-digital-text/esperanta.stelo.txt); BPEAPE 3153: Buenos Aires, Jan 1912–1914"),
+    # 2026-10-29 (Ezri's relay 00:2x: the handwritten issues, signed PRESENCE ONLY in
+    # ocr/lines/BORN-DIGITAL-LINES-2026-10-26-SIGNED-handwritten.txt, had no year, so the sources page gave Svisa Espero
+    # as 1904–1905): their years from our transcriptions (sources/born-digital-text/<item>.txt); PRIMARY by the rule
+    **{f"ANNO_e5a_190301{n:02d}": (1903, None, "1903: the minutes it prints, «Séance du 8 Mars 1903 à Lausanne», «… du 10 Avril 1903» (our transcription by vision); ANNO's file label 1903") for n in range(1, 7)},
+    **{f"juna.esperantisto.1903.{m}": (1903, None, "1903: its masthead, «Unua Jaro N° … 1903» (our transcription by vision)") for m in ("04", "06", "07", "09", "10", "11")},
+    **{f"juna.esperantisto.1904.{m}": (1904, None, "1904: its masthead, «IIa jaro … 1904» (our transcription by vision)") for m in ("01", "03", "06", "09")},
+    # 2026-10-29, cupel19b C13 (Miles; seen at C9's second sort, read again in the texts): ANNO files The Esperanto Monthly's
+    # title page and index under the year after their volume's for 1917 and 1918 (1914 and 1915 hold their own year)
+    **{f"ANNO_e0x_1917000{n}": (1916, None, "1916: Volume IV, «1916» on its title page and index (our text); ANNO's file label 1917") for n in (1, 2)},
+    **{f"ANNO_e0x_1918000{n}": (1917, None, "1917: Volume V, «1917» on its title page and index (our text); ANNO's file label 1918") for n in (1, 2)},
+    # 2026-10-31, cupel19c C10 (the editor 02:4x, to Miles's proposal: Idiom Neutral before 1931
+    # PRIMARY, as Ido, Occidental, Novial and Peano's Interlingua): Progres, the Idiom Neutral journal (ed. Rosenberger,
+    # St Petersburg 1906–1908)
+    "progres": (1906, "PRIMARY", "1906–1908: Progres, reviu internasional pro omni interesi de Idiom Neutral (the ÖNB copy, 65 pp); Idiom Neutral before 1931: PRIMARY (the editor 2026-10-31 02:4x)"),
     "beaufront-1923-doktoro-louis-couturat": (1923, "PRIMARY", "1923, in Ido: PRIMARY by the Ido cutoff of 1931 (the editor 2026-10-26 21:3x,)"),
-    # 2026-10-26 (the editor 21:2x; Ezri 10:2x: «yes … 1915 for the Coulommiers memorial volume»): the tool read
+    # 2026-10-26 (the editor 21:2x; Ezri 10:2x: ruled by the editor): the tool read
     # 1868, Couturat's birth year in the file name, for the volume printed after his death
     "Louis Couturat_1868-1914": (1915, "PRIMARY", "1915: the memorial volume «Louis Couturat 1868–1914» (Coulommiers 1915), not 1868, the year of his birth in the file name; Ezri 2026-10-26 10:2x, the editor 21:2x. PRIMARY: French with Ido (no «estas», «kaj» in 28,220 words; «esas», «qua»), Ido before the 1931 cutoff; the editor 21:3x"),
     # 2026-10-24, cupel18a C10 (the editor 11:3x, on the date rule: Koresteno 1932, Ido after 1931, SECONDARY):
@@ -106,8 +131,37 @@ RULED = {   # item → (year or None, kind or None, the ruling)
     "Weltsprache und Wissenschaft": (None, "PRIMARY", "the editor ruled on 2026-10-09: primary, contemporary polemic and "
                                                       "history"),
     "LaJubileaKongresoDeEsperanto_1912_kul46721": (1912, "PRIMARY", "La Jubilea Kongreso de Esperanto (the 1912 congress; "
-        "imprint «Copyright 1937 by J. Muusses – Purmerend»): the editor ruled on 2026-10-14: contemporary pieces, "
-        "anthologised in 1937, so primary; no reason to think a page is missing"),
+        "imprint «Copyright 1937 by J. Muusses – Purmerend»): the editor 2026-10-14 15:2x: contemporary pieces, "
+        "anthologised in 1937: primary, and no reason to think a page missing"),
+    "onb-katalogo-2026-11-06": (2026, "SECONDARY", "the ÖNB catalogue's author forms, read 2026-11-06: a catalogue, not a work; asked for by Ezri, the editor carrying it"),
+    "Filipina_Esperantisto": (1907, "PRIMARY", "Filipina Esperantisto, vol. 1, no. 1, August 1907 (PDF 7, 15), its text running to 1909; a bound volume of several journals, one item, cupel23"),
+    "klubaj.raportoj.vieno": (1907, "PRIMARY", "ÖNB's cover sheet: Klubaj raportoj, Wien, «Jahr: 1907-1914»; a run bound as one item, cupel23"),
+    "internacia.revuo.medicina": (1906, "PRIMARY", "ÖNB's catalogue: Internacia Revuo Medicina, Paris, 1906, cupel23"),
+    "ruslanda.adresaro": (1912, "PRIMARY", "ÖNB's cover sheet: Ruslanda Adresaro, Moskvo, «Jahr: 1912-1912», cupel23"),
+    "Espero.de.Katalunjo": (1905, "PRIMARY", "ÖNB's cover sheet: Espero de Katalunujo, Céret, «Jahr: 1905-1905», cupel23"),
+    "EsperantoKajLaBlinduloj": (1910, "PRIMARY", "ÖNB's cover sheet: Esperanto kaj la blinduloj, Jarlibro por 1910, «Jahr: 1910-1910», cupel23"),
+    "robertson-2002-kabe-cu-eterna-mistero": (2002, "SECONDARY", "Ed Robertson's article on Kabe, Esperanto en Skotlando, autumn 2002, on the Esperanto Association of Britain's site since 2017; "
+        "the editor signed the item 2026-11-06"),
+    "Lingvo Internacia 1914.7": (1920, None, "the editor 2026-11-07 21:2x: the ÖNB's part 7 of vol. XIX is all of "
+        "the combined issue «N-roj 8-12 (248-252) Aŭg. 1914-Dec. 1920» (pp. 301-346; out after 10 Feb 1921, Noël's obituary, PDF 43), printed "
+        "«por plenigi la abonjaron 1914»; its kind by the 1914 rule"),
+    "gauntlett-2007-edward-gauntlett": (2007, "SECONDARY", "Saiko Gauntlett's chapter on Edward Gauntlett, Britain & Japan: Biographical Portraits VI, "
+        "ed. Cortazzi, Brill, 2007, pp. 299-306; for Ezri's sinter, 2026-11-07"),
+    "gorecka-korjenkov-2018-postparolo-kotzin": (2018, "SECONDARY", "Gorecka and Korĵenkov's afterword to the 2018 reissue of "
+        "Orienta Almanako, pp. 76-77, Kotzin's life; the editor signed the item 2026-11-08 (the almanac's Kotzin pages only)"),
+    "kotzin-1913-orienta-almanako-antauparolo": (1913, "PRIMARY", "Kotzin's preface to Orienta Almanako (Moskvo, 1913), in the "
+        "corrected 2018 reissue, PDF 4-5: dated by the 1913 edition, as Dietterle's 1929 letters by 1888; the editor signed the item 2026-11-08 19:1x"),
+    "kotzin-1913-orienta-almanako-enhavo": (1913, "PRIMARY", "the contents of Orienta Almanako (1913), the 2018 reissue's page, PDF 78: "
+        "its authors and translators of 1913; the editor signed the item 2026-11-08 19:1x"),
+    "tsankova-2023-tarnovo-ljulka-na-esperantizma": (2023, "SECONDARY", "Olga Cankova, «Търново - люлка на есперантизма в България», "
+        "Staro Tarnovo (blog), July 2023: the Esperanto movement of Veliko Tarnovo; the editor signed the item 2026-11-09"),
+    "mallia-1987-oar-49495": (1987, "SECONDARY", "Mallia's article on Busuttil, Civilization 30, 1987: the catalogue record only, the article restricted; "
+        "the editor signed the item 2026-11-06"),
+    "wikipedia-eo-gustavo-busuttil-live-2026-11-06": (2026, "SECONDARY", "the live Esperanto Wikipedia page on Busuttil, read 2026-11-06; the editor signed the item that day"),
+    "dietterle-1929-ov-leteroj-wikisource": (1888, "PRIMARY", "Zamenhof's letters of 1888–1916 in Dietterle's Originala "
+        "Verkaro (1929), part V, those the Tekstaro lacks (born-digital, eo.wikisource): dated by the first letter, as "
+        "the Tekstaro's OV by its first work; the editor 2026-11-04 14:3x, on: "
+        "an anthology of primary material is primary, except its editorial content"),
 }
 # Years from archive.org's own item records (on the editor's decision of 2026-10-09, 17:0x, to try these items again
 # there), fetched 2026-10-09; taken only where the record is the same work and its «date» is not
@@ -332,12 +386,15 @@ ENCYCL = re.compile(r"ENCYCL|ENCYL_|^00_COUVERTURE")   # Künzli, Svisa Enciklop
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--out", required=True)
     ap.add_argument("--reads", action="append", default=[], help="a readers' folder (KEY.tsv, *.return.md); repeatable")
+    # a new batch's items have no row in the committed table, so no dates: a first table written elsewhere is read instead
+    # (2026-11-07, cupel23's C13: the table is replaced only when committed, so the first pass cannot go to its fixed name)
+    ap.add_argument("--table", default=os.path.join(G, "OCR-ITEM-TABLE.tsv"), help="the item table to read (default: geniza's)")
     a = ap.parse_args()
     R = {}
     for fo in a.reads: R.update(reads(fo))
     if os.path.exists(a.out): sys.exit(f"--out {a.out} exists: choose a new name")
     PS = _mod("ps", "ocr-page-sequence.py"); K = _mod("ks", "kapis-share-tables.py")
-    rows = K.rows(os.path.join(G, "OCR-ITEM-TABLE.tsv"))
+    rows = K.rows(a.table)
     # born-digital items (2026-10-10): rows of their own even before the item table has them; dated from the text's header
     sys.path.insert(0, HERE); import born_digital_lines as BDL
     BD = BDL.lists("proposed"); have = {r["item"] for r in rows}
@@ -345,6 +402,11 @@ def main():
     runs = collections.Counter(r.get("title_key", "") for r in rows)
     out, stats = [], collections.Counter()
     IDO = ido_items(); REU = reu_years(); cut = lambda it: 1931 if (it in IDO or OCC_BD.match(it)) else 1915
+    # THE FLOOR (the editor 2026-10-18 03:2x, cupel15 C10;
+    # 2026-10-25 12:3x, ruled by the editor, to carrying it here rather than in each scope file):
+    # written before 1887 → SECONDARY, whatever the language (Volapük's first years, 1880–1886, above all).
+    FLOOR = 1887
+    kind_of = lambda it, y: "PRIMARY" if FLOOR <= y < cut(it) else "SECONDARY"
     for r in rows:
         it = r["item"]
         # a periodical issue dated by its own year; one with none is read too; and one RULED (2026-10-17: a «1922» file of
@@ -401,7 +463,9 @@ def main():
             else: how = "archive.org-kind"
         if it in R and how not in ("archive.org", "archive.org-kind", "congress-number", "web", "web-kind"):
             pub, w_, work, title, evr = R[it]
-            wr = first_year(w_) if w_ and w_.upper() != "SAME" else None
+            # a RULED year is final: the readers' «written» year does not override it (2026-11-03: «1622», Molière's birth,
+            # had stood as the year written of Gross's 1926 translation)
+            wr = first_year(w_) if w_ and w_.upper() != "SAME" and not (it in RULED and RULED[it][0]) else None
             unknown = pub.upper().startswith("UNKNOWN")
             sig = re.search(r"Signatur:[^»]*?\d{6}-[A-Z]\.(?:[A-Z]+\.)?(\d{4})", evr)   # an ÖNB shelfmark ends in the volume's year
             if y is None and unknown and sig:
@@ -416,6 +480,8 @@ def main():
             if wr and y and wr > y: wr = None   # a «written» later than published is a later revision, not earlier writing
         if y is None and it not in R:
             pg = PS.item_pages(it)
+            for p_, t_ in WD.library_texts(it).items():   # a withdrawn library page's metadata, from the store (2026-11-04)
+                if not pg.get(p_, "").strip(): pg[p_] = t_
             if pg:
                 ks = sorted(pg); look = ks[:4] + ks[-1:]   # the title pages and the last page (colophon)
                 imp, tit = [], []
@@ -429,8 +495,8 @@ def main():
                     y, p, l = max(imp); how, ev = "imprint", f"PDF p. {p}: «{l}»"
                 elif tit:
                     y, p, l = max(tit); how, ev = "page", f"PDF p. {p}: «{l}»"
-        yw = wr or y   # the editor's ruling: pieces written, not published, before the cutoff are primary
-        kind = "SECONDARY" if (PRESS.match(it) and it in BD) else RULED[it][1] if it in RULED and RULED[it][1] else WEB[_ud.normalize("NFC", it)][1] if (_ud.normalize("NFC", it) in WEB and WEB[_ud.normalize("NFC", it)][1] and not yw) else ARCHIVE_ORG[it][1] if (it in ARCHIVE_ORG and ARCHIVE_ORG[it][1] and not yw) else (("PRIMARY" if yw < cut(it) else "SECONDARY") if yw else "")
+        yw = wr or y   # the editor
+        kind = "SECONDARY" if (PRESS.match(it) and it in BD) else RULED[it][1] if it in RULED and RULED[it][1] else WEB[_ud.normalize("NFC", it)][1] if (_ud.normalize("NFC", it) in WEB and WEB[_ud.normalize("NFC", it)][1] and not yw) else ARCHIVE_ORG[it][1] if (it in ARCHIVE_ORG and ARCHIVE_ORG[it][1] and not yw) else (kind_of(it, yw) if yw else "")
         late = (it in IDO or OCC_BD.match(it)) and yw and 1915 <= yw < 1931 and not (it in RULED and RULED[it][1])
         if late: stats["ido-cutoff"] += 1
         flag = ("Ido/Occidental/Novial cutoff 1931" if late else "")
@@ -444,7 +510,7 @@ def main():
         yy = agreed.most_common(1)[0][0]
         for o in parts:
             if not o[1]:
-                o[1], o[2], o[3] = yy, "part", ("PRIMARY" if int(yy) < cut(o[0]) else "SECONDARY")
+                o[1], o[2], o[3] = yy, "part", kind_of(o[0], int(yy))
                 o[5] = f"a part of a work filed in pieces; its parts give {yy}"; stats["part"] += 1; stats["none"] -= 1
     # an undated periodical issue: its kind from its run's dated issues, when the whole run falls on one side of 1914
     # (a run = title keys equal in their letters, so «posta-mundi-39» joins «posta_mundi»; a key of digits only, from
@@ -460,17 +526,17 @@ def main():
         r = byit[o[0]]
         if o[1] or o[3] or not K.periodical(r, runs): continue
         clue = [int(v) for v in re.findall(r"(?<!\d)(1[5-9]\d\d|20[0-2]\d)(?!\d)", R.get(o[0], [""] * 5)[0] + " " + R.get(o[0], [""] * 5)[4])]
-        c = cut(o[0])
-        if clue and (min(clue) >= c or max(clue) < c):
-            o[3] = "SECONDARY" if min(clue) >= c else "PRIMARY"
+        # the years agree when every one gives the same kind (the floor of 1887 and the cutoff both count)
+        if clue and len({kind_of(o[0], v) for v in clue}) == 1:
+            o[3] = kind_of(o[0], clue[0])
             o[4] = f"undated; kind from the reader's clue years, {min(clue)}–{max(clue)}"; stats["clue-kind"] += 1; continue
         ys = runyears.get(rk(r), [])
-        if ys and (min(ys) >= c or max(ys) < c):
-            o[3] = "SECONDARY" if min(ys) >= c else "PRIMARY"
+        if ys and len({kind_of(o[0], v) for v in ys}) == 1:
+            o[3] = kind_of(o[0], ys[0])
             o[4] = f"undated; kind from its run's dated issues, {min(ys)}–{max(ys)}"; stats["run-kind"] += 1
     with open(a.out, "w", encoding="utf-8") as f:
         f.write("# GENERATED by tools/ocr-item-dates.py. Do not hand-edit — re-run it (rulings go in its RULED table). "
-                "written = a year of publication unless «ruled»; kind by the editor's rule: 1914 or before PRIMARY (Ido/Occidental/Novial items: before 1931), later "
+                "written = a year of publication unless «ruled»; kind by the editor's rule: before 1887 SECONDARY, 1887 to 1914 PRIMARY (Ido/Occidental/Novial items: before 1931), later "
                 "SECONDARY, exceptions only as ruled; «documents?» = a later edition of what may be earlier writing.\n")
         f.write("item\twritten\tevidence\tkind\tflag\twhat it rests on\n")
         for o in sorted(out): f.write("\t".join(o) + "\n")

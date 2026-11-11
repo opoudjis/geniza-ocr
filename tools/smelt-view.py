@@ -166,7 +166,7 @@ def witness_keys(ls, line):
             return type("M", (), {"group": lambda self, i=1: d})() if d else None
     DER = _D
     # copies are no witnesses; but a group made only of copies is shown by them (G26 of the De Beaufront return)
-    own_ = [n for n in ls if line.get(n) and "kopio el" not in line[n]]
+    own_ = [n for n in ls if line.get(n) and "⟦kopio el" not in line[n]]   # our note only (the trigger audit, 33)
     units = {}
     for n in (own_ or [n for n in ls if line.get(n)]):
         units.setdefault(place(line[n]) or n, []).append(line[n])

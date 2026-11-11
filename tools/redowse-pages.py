@@ -5,6 +5,7 @@ D8, the third kind; the editor, 2026-10-25 15:5x).
     tools/redowse-pages.py measure [--date YYYY-MM-DD] [--notice RN-…] [--write]
     tools/redowse-pages.py prep MEASURE.tsv TAG [--source …] [--write]
     tools/redowse-pages.py search TAG [--hits HITS.tsv] [--write]     (R2 for search-only notices: search_only())
+    tools/redowse-pages.py pooled SCOPE.tsv TAG [--source …]          (D6c step 1 for any batch, one search: pooled())
     tools/redowse-pages.py merge MEASURE.tsv TAG [--source …]         (R5's config lines, printed: merge())
     tools/redowse-pages.py lost TAG [--write]                         (R5's step 8 on the harvest's missing lines: step8())
     tools/redowse-pages.py status [--notice RN-…] [--tag TAG] --set TEXT [--write]   (R7, «Ezri's status»: status())
@@ -29,7 +30,7 @@ The lines after the item's first changed page are counted too: R3 re-pins them (
 Without --write it prints the summary. --write writes dowse/REDOWSE-PAGES-MEASURE-<date>.md (by source, page by page,
 the persons and the lost anchors named) and .tsv, create-only. It writes nothing else: the notice file is Miles's, and
 the status column is set once a page is redowsed (R7). Ezri, 2026-10-25."""
-import argparse, csv, glob, importlib.util, json, os, re, sys, unicodedata
+import argparse, csv, glob, importlib.util, json, os, re, subprocess, sys, unicodedata
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G = os.path.join(ROOT, "published", "heterophony-resources", "geniza")
 NOTICES = os.path.join(G, "ocr", "RECUPEL-NOTICES.tsv")
@@ -45,6 +46,13 @@ def fold(s):
     """lower case, no accents, letters and digits only (an anchor across a line break or a re-cut hyphen still matches)."""
     s = unicodedata.normalize("NFKD", s.lower())
     return re.sub(r"[^a-z0-9]", "", "".join(c for c in s if not unicodedata.combining(c)))
+
+_LAT = dict(zip("абвгдеёжзийклмнопрстуфхцчшщъыьэюяѣі",
+                "a b v g d e e zh z i j k l m n o p r s t u f h c ch sh sht a y  e ju ja e i".split(" ")))
+def latin(s):
+    """Cyrillic in Latin letters (Bulgarian «ъ» as «a», «щ» as «sht»; tools/ocr-name-search.py's, for the Russian), so that
+    fold() keeps a Cyrillic name (2026-11-03, the bi-script search)."""
+    return "".join(_LAT.get(c, _LAT[c.lower()].capitalize() if c.lower() in _LAT else c) for c in s)
 
 def names(s):
     """the page's capitalised words, folded (a roster key matched against every word took common words for persons:
@@ -177,42 +185,178 @@ def measure(a):
                                 read=(item, p) in was_read))
     return rows, triage, out, rpath
 
+def pooled_search(a, want, rpath, lex, base):
+    """ONE NAME SEARCH FOR ALL THE SOURCES (2026-10-30; the editor): one strong search over every item of
+    the sources whose hits are still to make, its setup (the roster, the lexicon, the workers) paid once, not a source;
+    then its hits split into each source's record-<tag>-strong.hits.tsv, only the rows on the legiloj's pages and one page
+    either side (what the readers' rosters and the context read; a row elsewhere in the item serves no R4 reader).
+    `want`: source -> {item: the pages kept, or None for the whole item}; `base`: the pooled files' path without its
+    ending (the prep's REDOWSE-PREP-<tag>-pooled; `pooled` takes any batch, 2026-10-30)."""
+    need = {}
+    for src, w in sorted(want.items()):
+        if a.source and src not in a.source: continue
+        if os.path.exists(os.path.join(G, "dowse", src, f"record-{a.tag}-strong.hits.tsv")): continue
+        need[src] = w
+    if not need: return
+    items = sorted({i for w in need.values() for i in w})
+    if not os.path.exists(base + "-items.txt"): open(base + "-items.txt", "x", encoding="utf-8").write("\n".join(items) + "\n")
+    elif open(base + "-items.txt", encoding="utf-8").read().split() != items:   # a resume, never another batch's list
+        sys.exit(f"{os.path.relpath(base, ROOT)}-items.txt exists with other items: use a new tag")
+    hits = base + "-strong.hits.tsv"
+    if not os.path.exists(hits):
+        cmd = (f"python3 {os.path.join(ROOT, 'tools', 'ocr-dowse.py')} --roster {rpath} --items @{base}-items.txt --lexicon {lex} "
+               f"--strong-only --mode shared --write {base}-strong.md")
+        print(f"the pooled search: {len(items)} items of {len(need)} sources", flush=True)
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        print("  ocr-dowse.py: exit %d; %s" % (r.returncode, " | ".join((r.stdout + r.stderr).strip().split("\n")[-2:])), flush=True)
+        if r.returncode or not os.path.exists(base + "-strong.md"): sys.exit("  the pooled search failed: rerun to resume")
+    outs = {src: open(os.path.join(G, "dowse", src, f"record-{a.tag}-strong.hits.tsv.tmp"), "w", encoding="utf-8") for src in need}
+    kept, head = {src: 0 for src in need}, None
+    with open(hits, encoding="utf-8") as fh:
+        for l in fh:
+            if l.startswith("#") or head is None:
+                if not l.startswith("#"): head = l.rstrip("\n").split("\t")
+                for o in outs.values(): o.write(l)
+                continue
+            f = l.rstrip("\n").split("\t")
+            item, page = f[head.index("item")], f[head.index("page")]
+            if not page.isdigit(): continue
+            for src, w in need.items():
+                if item in w and (w[item] is None or int(page) in w[item]): outs[src].write(l); kept[src] += 1
+    for src, o in outs.items():
+        o.close(); p = o.name[:-4]; os.replace(o.name, p)
+        print(f"  {src}: {kept[src]} hits on its readers' pages → {os.path.relpath(p, ROOT)}", flush=True)
+    # the pooled record removed once split (2026-10-30: 100 items made 1,969 MB of hits and a 496 MB record, in a folder
+    # committed routinely; rebuilt by the same call if ever needed)
+    for p in (hits, base + "-strong.md"):
+        if os.path.exists(p): os.remove(p)
+    print(f"  the pooled record removed ({os.path.basename(hits)}, its .md); the items list kept", flush=True)
+
+def page_ranges(s):
+    """«1-3, 301-302» → {1, 2, 3, 301, 302}; «all» → None (the whole item)."""
+    if s.strip() == "all": return None
+    out = set()
+    for part in s.replace("–", "-").split(","):
+        lo, _, hi = part.strip().partition("-")
+        out.update(range(int(lo), int(hi or lo) + 1))
+    return out
+
+def pooled(a):
+    """THE POOLED NAME SEARCH FOR ANY BATCH (2026-10-30, the jarlibroj; the editor, on two searches run one after the other): dowse
+    runbook D6c step 1 for several sources in one search. SCOPE: a TSV, «source», «item», «pages» («1-59», «1-3,
+    301-302» or «all»), a row an item; a source whose dowse/<source>/record-<tag>-strong.hits.tsv stands is skipped, so
+    the call resumes. Each source keeps the hits on its pages and one page either side, or the whole item for «all»;
+    the pooled files are dowse/POOLED-SEARCH-<tag>-*, the record removed once split, the items list kept."""
+    want = {}
+    for r in read_tsv(a.scope):
+        pp = page_ranges(r["pages"])
+        w = want.setdefault(r["source"], {})
+        w[r["item"]] = None if pp is None else {q for p in pp for q in (p - 1, p, p + 1)}
+    for src in want: os.makedirs(os.path.join(G, "dowse", src), exist_ok=True)
+    lex = sorted(glob.glob(os.path.join(G, "sources", "ocr-work", "ocr-lexicon-*.tsv")))[-1]
+    rpath, _k = roster_keys()
+    print(f"{sum(len(w) for w in want.values())} items of {len(want)} sources; roster {os.path.basename(rpath)}, lexicon {os.path.basename(lex)}", flush=True)
+    pooled_search(a, want, rpath, lex, os.path.join(G, "dowse", f"POOLED-SEARCH-{a.tag}"))
+
 def prep(a):
     """R4's inputs, source by source, from a measure's table (the pages marked «R4 re-read»): dowse/<source>/
     redowse-items-<tag>.txt (the items, for the name search's --items @file) and redowse-readers-<tag>.txt (one legilo
-    a page, «N: `item` PDF p–p», for dowse-brief-fill.py --readers-file), create-only; prints each page's lines in the
-    new text (P1: 80 a legilo, at most 100) and the commands of steps 1, 2 and 4 for the tag."""
+    a run of adjacent changed pages, «N: `item` PDF p–q», for dowse-brief-fill.py --readers-file), create-only; prints
+    each run's lines in the new text (P1: 80 a legilo, at most 100) and the commands of steps 1, 2 and 4 for the tag, the
+    brief's with --context (the neighbouring pages as marked context, 2026-10-30)."""
     rows = [r for r in csv.DictReader(open(a.measure, encoding="utf-8"), delimiter="\t") if r["action"] == "R4 re-read"]
     lex = sorted(glob.glob(os.path.join(G, "sources", "ocr-work", "ocr-lexicon-*.tsv")))[-1]
     rpath, _k = roster_keys()
+    if a.run and not a.write: sys.exit("--run needs --write")
+    pooled = []
     by = {}
     for r in rows: by.setdefault(r["source"], []).append((r["item"], int(r["PDF page"]), r["notice"]))
+    if a.run:
+        want = {}
+        for src, pp in by.items():
+            for i, p, _n in pp: want.setdefault(src, {}).setdefault(i, set()).update((p - 1, p, p + 1))
+        pooled_search(a, want, rpath, lex, os.path.join(G, "dowse", f"REDOWSE-PREP-{a.tag}-pooled"))
     for src, pp in sorted(by.items()):
         if a.source and src not in a.source: continue
         D = os.path.join(G, "dowse", src)
         ip, rp = os.path.join(D, f"redowse-items-{a.tag}.txt"), os.path.join(D, f"redowse-readers-{a.tag}.txt")
+        done_before = a.run and os.path.exists(ip) and os.path.exists(rp)   # --run resuming: the source's two files kept
         for p in (ip, rp):
-            if os.path.exists(p): sys.exit(f"{os.path.relpath(p, ROOT)} exists: not overwritten (use a new tag)")
-        seen = list(dict.fromkeys((i, p) for i, p, _n in pp))
+            if os.path.exists(p) and not done_before: sys.exit(f"{os.path.relpath(p, ROOT)} exists: not overwritten (use a new tag)")
+        seen = sorted(dict.fromkeys((i, p) for i, p, _n in pp))
         items = list(dict.fromkeys(i for i, _p in seen))
-        over = []
+        # adjacent changed pages of one item read together, as one range (the editor, 2026-10-30 16:0x, R4's context: one
+        # reader for a run of changed pages; its neighbours come as marked context, dowse-brief-fill.py --context)
+        runs = []
         for i, p in seen:
-            n = len(pages(os.path.join(G, "sources", "ocr-preferred", i + ".txt")).get(p, "").strip("\n").split("\n"))
-            if n > 100: over.append(f"{i} PDF {p}: {n} lines")
-        readers = " · ".join(f"{k}: `{i}` PDF {p}–{p}" for k, (i, p) in enumerate(seen, 1)) + "."
-        if a.write:
+            # the extracts only (--other-readings): one reader an item, its pages first to last; the pages between with no
+            # extract give the reader nothing (dowse-brief-fill.py --other-readings-only), so the range is the item's
+            if runs and runs[-1][0] == i and (runs[-1][2] == p - 1 or a.other_readings): runs[-1][2] = p
+            else: runs.append([i, p, p])
+        # A RUN CUT AT 100 LINES (2026-11-10, the roster-cut redowse; Ezri through the editor: prep's runs cut at 100
+        # lines, prep's own rule (80 a legilo, at most 100), the cut made in prep, not by hand, so every source
+        # gets the same treatment): a run of adjacent pages over --cut-lines (default 100) is cut between pages into parts
+        # of at most that many lines, each part with its neighbouring pages as marked context (--context), so the page past
+        # a cut is the next part's context. The brief filler's unit is the page: a page over the limit is a part by itself
+        # (Esperanto (UEA)'s broadsheet pages, 400 lines and more). 0 keeps the runs whole, as before.
+        if a.cut_lines and not a.other_readings:
+            cut, cache = [], {}
+            for i, lo, hi in runs:
+                pg = cache.setdefault(i, pages(os.path.join(G, "sources", "ocr-preferred", i + ".txt")))
+                cur, n = None, 0
+                for p in range(lo, hi + 1):
+                    k = len(pg.get(p, "").strip("\n").split("\n"))
+                    if cur and n + k <= a.cut_lines: cur[2] = p; n += k
+                    else: cur = [i, p, p]; cut.append(cur); n = k
+            runs = cut
+        over = []
+        for i, lo, hi in runs:
+            if a.other_readings: continue   # the reader is given the extracts, not these pages' lines
+            pg = pages(os.path.join(G, "sources", "ocr-preferred", i + ".txt"))
+            n = sum(len(pg.get(p, "").strip("\n").split("\n")) for p in range(lo, hi + 1))
+            if n > 100: over.append(f"{i} PDF {lo}–{hi}: {n} lines")
+        readers = " · ".join(f"{k}: `{i}` PDF {lo}–{hi}" for k, (i, lo, hi) in enumerate(runs, 1)) + "."
+        if a.write and not done_before:
             open(ip, "x", encoding="utf-8").write("\n".join(items) + "\n")
             open(rp, "x", encoding="utf-8").write(readers + "\n")
-        print(f"{src}: {len(seen)} pages, {len(items)} items; notices {', '.join(sorted({n for _i, _p, n in pp}))}"
-              + (f"; OVER 100 LINES: {'; '.join(over)}" if over else ""))
+        # (the over-100 list counted, its first five shown: 2026-11-10, the roster-cut dry run printed some 550 of them)
+        print(f"{src}: {len(seen)} pages in {len(runs)} readers, {len(items)} items; notices {', '.join(sorted({n for _i, _p, n in pp}))}"
+              + (f"; OVER 100 LINES: {len(over)} readers, {'; '.join(over[:5])}{' …' if len(over) > 5 else ''}" if over else ""), flush=True)
         if a.write:
             T = os.path.join(ROOT, "tools")
-            print(f"  wrote {os.path.relpath(ip, ROOT)} and {os.path.relpath(rp, ROOT)}")
-            print(f"  python3 {T}/ocr-dowse.py --roster {rpath} --items @{ip} --lexicon {lex} --strong-only --mode shared --write {D}/record-{a.tag}-strong.md")
-            print(f"  python3 {T}/dowse-reader-roster.py {src} {rpath} {D}/record-{a.tag}-strong.hits.tsv --date {a.tag} --out-list")
-            print(f"  python3 {T}/dowse-candidates.py {src} --date {a.tag}")
-            print(f"  python3 {T}/dowse-brief-fill.py {src} {a.tag} --readers-file {rp} --partial \"the selective redowse of the pages recupelled ({a.tag})\" --per-reader --write-returns --group 3")
-    if not a.write: print("(dry run: --write writes the two files a source)")
+            steps = [(f"python3 {T}/ocr-dowse.py --roster {rpath} --items @{ip} --lexicon {lex} --strong-only --mode shared --write {D}/record-{a.tag}-strong.md",
+                      f"{D}/record-{a.tag}-strong.hits.tsv"),
+                     (f"python3 {T}/dowse-reader-roster.py {src} {rpath} {D}/record-{a.tag}-strong.hits.tsv --date {a.tag} --out-list",
+                      f"{D}/out-list-{a.tag}.md"),
+                     (f"python3 {T}/dowse-candidates.py {src} --date {a.tag}", f"{D}/candidates-{a.tag}.md"),
+                     (f"python3 {T}/dowse-brief-fill.py {src} {a.tag} --readers-file {rp} --partial \"the selective redowse of the pages recupelled ({a.tag})\" --per-reader --write-returns --group 3"
+                      # the extracts only, without the page or its neighbours (2026-11-03: the page was dowsed already)
+                      + (f" --other-readings {a.measure} --other-readings-only" if a.other_readings else " --context"),
+                      f"{D}/facts-pages-{a.tag}-1.txt")]
+            print(f"  {'reused' if done_before else 'wrote'} {os.path.relpath(ip, ROOT)} and {os.path.relpath(rp, ROOT)}")
+            for cmd, outp in steps:
+                if not a.run: print("  " + cmd); continue
+                # --run (2026-10-30, the recupel redowse of 14 sources): each step run here, one source after another;
+                # a step whose output stands is skipped, so a run stopped midway resumes where it stopped
+                if os.path.exists(outp): print(f"  skipped, {os.path.basename(outp)} stands: {cmd.split()[1].rsplit('/', 1)[-1]}"); continue
+                r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                tail = (r.stdout + r.stderr).strip().split("\n")
+                print(f"  {cmd.split()[1].rsplit('/', 1)[-1]}: exit {r.returncode}; " + " | ".join(tail[-3:]), flush=True)
+                wa = [l for l in tail if l.startswith("workflow args: ")]
+                if wa: pooled.append(json.loads(wa[-1][len("workflow args: "):]))
+                if r.returncode: sys.exit(f"  stopped at {src}: rerun the same command to resume")
+            if a.run and not any(s_["dir"] == D for s_ in pooled):   # the briefs made by an earlier run: groups by their names
+                gs = sorted((re.search(rf"facts-brief-{re.escape(a.tag)}-(g?\d+(?:-\d+)?)\.md$", f).group(1).lstrip("g")
+                             for f in os.listdir(D) if re.search(rf"facts-brief-{re.escape(a.tag)}-g?\d+(?:-\d+)?\.md$", f)),
+                            key=lambda g_: int(g_.split("-")[0]))
+                if gs: pooled.append({"dir": D, "tag": a.tag, "groups": gs})
+    if a.run and pooled and a.source:   # a trial on some sources: the pooled file is written by the whole run only
+        print("workflow args (not pooled, --source): " + json.dumps({"sources": pooled}, ensure_ascii=False))
+    elif a.run and pooled:
+        wp =os.path.join(G, "dowse", f"workflow-readers-{a.tag}.json")
+        with open(wp, "x", encoding="utf-8") as fh: json.dump({"sources": pooled}, fh, ensure_ascii=False, indent=1)
+        print(f"pooled {sum(len(s['groups']) for s in pooled)} legiloj of {len(pooled)} sources → {os.path.relpath(wp, ROOT)}")
+    if not a.write: print("(dry run: --write writes the two files a source; --run runs each source's four steps)")
 
 def merge(a):
     """R5's inputs, source by source, from a measure's (or a search's) table and the tag's joined returns: prints the
@@ -230,11 +374,34 @@ def merge(a):
                        if re.search(rf"-{re.escape(a.tag)}-\d+\.md$", p)), key=lambda p: int(re.search(r"-(\d+)\.md$", p).group(1)))
         rr = open(os.path.join(D, f"redowse-readers-{a.tag}.txt"), encoding="utf-8").read()
         nread = len(re.findall(r"`[^`]+` PDF \d+–", rr))
-        if len(rets) < nread: print(f"{src}: REFUSED, {len(rets)} returns for {nread} readers"); continue
+        if len(rets) < nread:
+            # the legiloj write pieces (-N-pK.md); dowse-file-returns.py joins them into -N.md (2026-10-30: the merge
+            # of 2026-10-30-rd refused all 13 sources before the join)
+            pieces = glob.glob(os.path.join(D, f"facts-return-{glob.escape(a.tag)}-*-p*.md"))
+            print(f"{src}: REFUSED, {len(rets)} returns for {nread} readers" + (f"; {len(pieces)} pieces not joined: run "
+                  f"tools/dowse-file-returns.py dowse/{src}/agents-{a.tag}.tsv first" if pieces else "")); continue
         S = json.load(open(os.path.join(D, "facts-config.json"), encoding="utf-8"))
         add = [r for r in rets if r not in S["returns"]]
         have = {(e["notice"], e["item"], e["tag"]) for e in S.get("redowsed_pages", [])}
         rp = [dict(notice=n, item=i, pages=sorted(pp), tag=a.tag) for (n, i), pp in sorted(ee.items()) if (n, i, a.tag) not in have]
+        # AN EXTRACTS RUN ADDS, IT DOES NOT SUPERSEDE (2026-11-03, the bi-script redowse 2026-11-03bs: its 14 entries
+        # would have dropped the earlier reading of 67 pages for 340 lines from their other readings; taken out by hand):
+        # a table of `search --items-file` (its notice not an RN- row) gets its returns only, and only with --add-only
+        # THE ROSTER-CUT REDOWSE SUPERSEDES (2026-11-10, the editor's ruling): its readers had full briefs (every person in
+        # scope on the page), so its notices («roster-cut-…») count as notice rows; but only on the pages its readers read,
+        # by redowse-readers-<tag>.txt (the four measure tables of 2026-11-10 disagree: kongresa-gazeto 80 or 60 pages), and
+        # a table page they did not read refuses the source, since superseding it would drop its old lines for nothing
+        rc = all(n.startswith("roster-cut-") for n, _i in ee)
+        if rc and not a.add_only:
+            read = {(m.group(1), p) for m in re.finditer(r"`([^`]+)` PDF (\d+)–(\d+)", rr) for p in range(int(m.group(2)), int(m.group(3)) + 1)}
+            unread = sorted((i, p) for (n, i), pp in ee.items() for p in pp if (i, p) not in read)
+            extra = len({ip for ip in read} - {(i, p) for (n, i), pp in ee.items() for p in pp})
+            if unread:
+                print(f"{src}: REFUSED, {len(unread)} table pages its readers did not read (first: {unread[:5]}); use the table of this tag's pages"); continue
+            print(f"{src}: roster-cut, every table page read by the tag's readers; {extra} pages read beyond the table (not superseded)")
+        elif any(not n.startswith("RN-") for n, _i in ee):
+            if not a.add_only: print(f"{src}: REFUSED, not notice rows (an extracts run, search --items-file): use --add-only"); continue
+            rp = []
         print(f"=== {src}: {len(add)} returns to add after {S['returns'][-1]!r}; {len(rp)} «redowsed_pages» entries, "
               f"{sum(len(e['pages']) for e in rp)} pages" + ("; the key exists: add the entries to it" if "redowsed_pages" in S else ""))
         if not a.write:
@@ -265,7 +432,7 @@ def step8(a):
     longer on the page: «person lost on the page», the step 10 candidates (the lines to restore, «restore»); off the
     redowsed pages: «not a redowsed page», a fault of another kind. --write writes dowse/REDOWSE-LOST-<tag>.md (the lost
     and off-page lines in full), create-only."""
-    rep = os.path.join(G, "profiles", "build", "MISSING-FACTS-LATEST.md")
+    rep = a.report or os.path.join(G, "profiles", "build", "MISSING-FACTS-LATEST.md")
     by, src = {}, None
     for l in open(rep, encoding="utf-8"):
         m = re.match(r"^### (.+?)-dowse\.md — \d+", l)
@@ -273,7 +440,7 @@ def step8(a):
         if l.startswith("## ") and src: src = None
         if src and l.startswith("- - $$$"): by.setdefault(src, []).append(l[2:].rstrip("\n"))
     out, L = {}, [f"# The selective redowse: what the new reading lost (R5, step 8), {a.tag}", "",
-                  f"*Generated by `tools/redowse-pages.py lost {a.tag} --write` from `profiles/build/MISSING-FACTS-LATEST.md` "
+                  f"*Generated by `tools/redowse-pages.py lost {a.tag}{' --report ' + os.path.basename(rep) if a.report else ''} --write` from `{os.path.basename(rep) if a.report else 'profiles/build/MISSING-FACTS-LATEST.md'}` "
                   f"and the current facts files. «Person lost on the page»: the head's name is on no current line citing that "
                   f"page; these are the lines for step 10 (restore). «Re-read, person kept» lines are not listed: the new "
                   f"reading has the person there, in other words.*", ""]
@@ -354,10 +521,21 @@ def search_only(a):
     (dowse/<source>/record-*.hits.tsv; a redowse tag's only on the pages its readers were given, redowse-readers-<tag>.txt,
     since its search ran over whole items); a person gained sends the page to R4, the form the search read named.
     --write writes dowse/REDOWSE-SEARCH-<tag>.md and .tsv (the columns prep reads), create-only."""
-    rows = [r for r in read_tsv(NOTICES) if (r.get("Ezri's status") or "").strip() in ("", "pending")]
     by_item, sched = sources_by_item(), scheduled()
-    want = {}
-    for r in rows:
+    want, readpages = {}, {}
+    if a.items_file:
+        # ITEMS SEARCHED IN EVERY READING (2026-11-03, the bi-script lines re-signed so, R98; Miles: the notices file has
+        # no row for them): the items of a list, each page the source's readers were given, the list's name standing for
+        # the notice; the gain is measured against the every-reading text (below)
+        note = os.path.basename(a.items_file).rsplit(".", 1)[0]
+        for it in [l.strip() for l in open(a.items_file, encoding="utf-8") if l.strip() and not l.startswith("#")]:
+            for src, _bt in by_item.get(it, []):
+                if src in sched: continue
+                if src not in readpages: readpages[src] = read_pages(src)
+                for i, p in readpages[src]:
+                    if i == it: want.setdefault((src, it), {})[p] = note
+    for r in ([] if a.items_file else read_tsv(NOTICES)):
+        if (r.get("Ezri's status") or "").strip() not in ("", "pending"): continue
         if r["kind"] != "search-only reading added" and (r.get("superseded text") or "").strip(): continue
         for src, _bt in by_item.get(r["item"], []):
             if src in sched: continue
@@ -369,9 +547,11 @@ def search_only(a):
         if not a.write: print("(dry run: --write writes the items file and prints the search)"); return
         if os.path.exists(ip): sys.exit(f"{os.path.relpath(ip, ROOT)} exists: not overwritten (use a new tag)")
         open(ip, "x", encoding="utf-8").write("\n".join(glob.escape(i) for i in items) + "\n")
+        pp = os.path.join(G, "dowse", f"redowse-search-pages-{a.tag}.tsv")   # only these pages searched (2026-11-07)
+        open(pp, "x", encoding="utf-8").write("".join(f"{i}\t{p}\n" for i, p in sorted({(i, p) for (_s, i), v in want.items() for p in v})))
         rpath, _k = roster_keys()
         lex = sorted(glob.glob(os.path.join(G, "sources", "ocr-work", "ocr-lexicon-*.tsv")))[-1]
-        print(f"wrote {os.path.relpath(ip, ROOT)}\n  python3 {ROOT}/tools/ocr-dowse.py --roster {rpath} --items @{ip} --lexicon {lex} "
+        print(f"wrote {os.path.relpath(ip, ROOT)}\n  python3 {ROOT}/tools/ocr-dowse.py --roster {rpath} --items @{ip} --pages {pp} --lexicon {lex} "
               f"--strong-only --mode shared --write {G}/dowse/REDOWSE-SEARCH-{a.tag}-strong.md")
         return
     # only the notice pages' hits are kept as the table is read (2026-10-26: the 2026-10-25s search wrote 18.4 million
@@ -424,7 +604,19 @@ def search_only(a):
             pp_ = os.path.join(G, "sources", "ocr-preferred", item + ".txt")
             if pp_ not in _pref: _pref[pp_] = {k: fold(v) for k, v in pages(pp_).items()} if os.path.exists(pp_) else {}
             prefp = _pref[pp_].get(p, "")
-            gained = [x for x in raw if fold(hit[x]) and fold(hit[x]) in snip and fold(hit[x]) not in prefp]
+            ok = lambda f: True
+            if a.items_file:
+                # every reading (2026-11-03): the form in the page's every-reading text, not in the text the readers were
+                # given with its Cyrillic put in Latin letters (fold keeps a-z0-9 only, so a name legible in Cyrillic
+                # counted as gained), and read as a name, capitalised, five letters or more (the first count, 919
+                # person-pages on Rondiranto, nearly all short keys matched by Latin misreadings of Cyrillic print)
+                ap_ = os.path.join(G, "sources", "ocr-rendersearch-all", item + ".txt")
+                if ap_ not in _pref: _pref[ap_] = {k: fold(v) for k, v in pages(ap_).items()} if os.path.exists(ap_) else {}
+                snip = _pref[ap_].get(p, "")
+                if ("raw", pp_) not in _pref: _pref[("raw", pp_)] = pages(pp_) if os.path.exists(pp_) else {}
+                prefp = fold(latin(readpages.get(src, {}).get((item, p)) or _pref[("raw", pp_)].get(p, "")))
+                ok = lambda f: f[:1].isupper() and len(fold(f)) >= 5
+            gained = [x for x in raw if fold(hit[x]) and fold(hit[x]) in snip and fold(hit[x]) not in prefp and ok(hit[x])]
             if a.tight:
                 faced = onpage.get((src, HF.item_key(item), p), set())
                 gained = [x for x in gained if fold(x) not in faced]
@@ -465,18 +657,26 @@ def main():
     sp = ap.add_subparsers(dest="cmd", required=True)
     p = sp.add_parser("prep"); p.add_argument("measure"); p.add_argument("tag"); p.add_argument("--source", nargs="*")
     p.add_argument("--write", action="store_true")
+    p.add_argument("--cut-lines", type=int, default=100, help="cut a run of adjacent pages into parts of at most N lines, between pages (2026-11-10; 0: whole runs, as before)")
+    p.add_argument("--run", action="store_true", help="with --write: run each source's steps 1, 2 and 4 and the brief, then pool the readers' workflow args (dowse/workflow-readers-<tag>.json)")
+    p.add_argument("--other-readings", action="store_true", help="the measure is a search table (search --items-file): each page's brief carries only its other readings round the forms gained (dowse-brief-fill.py --other-readings --other-readings-only, 2026-11-03)")
+    q = sp.add_parser("pooled"); q.add_argument("scope"); q.add_argument("tag"); q.add_argument("--source", nargs="*")
     m = sp.add_parser("measure"); m.add_argument("--date"); m.add_argument("--notice", nargs="*"); m.add_argument("--write", action="store_true")
     m.add_argument("--show", type=int, default=0, help="print the first N pages in full")
     s = sp.add_parser("search"); s.add_argument("tag"); s.add_argument("--hits"); s.add_argument("--write", action="store_true")
     s.add_argument("--tight", action="store_true", help="the «exact» tier only, and not a person with a fact citing the page (2026-10-26)")
+    s.add_argument("--items-file", help="items with no notice rows, searched in every reading: each page the source's readers were given, measured against the every-reading text (2026-11-03)")
     g = sp.add_parser("merge"); g.add_argument("measure"); g.add_argument("tag"); g.add_argument("--source", nargs="*")
     g.add_argument("--write", action="store_true", help="append the returns and entries to each facts-config.json (only one that re-dumps as it stands)")
+    g.add_argument("--add-only", action="store_true", help="an extracts run (search --items-file, prep --other-readings): the returns only, no «redowsed_pages» entries (2026-11-03)")
     o = sp.add_parser("lost"); o.add_argument("tag"); o.add_argument("--write", action="store_true")
+    o.add_argument("--report", help="a kept missing-facts report in place of profiles/build/MISSING-FACTS-LATEST.md (2026-11-03: a harvest run since the one that found the losses)")
     t = sp.add_parser("status"); t.add_argument("--notice", nargs="*"); t.add_argument("--tag"); t.add_argument("--set", required=True)
     t.add_argument("--measure", help="a measure's .md: the notices its triage table gives --triage"); t.add_argument("--triage", default="no dowse yet")
     t.add_argument("--write", action="store_true")
     a = ap.parse_args()
     if a.cmd == "prep": return prep(a)
+    if a.cmd == "pooled": return pooled(a)
     if a.cmd == "merge": return merge(a)
     if a.cmd == "lost": return step8(a)
     if a.cmd == "status": return status(a)

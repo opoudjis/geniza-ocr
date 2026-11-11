@@ -16,6 +16,11 @@ HOW, so that the language of the page cannot mislead it:
               diacritics off, old Cyrillic letters folded). Real text hits its own language; a turned reading hits none.
               2026-09-29: 1,453 pages in 147 items below 0.35. Most are real non-Latin print (Russian, Georgian,
               Armenian read with a Latin model), which a turn does not help.
+              ON 5+ LETTERS TOO (failure map R82; the editor, 2026-10-30 13:0x: the tool changed): once the lexicons
+              grew (Croatian, 1,045,530 forms, and Hungarian, 2026-10-29) almost any three-letter scrap was a word
+              somewhere, and cupel19c's sideways circular (Dana Esperantisto 1908 no. 54 PDF 7-10) scored as text; so a
+              page of >= 40 tokens is also a candidate below --below5 (0.5) on >= 10 words of 5+ letters, or with
+              under 10 such words in 100+ tokens (cupel19c: 62 of 1,944 pages, the circular's four among them).
   test        each candidate read turned by 180, 90 and 270 degrees (from the image the conversion reads, which now
               honours /Rotate), each reading scored the same way. A turn is a REPAIR only where it scores far above
               the current reading; the decision and the re-read are separate, reviewed steps.
@@ -74,14 +79,26 @@ def candidates(a):
             m = re.fullmatch(r"page-(\d+)\.txt", os.path.basename(f))
             if not m:
                 continue
-            s, n = score(open(f, encoding="utf-8", errors="ignore").read(), lex)
-            if n >= 40:
-                dist[int(s * 10)] += 1
-                if s < a.below:
-                    out.append((os.path.basename(d), int(m.group(1)), round(s, 3), n))
+            t = open(f, encoding="utf-8", errors="ignore").read()
+            tok = len(t.split())
+            if tok < 40:
+                continue
+            s, n = score(t, lex)
+            s5, n5 = score5(t, lex)
+            dist[int(s5 * 10)] += 1
+            # on 5+ letters too (failure map R82, 2026-10-30): since the lexicons grew (Croatian, Hungarian, 2026-10-29) a
+            # sideways page's three-letter scraps hit them almost whole (Dana Esperantisto 1908 no. 54 PDF 7-10: 0.74-1.00,
+            # its real neighbours 0.95), but its long words do not (0.27-0.46, or 1 such word in 182 tokens)
+            if (n >= 40 and s < a.below) or (n5 >= 10 and s5 < a.below5) or (n5 < 10 and tok >= 100):
+                out.append((os.path.basename(d), int(m.group(1)), round(s, 3), n))
+    if a.items_file:   # the batch's items only (2026-10-29: in place of the run sheet's `awk` join); the folder made
+        keep = {l.strip() for l in open(a.items_file, encoding="utf-8") if l.strip()}
+        out = [o for o in out if o[0] in keep]
+    os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     open(a.out, "w").write("".join(f"{c}\t{p}\t{s}\t{n}\n" for c, p, s, n in sorted(out)))
-    print("pages >= 40 words by all-lexicon rate (tenths):", dict(sorted(dist.items())))
-    print(f"candidates below {a.below}: {len(out)} in {len({o[0] for o in out})} items")
+    print("pages >= 40 tokens by all-lexicon rate on 5+ letters (tenths):", dict(sorted(dist.items())))
+    print(f"candidates (3+ letters below {a.below}, 5+ letters below {a.below5}, or under 10 words of 5+ letters in "
+          f"100+ tokens): {len(out)} in {len({o[0] for o in out})} items")
 
 
 def test(a):
@@ -139,6 +156,9 @@ def test(a):
         for n in ex.map(item, sorted(cand)):
             total += n
     print("pages read", total, "· already done", len(done))
+    # the error count the run sheet checked with `cut -f4 … | grep -c error` (2026-10-29): it must be 0 before decide
+    errs = sum(1 for l in list(open(a.out))[1:] if len(l.split("\t")) > 3 and "error" in l.split("\t")[3])
+    print(f"rows with an error: {errs}" + ("" if not errs else " — NOT 0: run outside the sandbox (failure map R43)"))
 
 
 def decide(a):
@@ -170,8 +190,10 @@ def decide(a):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("mode", choices=("candidates", "test", "decide"))
-    ap.add_argument("--below", type=float, default=0.35); ap.add_argument("--out", required=True)
+    ap.add_argument("--below", type=float, default=0.35); ap.add_argument("--below5", type=float, default=0.5)
+    ap.add_argument("--out", required=True)
     ap.add_argument("--candidates"); ap.add_argument("--pdfs"); ap.add_argument("--jobs", type=int, default=8)
     ap.add_argument("--test")
+    ap.add_argument("--items-file", help="candidates: keep only these items (one a line): the batch's ITEMS.txt")
     a = ap.parse_args()
     {"candidates": candidates, "test": test, "decide": decide}[a.mode](a)

@@ -50,6 +50,7 @@ import os, re, sys, glob, json, argparse, subprocess, statistics, collections
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import ocr_text_languages as TL
+import ocr_withdrawn as WD
 import old_orthography as OO   # Portuguese before the spelling reforms (2026-10-21)
 import cyrillic_lexicon as CL   # Russian or Bulgarian list per item (2026-10-17)   # the language table: which non-Latin languages a text prints (2026-10-03)
 LEXDIR = os.path.join(HERE, "lexicons")
@@ -71,6 +72,11 @@ def lex(name):
         p = os.path.join(LEXDIR, name + ".txt")
         _LEX[name] = ({w.strip().lower() for w in open(p, encoding="utf-8") if w.strip()}
                       if os.path.exists(p) else None)
+        # HUNGARIAN, ESTONIAN: the stems with Hunspell behind them, verdicts cached (tools/hunspell_words.py; the editor
+        # 2026-10-29 21:2x: the dictionary and its own inflections only, never forms from our texts)
+        sys.path.insert(0, HERE)
+        import hunspell_words
+        _LEX[name] = hunspell_words.words_for(name, _LEX[name])
     return _LEX[name]
 
 
@@ -129,14 +135,17 @@ class FoldedEstonian(set):
 
     def __init__(self, base, mode):
         super().__init__(base)
-        self.mode = mode
+        self.mode, self.base = mode, base   # membership asks `base` (2026-10-29: Hunspell may stand behind it)
         self.stripped = {w.replace("w", "v").translate(self.STRIP) for w in base} if mode == "wv-strip" else None
 
+    def listed(self, w):   # the stems with the fold, not a judge behind them (hunspell_words.listed)
+        return set.__contains__(self, w) or ("w" in w and set.__contains__(self, w.replace("w", "v")))
+
     def __contains__(self, w):
-        if set.__contains__(self, w):
+        if w in self.base:
             return True
         if self.mode == "wv":
-            return "w" in w and set.__contains__(self, w.replace("w", "v"))
+            return "w" in w and w.replace("w", "v") in self.base
         return w.replace("w", "v").translate(self.STRIP) in self.stripped
 
 
@@ -282,6 +291,9 @@ def main():
                          "runs with and without the diacritics): none = exact; wv = old «w» spelling also tried as «v», diacritics exact; "
                          "wv-strip = w→v AND ä õ ö ü š ž stripped on both sides")
     ap.add_argument("--no-auxlang-credit", action="store_true", help="switch OFF the page-local credit for the other planned languages (adopted 2026-09-26) — only to reproduce gates before p")
+    ap.add_argument("--no-old-spelling-fold", action="store_true",
+                    help="match German and Swedish words as printed only: only to reproduce gates before 2026-10-31 "
+                         "(the old spellings, tools/old_orthography.py)")
     ap.add_argument("--no-portuguese-fold", action="store_true",
                     help="match Portuguese words as printed only — only to reproduce gates before 2026-10-21 "
                          "(the old spellings, tools/old_orthography.py)")
@@ -290,6 +302,10 @@ def main():
         _LEX["estonian"] = FoldedEstonian(lex("estonian"), a.estonian_fold)
     if not a.no_portuguese_fold and lex("portuguese"):
         _LEX["portuguese"] = OO.FoldedPortuguese(lex("portuguese"))
+    # German before 1901 and 1996, Swedish before 1906 (2026-10-31, the editor; tools/old_orthography.py)
+    for _n, _v in (("german", OO.german_variants), ("swedish", OO.swedish_variants)):
+        if not a.no_old_spelling_fold and lex(_n):
+            _LEX[_n] = OO.FoldedVariants(lex(_n), _v)
     global NOT_CORPUS
     NOT_CORPUS = set()
     if a.not_corpus and os.path.exists(a.not_corpus):
@@ -332,6 +348,8 @@ def main():
         if os.path.basename(d) in NOT_CORPUS:
             continue
         pg = pages_of(d, a.script_segregated)
+        for n in WD.pages(os.path.basename(d)):   # a duplicate page withdrawn (2026-10-30): empty, not silent
+            pg.pop(n, None)
         if not pg:
             continue
         lens = sorted(len(t) for t in pg.values())
@@ -379,10 +397,19 @@ def main():
         toks = {m.group(0).lower() for m in WORD4.finditer(allt)}
         if toks:
             dens = {}
+            import hunspell_words as HW
             for n in others:
                 L = lex(n)
                 # EXCLUSIVE density: words of that language that are NOT also Esperanto.
-                dens[n] = 100 * sum(1 for x in toks if x in L and x not in prim) / len(toks)
+                # A FULL_LIST language is DETECTED by its own list only (2026-10-31, cupel19c chain -8: with Hunspell
+                # behind Danish, six signed Dutch and French journals, Nederlanda Katoliko and La Deksepa, were found
+                # «Danish» and held G2 pending; failure map R87). Hunspell still credits its words at G4 and in the merge.
+                # So is EVERY judged language (2026-10-31, before cupel20a's C0: with Hunspell behind Estonian, the gate
+                # found «Estonian» in ten Esperanto, Russian and Croatian items, the language table's rebuild adding it;
+                # the editor, to; failure map R88): a stems-only
+                # list detects by its stems
+                inL = (lambda x, L=L: HW.listed(L, x)) if n in HW.JUDGED else (lambda x, L=L: x in L)
+                dens[n] = 100 * sum(1 for x in toks if inL(x) and x not in prim) / len(toks)
             if dens:
                 mid = statistics.median([v for n, v in dens.items() if n in BASELINE] or dens.values())
                 if mid:
@@ -396,8 +423,10 @@ def main():
                     names = [n for n, _ in seconds]
                     if (a_ in names or b_ in names) and lex(a_) and lex(b_):
                         La, Lb = lex(a_), lex(b_)
-                        da = sum(1 for x in toks if x in La and x not in prim and x not in Lb)
-                        db = sum(1 for x in toks if x in Lb and x not in prim and x not in La)
+                        ina = (lambda x: HW.listed(La, x)) if a_ in HW.JUDGED else (lambda x: x in La)   # as above
+                        inb = (lambda x: HW.listed(Lb, x)) if b_ in HW.JUDGED else (lambda x: x in Lb)
+                        da = sum(1 for x in toks if ina(x) and x not in prim and not inb(x))
+                        db = sum(1 for x in toks if inb(x) and x not in prim and not ina(x))
                         keep = a_ if da >= db else b_
                         pos = min(i for i, (n, _) in enumerate(seconds) if n in (a_, b_))
                         seconds = [(n, v) for n, v in seconds if n not in (a_, b_)]

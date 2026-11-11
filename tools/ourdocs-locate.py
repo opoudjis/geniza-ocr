@@ -23,6 +23,8 @@ line, in this order:
   none    nothing found: the reader looks, or the line keeps its locator.
 The TSV: file, line, name, how, item key, page, text path, the locator as written. Ezri, 2026-10-20."""
 import csv, importlib.util, os, re, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import factline as FLN   # a line's own fields, the source's words left out (2026-10-28); FL is another module here
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G = os.path.join(ROOT, "published", "heterophony-resources", "geniza")
 BS = os.path.join(G, "profiles", "by-source")
@@ -46,9 +48,10 @@ def alias(l):
     """(item key, page, path) for a work named in prose, or None."""
     items = FL._items()
     pdf = re.search(r"\bPDF (\d+)", l)
-    if re.search(r"Ora Libro", l) and pdf:
+    # the work named in our words, not one the anchor or a quotation names (the trigger audit, 40)
+    if re.search(r"Ora Libro", FLN.ours(l)) and pdf:
         return items.get("oralibro", "oralibro"), pdf.group(1), FL._txt("oralibro") or ""
-    if re.search(r"\bEdE\b|Enciklopedio de Esperanto", l) and pdf:
+    if re.search(r"\bEdE\b|Enciklopedio de Esperanto", FLN.ours(l)) and pdf:
         k = "ENCIKLOPEDIO_DE_ESPERANTO_1933_"
         return items.get(k, k), pdf.group(1), FL._txt(k) or ""
     m = re.search(r"eo\.wikipedia «([^»]+)»", l)
@@ -124,7 +127,7 @@ def locate(lines):
         if not r and re.search(r"(^|· )same\b", l) and prev:
             sl = re.search(r"same,?\s*`?:(\d+)", l)   # «same, `:723–726`»: the same file, another line
             r = ("same", prev[1], _line_page(prev[3], int(sl.group(1))) if sl and prev[3] else prev[2], prev[3])
-        if not r and (re.search(r"RULED|⇒ juĝo|\{juĝo:", l)):
+        if not r and (re.search(r"RULED|⇒ juĝo|\{juĝo:", FLN.ours(l))):
             r = ("ruling", "", "", "")
         if not r: r = ("none", "", "", "")
         if r[0] in ("item", "old", "alias", "same", "file", "web", "work"): prev = r

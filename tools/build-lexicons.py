@@ -46,7 +46,10 @@ SOURCES = {
 HUNSPELL = {"french": "fr", "german": "de", "spanish": "es", "czech": "cs", "italian": "it",
             "swedish": "sv", "dutch": "nl", "polish": "pl", "russian_post1918": "ru",
             "danish": "da", "catalan": "ca",
-            # 2026-10-14 (on the editor's request for Portuguese): Brazila Esperantisto's second language (cupel11);
+            # 2026-11-06 (the editor): Filipina Esperantisto's pages (cupel23);
+            # jmalonzo/tl-wordlist tl.wl, v0.5: Scannell's and Sagum's list, a plain word list, no affix file; MODERN spelling.
+            "tagalog": "tl",
+            # 2026-10-14 (the editor): Brazila Esperantisto's second language (cupel11);
             # wooorm/dictionaries `pt` = VERO, Brazilian Portuguese (LGPL-3.0 OR MPL-2.0); MODERN spelling, the
             # pre-1943 orthography («approvarem») under-credited (hunspell/SOURCE.md)
             "portuguese": "pt",
@@ -63,12 +66,97 @@ HUNSPELL = {"french": "fr", "german": "de", "spanish": "es", "czech": "cs", "ita
             "latin": "la",
             # 2026-10-12 (at the editor's request to add Slovak to the gate): cupel9's Gašparíková & Pollák 1987 is Slovak, and the
             # gate had no list for it (a Slovak page scored against Czech is not a measurement); same source, hunspell/SOURCE.md
-            "slovak": "sk"}
+            "slovak": "sk",
+            # 2026-10-29 (cupel19c C5.2, the editor: Hungarian and Croatian lists for Hungara Esperantisto and Kroata
+            # Esperantisto; the dictionary and its own inflections only, 21:0x): wooorm/dictionaries
+            # `hu` = Magyar Ispell (GPL/LGPL/MPL), MODERN spelling (AkH. 12, 2015); `hr` = Denis Lackovic's (LGPL/SISSL, 2003)
+            "hungarian": "hu", "croatian": "hr"}
 HUNSPELL_DIR = REPO / "tools/lexicons/hunspell"
 # STEMS ONLY for these (2026-09-27): affix expansion gave Lithuanian 36.4 M forms (634 MB) and Estonian
 # 15.0 M (227 MB) — too heavy to load, and a false-credit risk. Measured on 31,193 junk tokens (Cyrillic
 # read as Latin): stems match 0.69% (lt) / 1.23% (et), under French's 2.40% baseline; Latvian EXPANDED 1.70%.
-STEMS_ONLY = {"estonian", "lithuanian"}
+STEMS_ONLY = {"estonian", "lithuanian", "hungarian"}   # hungarian 2026-10-29: unmunch passed 59.5 GB and was stopped
+# AN AGGLUTINATIVE LANGUAGE IS JUDGED, NEVER PRE-GENERATED (the editor 2026-10-31: the approach preferred for
+# agglutinative languages, rather than pre-generated dictionaries, the precedent to be set firmly): its list stays the stems,
+# and tools/hunspell_words.py judges each word with the dictionary's own rules, verdicts cached. Checked in main().
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import hunspell_words as _HW
+assert set(_HW.JUDGED) - _HW.FULL_LIST <= STEMS_ONLY, \
+    "a language judged by Hunspell must stay STEMS_ONLY here (hunspell_words.JUDGED), unless named in hunspell_words.FULL_LIST"
+# OLD SPELLINGS derived from the dictionary's own forms (2026-10-31, cupel19c, the editor 09:4x: the Danish old spelling
+# addressed now). Danish wrote «aa» for «å» until the reform of 1948, and the hunspell list is modern: the Danish
+# Esperanto «Raporto» of 1913–1919 (ANNO_e5j) failed G4 on its commonest words (paa, naar, saa, maa, gaa, staa), whatever
+# its reading (failure map R85). Each form with «å» is added again with «aa»; no form is taken from our texts.
+OLD_SPELLING = {"danish": [("å", "aa")]}
+# NO FORMS FROM OUR OWN TEXTS (the editor 2026-10-29 21:0x: words taken from the OCR to check the OCR are circular; only
+# the dictionary and its own inflections, as for every other language). `hr.aff` names its flag sets by number (`AF`)
+# and its flags by two letters (`FLAG long`), which unmunch cannot read (it gave the stems back, 53,603 forms), so such
+# a file is expanded by `expand()` below, which applies the same SFX/PFX rules.
+EXPAND = {"croatian"}
+
+
+def expand(dic, aff):
+    """A dictionary's own inflected forms, for an .aff unmunch cannot read (`FLAG long`/`num`, `AF` aliases).
+    Applies every SFX and PFX rule whose condition the stem meets, and prefix × suffix where both cross; drops stems
+    flagged NEEDAFFIX, and entries flagged FORBIDDENWORD or ONLYINCOMPOUND. No twofold (continuation) affixes: hr.aff
+    has none; a file that does is refused rather than half-expanded."""
+    mode, aliases, special, rules = "char", [], {}, {}
+    lines = aff.read_text(encoding="utf-8", errors="replace").splitlines()
+    for line in lines:
+        p = line.split("#")[0].split()
+        if not p:
+            continue
+        if p[0] == "FLAG":
+            mode = p[1]
+        elif p[0] == "AF" and len(p) > 1 and not p[1].isdigit():
+            aliases.append(p[1])
+        elif p[0] in ("NEEDAFFIX", "FORBIDDENWORD", "ONLYINCOMPOUND") and len(p) > 1:
+            special[p[0]] = p[1]
+        elif p[0] in ("SFX", "PFX") and len(p) >= 4:
+            if p[1] not in rules and p[3].isdigit():
+                rules[p[1]] = (p[0], p[2] == "Y", [])
+            elif p[1] in rules:
+                strip, add, cond = p[2], p[3], p[4] if len(p) > 4 else "."
+                if "/" in add:
+                    sys.exit(f"expand(): {aff.name} has twofold affixes («{line.strip()}»), not expanded")
+                strip, add = ("" if strip == "0" else strip), ("" if add == "0" else add)
+                cond = re.compile((r"^" + cond) if p[0] == "PFX" else (cond + r"$"))
+                rules[p[1]][2].append((strip, add, cond))
+
+    def flags(s):
+        if s.isdigit() and aliases:
+            s = aliases[int(s) - 1]
+        if mode == "long":
+            return {s[i:i + 2] for i in range(0, len(s), 2)}
+        if mode == "num":
+            return set(s.split(","))
+        return set(s)
+
+    def apply(word, kind, rs):
+        for strip, add, cond in rs:
+            if cond.search(word) and (word.endswith(strip) if kind == "SFX" else word.startswith(strip)):
+                yield word[:len(word) - len(strip)] + add if kind == "SFX" else add + word[len(strip):]
+
+    out = set()
+    for i, line in enumerate(dic.read_text(encoding="utf-8", errors="replace").splitlines()):
+        if i == 0 and line.strip().isdigit():
+            continue
+        word, _, fl = line.split()[0].partition("/") if line.split() else ("", "", "")
+        f = flags(fl) if fl else set()
+        if not word or special.get("FORBIDDENWORD") in f or special.get("ONLYINCOMPOUND") in f:
+            continue
+        if special.get("NEEDAFFIX") not in f:
+            out.add(word)
+        sfx = [r for k, r in rules.items() if k in f and r[0] == "SFX"]
+        pfx = [r for k, r in rules.items() if k in f and r[0] == "PFX"]
+        for kind, cross, rs in sfx + pfx:
+            out.update(apply(word, kind, rs))
+        for _, pc, prs in pfx:
+            for _, sc, srs in sfx:
+                if pc and sc:
+                    for w in apply(word, "SFX", srs):
+                        out.update(apply(w, "PFX", prs))
+    return out
 WORD = re.compile(r"[^\W\d_]{2,}", re.U)
 LETTERS = re.compile(r"[^\W\d_]+", re.U)
 TAG = re.compile(r"(?is)<(script|style|head)[^>]*>.*?</\1>|<[^>]+>")
@@ -114,6 +202,8 @@ def main():
             print(f"  ⚠ {lang}: NO LEXICON BUILT (no readable source)", file=sys.stderr)
             continue
         kept = sorted(w for w, n in freq.items() if n >= minf)
+        if lang == "esperanto":   # German quotations in the Tekstaro (daß, fuß, großes …): Esperanto has no «ß»; kept,
+            kept = [w for w in kept if "ß" not in w]   # they credit German as Esperanto (2026-10-31, the old-spelling measure)
         (out / f"{lang}.txt").write_text("\n".join(kept) + "\n", encoding="utf-8")
         print(f"  {lang}: {files} files, {toks:,} tokens, {len(kept):,} types -> {out / (lang + '.txt')}")
         manifest.append(f"| {lang} | {'<br>'.join(used)} | {files} | {toks:,} | {len(kept):,} |")
@@ -147,10 +237,19 @@ def main():
                 if w and LETTERS.fullmatch(w):
                     words.add(w)
             how = "stems + affix expansion"
+        # expand() only where it was built for (2026-10-31: da.aff also says FLAG num, but unmunch reads it, and the
+        # test below made a Danish rebuild stop on da.aff's twofold affixes; every other list was built by unmunch alone)
+        if aff.exists() and lang in EXPAND and re.search(r"(?m)^(FLAG\s+(long|num)|AF\s+\d+)", aff.read_text(
+                encoding="utf-8", errors="replace")):
+            words.update(w.lower() for w in expand(src, aff) if LETTERS.fullmatch(w))
+            how = "stems + affix expansion (expand(): unmunch cannot read this .aff)"
+        for new, old in OLD_SPELLING.get(lang, []):
+            words.update([w.replace(new, old) for w in words if new in w])
+            how += f", old spelling «{old}» for «{new}»"
         kept = sorted(words)
         (out / f"{lang}.txt").write_text("\n".join(kept) + "\n", encoding="utf-8")
         print(f"  {lang}: hunspell {code}.dic ({how}), {len(kept):,} forms -> {out / (lang + '.txt')}")
-        manifest.append(f"| {lang} | hunspell `{code}.dic`{' + `' + code + '.aff` (unmunch)' if how != 'stems' else ''} "
+        manifest.append(f"| {lang} | hunspell `{code}.dic`{' + `' + code + '.aff` (' + ('expand()' if 'expand' in how else 'unmunch') + ')' if 'affix' in how else ''} "
                         f"(see hunspell/SOURCE.md) | 1 | — | {len(kept):,} |")
     manifest.append("\n⊕ **Ido** is built separately, from dictionaries rather than a running corpus, "
                     "by `tools/build-ido-lexicon.py` — see `_MANIFEST-ido.md`.")

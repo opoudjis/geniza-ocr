@@ -7,7 +7,8 @@ r"""ocr-g5-sample — G5, THE VERDICT-CLASS AUDIT: build the blind sample, then 
 
 Approved by the editor, 2026-09-28 22:08 (the proposal: an internal record, 2026-09-28, not published). Every automated
 verdict class — including the classes that CLEAR a page — gets its own blind sample of N pages. All pages are shuffled
-together into batches of 20; a judge never learns a page's class. ONE brief for every page: coverage (NOTHING / MINOR
+together into batches of 15 (`--per-folder`; 20 until 2026-10-28, when the editor chose folders within the image readers'
+cap of 15 over splitting a folder between two judges); a judge never learns a page's class. ONE brief for every page: coverage (NOTHING / MINOR
 / LOST), orientation (UPRIGHT / ROTATED), Russian printed (NONE / SOME / MUCH), and up to 10 printed personal names.
 The SCORE step reads each class against ITS verdict:
   g1-blank       contradicted if the judge finds print the text misses (MINOR or LOST)
@@ -30,6 +31,8 @@ The SCORE step reads each class against ITS verdict:
 A clearing class passes if at most 1 of its N pages is contradicted (the proposal's bar).
 """
 import os, re, sys, json, glob, random, argparse, subprocess, statistics, collections, importlib.util
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ocr_withdrawn as WD
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
@@ -62,6 +65,7 @@ def silent_pages(c):
     for f in glob.glob(os.path.join(d, "page-*.txt")):
         m = re.fullmatch(r"page-(\d+)\.txt", os.path.basename(f))
         if m: sz[int(m.group(1))] = os.path.getsize(f)
+    for n in WD.pages(c): sz.pop(n, None)   # a duplicate page withdrawn (2026-10-30)
     if len(sz) < 3: return []
     med = statistics.median(sz.values())
     return [n for n, s in sz.items() if med and s < med * .25]
@@ -170,7 +174,7 @@ def build(a):
     picked = []
     for cls, cand in pool.items():
         if cls == "_" or (want and cls not in want): continue
-        cand = sorted(set(cand))
+        cand = sorted(x for x in set(cand) if x[1] not in WD.pages(x[0]))   # never a withdrawn duplicate page (2026-10-30)
         if len(cand) > a.n:
             cand = [x for x in cand if (x[0], x[1]) not in avoid]
         random.shuffle(cand)
@@ -184,14 +188,15 @@ def build(a):
     random.shuffle(picked)
     os.makedirs(a.out, exist_ok=True); key = []
     for i, (cls, c, p, side) in enumerate(picked, 1):
-        b = f"b{(i - 1) // 20 + 1:02d}"; d = os.path.join(a.out, b); os.makedirs(d, exist_ok=True); nn = f"{i:03d}"
+        b = f"b{(i - 1) // a.per_folder + 1:02d}"; d = os.path.join(a.out, b); os.makedirs(d, exist_ok=True); nn = f"{i:03d}"
         subprocess.run(["pdftoppm", "-r", "150", "-png", "-singlefile", "-f", str(p), "-l", str(p), pdfs[c], os.path.join(d, nn)], capture_output=True)
         open(os.path.join(d, nn + ".esperanto-text.txt"), "w", encoding="utf-8").write(pages(os.path.join(R, c + ".txt")).get(p, ""))
         ru = pages(os.path.join(RR, c + ".txt")).get(p)
         if ru: open(os.path.join(d, nn + ".russian-text.txt"), "w", encoding="utf-8").write(ru)
-        # SPECIAL HANDLING searches EVERY reading on disk (the editor's choice of 2026-10-02 22:5x): the scorer searches this file
-        # for ledger-special. Not named in the judges' brief, so a judge never reads it.
-        if cls == "ledger-special":
+        # SPECIAL HANDLING searches EVERY reading on disk (editor 2026-10-02 22:5x, option (a)): the scorer searches this file
+        # for ledger-special. Not named in the judges' brief, so a judge never reads it. So too any item whose ledger
+        # note says SEARCH EVERY READING (2026-11-03, cupel20b, failure map R97).
+        if cls == "ledger-special" or "SEARCH EVERY READING" in live[c][6]:
             al = pages(os.path.join(RA, c + ".txt")).get(p)
             if al: open(os.path.join(d, nn + ".all-readings.txt"), "w", encoding="utf-8").write(al)
         key.append(f"{nn}\t{b}\t{cls}\t{c}\t{p}\t{side}")
@@ -254,6 +259,9 @@ def score(a):
                       (".esperanto-text.txt", ".russian-text.txt") if a.search_all else
                       (".esperanto-text.txt",) if side == "eo" else (".russian-text.txt",) if side == "ru" else (".esperanto-text.txt", ".russian-text.txt"))
                      if os.path.exists(os.path.join(d, nn + f))]
+            al = os.path.join(d, nn + ".all-readings.txt")
+            if cls != "ledger-special" and os.path.exists(al):   # its absence search reads every reading (R97)
+                texts.append(open(al, encoding="utf-8", errors="ignore").read())
             cyr = lambda s: bool(re.search("[а-яёѣі]", s.lower()))
             # a name in the other script is not claimed of a one-side text, unless every text of the page is searched
             claimed = names if a.search_all else [n for n in names if not ((side == "eo" and cyr(n)) or (side == "ru" and not cyr(n)))]
@@ -291,6 +299,8 @@ if __name__ == "__main__":
     ap.add_argument("--search-all", action="store_true", help="search EVERY text of the page (what a searcher does), not only the class's absence side")
     ap.add_argument("--items", help="build: only these items (comma-separated stems, or @file) — a cupel batch")
     ap.add_argument("--scope", help="build: a scope TSV (item · pages · kind): only those pages are drawn")
+    ap.add_argument("--per-folder", type=int, default=15,
+                    help="build: pages per judge's folder (default 15, the image readers' cap; 20 before 2026-10-28)")
     ap.add_argument("--batch", help="file: the batch (b01 …) whose return this is")
     ap.add_argument("--table", help="file: a file holding the judge's table, verbatim")
     a = ap.parse_args()

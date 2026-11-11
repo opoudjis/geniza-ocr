@@ -42,7 +42,8 @@ def reader_numbers(paths):
             c = [x.strip() for x in l.strip().strip("|").split("|")]
             if len(c) < 3:
                 continue
-            m = re.search(r"([A-Za-z][\w.-]+)\s*/\s*(?:PDF\s*)?p\.?\s*0*(\d{1,4})\b", c[0])
+            # [A-Za-z0-9]: an item named by its ÖNB id («13162CBF_iiif») was read as «CBF_iiif» (2026-10-30, cupel19c)
+            m = re.search(r"([A-Za-z0-9][\w.-]+)\s*/\s*(?:PDF\s*)?p\.?\s*0*(\d{1,4})\b", c[0])
             n = re.match(r"^\s*(\d{1,4})\b", c[1])
             if m and n:
                 out[m.group(1)][int(m.group(2))] = int(n.group(1))
@@ -75,7 +76,11 @@ def main():
     ap.add_argument("--items", required=True)
     ap.add_argument("--returns", required=True, help="glob of the ends-look return files")
     ap.add_argument("--exclude", default="", help="comma-separated return file names to leave out (superseded)")
+    ap.add_argument("--report", help="write the report to this new file, not the console (2026-10-29: in place of `>`)")
     a = ap.parse_args()
+    if a.report:
+        if os.path.exists(a.report): sys.exit(f"exists: {a.report}")
+        sys.stdout = open(a.report, "x", encoding="utf-8")
     ex = {x.strip() for x in a.exclude.split(",") if x.strip()}
     rets = [f for f in sorted(glob.glob(a.returns)) if os.path.basename(f) not in ex]
     rd, roman = reader_numbers(rets)

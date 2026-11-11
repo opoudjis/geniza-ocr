@@ -129,6 +129,19 @@ PRESENCE_ONLY_NAMED = {
     # the editor 2026-10-07 13:5x on the 7 unclear leads chose (a) (a second copy first, then replace, as for May 1907); 19:01 signed
     # the ÖNB copy (cupel5); 19:5x approved ruling this archive.org copy presence only and withdrawing its line
     "Esperanto-UEA_1912_n136_dec20": "superseded by the complete ÖNB copy Esperanto-UEA_1912_n136_dec20.1 (this archive.org scan ends at printed p. 352, lacking pp. 353–356); kept, as it may have been cited, its signed line withdrawn (editor's ruling, 2026-10-07)",
+    # 2026-11-04, the 1887 floor's pre-1887 items (geniza/QUEUE.md «The 1887 floor caught genuine period texts»): the editor
+    # 10:4x ruled by the editor,
+    # Volapük in the corpus only so far as it bears on Esperanto; 13:0x ruled by the editor; 13:2x approved (ruled here,
+    # then their signed lines withdrawn; Dragoumis's 1881 lecture, the fourth, never had one)
+    "nurnberger_presse_1884": "out of the corpus: a Volapük cutting of 1884 with no bearing on Esperanto (editor's ruling, 2026-11-04)",
+    "nurnberger_presse_erste_versammlung_1884": "out of the corpus: a Volapük cutting of 1884 with no bearing on Esperanto (editor's ruling, 2026-11-04)",
+    "nov_gruzintsev_vp": "out of the corpus: a Volapük document of 1885 with no bearing on Esperanto (editor's ruling, 2026-11-04)",
+    "ANNO_e4c_19100005": "a second copy withdrawn: the ÖNB's copy of this Oficiala Dokumentaro, no gap against ours by text (ocr/runs/COPY-TEXT-MATCH-cupel22-2026-11-05.md; editor's ruling, 2026-11-05)",
+    "ANNO_e4c_19110012": "a second copy withdrawn: the ÖNB's copy of this Oficiala Dokumentaro, no gap against ours by text (ocr/runs/COPY-TEXT-MATCH-cupel22-2026-11-05.md; editor's ruling, 2026-11-05)",
+    "ANNO_e4c_19120012": "a second copy withdrawn: the ÖNB's copy of this Oficiala Dokumentaro, no gap against ours by text (ocr/runs/COPY-TEXT-MATCH-cupel22-2026-11-05.md; editor's ruling, 2026-11-05)",
+    "ANNO_e4c_19130012": "a second copy withdrawn: the ÖNB's copy of this Oficiala Dokumentaro, no gap against ours by text (ocr/runs/COPY-TEXT-MATCH-cupel22-2026-11-05.md; editor's ruling, 2026-11-05)",
+    "ANNO_e4c_19130020": "a second copy withdrawn: the ÖNB's copy of this Oficiala Dokumentaro, no gap against ours by text (ocr/runs/COPY-TEXT-MATCH-cupel22-2026-11-05.md; editor's ruling, 2026-11-05)",
+    "ANNO_e4c_19140012": "a second copy withdrawn: the ÖNB's copy of this Oficiala Dokumentaro, no gap against ours by text (ocr/runs/COPY-TEXT-MATCH-cupel22-2026-11-05.md; editor's ruling, 2026-11-05)",
 }
 RESIDUAL_LOST = {("oficiala_aldono_4a", 1): "«PARIS» lost, edge speckle"}
 # FALSE BI-SCRIPT MARKS: pages the Russian pass marked bi-script that carry NO Russian on the image. The mark is ignored
@@ -189,6 +202,12 @@ NAMELIST_CHECKED = {
     # (sources/cupel-batch-18a/g5-lists/, seed 2410244, class ledger-presence-g4): 40 pages, 0 contradicted, 369/369 names found
     "ANNO_e5a_19060112": "the S. E. S. members' list (1906, 277 lines in Esperanto form); G5 on name recall 2026-10-24: 369/369 names found over both issues",
     "ANNO_e5a_19070112": "the S. E. S. members' list (1907, in French form); G5 on name recall 2026-10-24: 369/369 names found over both issues",
+    # cupel19c, three lists PRESENCE ONLY on G4 alone (the editor 2026-10-31 03:5x): a G5 of
+    # their pages on name recall (sources/cupel-batch-19c/g5-lists/, seed 3110312, class ledger-presence-g4): 40 pages,
+    # 0 contradicted, 326/326 names found, none LOST
+    "10035102_iiif": "the Dresden congress members' list (1908); G5 on name recall 2026-10-31: 326/326 names found over the three lists, 80/80 on this list's 8 pages",
+    "13162CBF_iiif": "the world address list of Catholic Esperantists (1913); G5 on name recall 2026-10-31: 326/326 names found over the three lists, 177/177 on this list's 25 pages",
+    "100468F5_iiif": "Cenero esperantista (1906); G5 on name recall 2026-10-31: 326/326 names found over the three lists, 69/69 on this list's 7 pages",
     "Nomaro de la kongresanoj 1905": "631 names on 33 text pages, 1 unfindable (p.7 «M. Fichot (Auxerre)»); 32 empty pages blank",
     "Adresaro de la kongresanoj en Boulogne-sur-Mer 1905": "365 names on 20 text pages, 0 unfindable by the search; empty pages blank",
     # approved by the editor, 2026-10-01 00:28, for the three below (checks recorded in an internal record, 2026-09-30, not published;
@@ -224,7 +243,8 @@ for _p in (50, 495):
 # (and the look itself: an internal record, 2026-09-29, not published). Omitted blank backs are NOT listed
 # (nothing lost, the editor's rule); whole missing issues are series-level gaps, recorded in the register, not here.
 NOT_IN_SCAN = {
-    "LEsperantiste.1907.5": "printed pp. 110–111 (= 370–371) not in the scan; the text breaks off across the gap; the second copy is LEsperantiste.1907.5.1 (Gallica, complete; decided by the editor, 2026-10-07)",
+    "Esperanto-UEA_1940_n486_aug-dec": "printed p. 48 not in the scan: PDF 8 is 47, PDF 9 is 49, opening mid-sentence (the editor, 2026-11-06, cupel23: recorded as lost; another copy would repair it)",
+    "LEsperantiste.1907.5": "printed pp. 110–111 (= 370–371) not in the scan; the text breaks off across the gap; the second copy is LEsperantiste.1907.5.1 (Gallica, complete; editor 2026-10-07)",
     "RuslandaEsperantisto1907.5-6": "printed pp. 16–17 not in the scan (the country news jumps from Lapland to Finland); Bitarkivo's scan no longer on archive.org",
     "bohemaesperantisto_1909_j03_n07_apr": "printed pp. 107–116 (end of III,7 and start of III,8) and 127–128 not in the scan; no second copy (ANNO 1909 is Oct–Dec only)",
     "bohemaesperantisto_1909_j03_n08_maj": "printed pp. 127–128 not in the scan (this file holds the same III,8 pages as …n07_apr); no second copy",
@@ -246,7 +266,13 @@ NOT_IN_SCAN = {
     # cupel15, approved by the editor 2026-10-17 22:0x (the neighbour look, an internal record, 2026-10-17, not published, L06):
     # p. 91 ends a piece, p. 168 opens mid-story; the reader cannot tell how much is missing (pp. 90–91 an English lesson series)
     "volaspodelamont00unkngoog": "printed pp. between 91 and 168 not in the scan (PDF 72 = p. 91 ends a piece; PDF 73 = p. 168 opens mid-story, the end of a piece signed «E. D. FRENCH.»; how many pages, the look cannot tell); whole issues absent too, recorded in LACUNAE.tsv (Yelüp 3 Nüm 2; Nüm 5 likely); temerov's volaspodel_y3_1892-93 and _y4_1893-94 to be matched at cupel16's C0",
+    # cupel19b, the editor 2026-10-29 01:0x (the neighbour look, sources/cupel-batch-19b/gap-look/RETURN-R2.md, G002;
+    # ANNO, BitArkivo and archive.org checked: no other copy)
+    "ANNO_e0x_19190056": "printed pp. 61–64 not in the scan (p. 60 ends complete pieces; p. 65 opens «Komercaj Leteroj. Sekvo de LA INTERNACIA EKSPERIMENTO»: a four-page unit missing from the bound copy); no second copy (ANNO only; BitArkivo and archive.org hold no 1919 issue)",
     "informilo_c_k_seu__1926_27__nn9_12": "printed pp. 367–368 (one leaf) not in the scan, text or blank unclear (114 images for printed 303–416 and two covers; p. 366 ends a piece; the next image, by sequence 369, opens the self-teacher section «ХОЧУ ЗНАТЬ ЭСПЕРАНТО» and a new gathering, signature «5»); no second copy (REU only)",
+    # cupel21, the editor 2026-11-03 18:1x (no other copy existing; the rows approved): the line names the
+    # lacuna at C12; the Jagiellonian copy holds the leaf (the neighbour look, sources/cupel-batch-21/gap-look/; LACUNAE.tsv)
+    "ANNO_e1c_19060004": "printed pp. 92–93 (one leaf) not in the scan (PDF 91 = p. 91 ends mid-article, «…devos aldone pagi la diferencon.»; PDF 92 = p. 94 opens at «2. Higieno de la spirado»); the Jagiellonian copy of Pola Esperantisto 1906 holds them (Nos. 5–6, PDF 30–31), read at C13",
 }
 
 
@@ -337,6 +363,18 @@ ADS_EXCLUDED = {   # the editor ruled on 2026-10-02 11:1x that the 18 are unambi
     # looked at that is trade advertising only (Zurich alcohol-free restaurants and boarding house; the Kuz-Globo globe and
     # atlas, with an order form); the editor 2026-10-24 11:5x
     ('ANNO_e5a_19110104', 20),
+    # cupel19c (ocr/runs/CUPEL-BATCH-19C-ADLOOK-2026-10-31.md): of the 8 pages of the 43 looked at judged MUNDANE-AD, the
+    # seven that are trade advertising but for the journal's rates or a teacher's box (Dana Esperantisto's Copenhagen back
+    # pages: umbrellas, margarine, soap, carriages, chocolate, biscuits; Kroata Esperantisto's drugstore, draper, furniture
+    # factory); Dana Esperantisto ANNO_e5g_19100056 PDF 12 kept read (the Esperanto-Oficejo's stamp, Zachrison's Kort
+    # Lärobok); the editor 2026-10-31 03:1x
+    ('ANNO_e5g_19090051', 12),
+    ('ANNO_e5g_19090052', 16),
+    ('ANNO_e5g_19090053', 16),
+    ('ANNO_e5g_19090054', 20),
+    ('ANNO_e5g_19090057', 16),
+    ('ANNO_e5g_19090058', 16),
+    ('ONB_e6e_19100425', 28),
 }
 # A PART exception (approved by the editor, 2026-10-08 02:4x, on a proposal, an internal record, 2026-10-08, not published, (b)): a block
 # on a page that is not in the text, while the rest of the page is (cupel5: a hand-lettered advertisement among kept
@@ -357,6 +395,15 @@ EO_NAME_RECALL = {l.strip() for l in open(os.path.join(GENIZA, "ocr", "method", 
 
 COLUMN_RISK = {   # E5, the editor ruled at 13:3x that they be kept, with a note
     f"KaukazaEsperantisto.1910.{n}" for n in ("1", "2", "3", "5", "6", "7", "8", "9", "10-11", "12")}
+
+# cupel20b, G5 2026-11-03 (failure map R97): 5 of 40 ledger-admissible pages contradicted; the missed names were in
+# readings on disk (psm 3, psm 4, the German model's) but not in the chosen C7c cut (cols, gutter, blocks), the chosen
+# text of about 1,400 of the batch's 1,547 scoped pages, and the same returns scored 0 of 40 against every reading. The
+# editor 02:5x: as for SPECIAL HANDLING since 2026-10-02, an absence claim on these
+# items searches every reading on disk. The items: the scope file's rows (CUPEL-BATCH-20b-SCOPE.tsv).
+SEARCH_ALL_NAMED = {"ANNO_e1a_19110001", "ANNO_e1a_19110002", "ANNO_e1a_19110004"} | {
+    f"ANNO_e1a_{y}{n}" for y in range(1912, 1919) for n in ("0101", "0102", "0104", "0201", "0202")} | {
+    f"ANNO_e1a_{y}{n}" for y in (1912, 1913) for n in ("0190", "0290")}
 
 
 def _ranges(ps):
@@ -422,6 +469,11 @@ def sort_verdicts():
             m = re.match(r"\| (\d{3,4}) \| (NOTHING|MINOR|LOST|SCRIPT) \|(.*)", line)
             if m and m.group(1) in k:
                 v[k[m.group(1)]] = m.group(2); NOTES[k[m.group(1)]] = m.group(3)
+    # a page marked .setoff (ocr-setoff-check.py mark, on the editor's ruling) carries only the facing page's mirrored ink:
+    # nothing of its own is lost, whatever a blind sort said (cupel19b 2026-10-29: 1918 PDF 8 sorted LOST, vision vr12 a set-off)
+    for (c, p), x in list(v.items()):
+        if x == "LOST" and os.path.exists(os.path.join(GENIZA, "sources", "ocr-rendersearch", c, f"page-{p:04d}.setoff")):
+            v[(c, p)] = "NOTHING"; NOTES[(c, p)] = " set-off of the facing page (.setoff), not a loss"
     return v
 
 
@@ -640,7 +692,8 @@ def main():
         if why: k = "PRESENCE ONLY"
         elif pend: k = "PENDING"
         else: k, exc = reclassify(c, exc)
-        if k == "SPECIAL HANDLING" or (k == "WITH EXCEPTIONS" and any(re.match(r"the Latin reading of \d+ Cyrillic", e) for e in exc)):
+        if k == "SPECIAL HANDLING" or (k == "WITH EXCEPTIONS" and any(re.match(r"the Latin reading of \d+ Cyrillic", e) for e in exc)) \
+                or (c in SEARCH_ALL_NAMED and k in ("ABSENCE-ADMISSIBLE", "WITH EXCEPTIONS")):   # cupel20b, R97
             # (2026-10-24, bi-script fix (d)): also a WITH EXCEPTIONS item with Cyrillic pages, so a Russian-side absence
             # claim reads their Latin reading too (Drezen 1928, Bulgara Esperantisto 1907)
             # editor 2026-10-02 22:5x: the absence search on these items

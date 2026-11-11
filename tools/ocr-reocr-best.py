@@ -369,8 +369,13 @@ def empty_page(job):
         if kind == "light":
             stem4 = os.path.join(work, "p400")
             subprocess.run(["pdftoppm", "-r", "400", "-gray", "-png", "-singlefile", "-f", str(n), "-l", str(n), pdf, stem4], capture_output=True)
-            t = subprocess.run(["tesseract", stem4 + ".png", "-", "-l", "deu", "--psm", "3", "-c", "thresholding_method=2"],
-                               capture_output=True, text=True).stdout
+            # a timeout (2026-10-30, cupel19c: one page held Tesseract 34 minutes at full CPU; the editor): a page
+            # Sauvola has not read in 10 minutes is one it cannot read, and goes to the look
+            try:
+                t = subprocess.run(["tesseract", stem4 + ".png", "-", "-l", "deu", "--psm", "3", "-c", "thresholding_method=2"],
+                                   capture_output=True, text=True, timeout=600).stdout
+            except subprocess.TimeoutExpired:
+                t = ""; rec["sauvola_timeout"] = True
             w1 = len(re.findall(r"[^\W\d_]{3,}", t)); rec["sauvola_words"] = w1
             if w1 >= 20 and w1 >= 0.8 * w0:
                 rec["action"] = "sauvola-add"; return rec, t

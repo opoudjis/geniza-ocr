@@ -30,12 +30,16 @@ def item_names():
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--kept-tag", action="append", default=[]); ap.add_argument("--accuracy"); ap.add_argument("--write", action="store_true")
+    ap.add_argument("--heads", action="append", default=[], metavar="SOURCE:HEAD|HEAD…",
+                    help="the lines of these heads in profiles/by-source/SOURCE-dowse.md: names the OCR garbles in every reading, "
+                         "which the name ungarbler cannot fold (2026-10-27; the editor)")
+    ap.add_argument("--heads-by", default="the name ungarbler", help="with --heads: where they were found, for «found by»")
     a = ap.parse_args()
-    found = {}   # (key, pdf) -> {"printed", "lines": [], "words": [], "by": []}
-    def add(src, loc, why, by):
+    found = {}   # (key, pdf) -> {"printed", "lines": [], "words": [], "by": [], "reason"}
+    def add(src, loc, why, by, reason="named by the reader as OCR damage (the brief's «Difektita OCR» rule)"):
         m = LOC.search(loc or "")
         if not m: return
-        f = found.setdefault((m.group(1), int(m.group(2))), {"printed": m.group(3) or "", "lines": [], "words": [], "by": [], "src": src})
+        f = found.setdefault((m.group(1), int(m.group(2))), {"printed": m.group(3) or "", "lines": [], "words": [], "by": [], "src": src, "reason": reason})
         if m.group(4) and m.group(4) not in f["lines"]: f["lines"].append(m.group(4))
         f["words"].append(re.sub(r"\s+", " ", why).strip()); f["by"].append(by)
     for kp in sorted(glob.glob(os.path.join(G, "dowse", "*", "UNDATED-KEPT.tsv"))):
@@ -60,6 +64,18 @@ def main():
                 if n in sample:
                     loc = next((p.strip() for p in sample[n].split(" · ") if LOC.match(p.strip())), "")
                     add(src, loc, why or "OCR difektita", f"the accuracy check {a.accuracy}, line {n}: dowse/{src}/accuracy-return-{a.accuracy}.md")
+    for spec_ in a.heads:
+        src, _, hs = spec_.partition(":")
+        want = {h.strip() for h in hs.split("|") if h.strip()}
+        fp = os.path.join(G, "profiles", "by-source", f"{src}-dowse.md")
+        for l in open(fp, encoding="utf-8"):
+            m = re.match(r"- \$\$\$ (.+?) \$\$\$", l)
+            if not m or m.group(1).strip() not in want: continue
+            ps = l.rstrip("\n").split(" · ")
+            loc = next((p.strip() for p in ps if LOC.match(p.strip())), "")
+            anchor = ps[3].strip() if len(ps) > 3 else ""
+            add(src, loc, f"the head as read «{m.group(1).strip()}»; the anchor «{anchor}»", f"{a.heads_by}: {src}",
+                "a name the OCR misreads in every reading of it here; the name ungarbler finds no clean form to fold it to")
     have = set(); last = 0; today = datetime.date.today().isoformat()
     rows = [r for r in csv.reader(open(VR, encoding="utf-8"), delimiter="\t") if r]
     for r in rows[1:]:
@@ -71,7 +87,7 @@ def main():
         last += 1
         words = " | ".join(dict.fromkeys(f["words"]))
         new.append([f"VR-{today}-{last}", today, key, k2n.get(key, key), f"{pdf}" + (f" (prese {f['printed']})" if f["printed"] else ""),
-                    ", ".join(f["lines"]) or "?", words[:500], "named by the reader as OCR damage (the brief's «Difektita OCR» rule)",
+                    ", ".join(f["lines"]) or "?", words[:500], f["reason"],
                     "; ".join(dict.fromkeys(f["by"])), "requested", "held: no judgement until the vision text and the redowse"])
     for r in new: print("\t".join(r[:6]), "\n   ", r[6][:200])
     print(f"{len(found)} pages named; {len(new)} new, {len(found) - len(new)} already in the file")

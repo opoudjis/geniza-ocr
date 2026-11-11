@@ -2,7 +2,11 @@
 """The fact readers' roster for one source: the full roster's lines of the persons the name search found at the strong
 tiers (exact, near, confusion), not those found only by joins, small caps or stems (mostly noise).
 
-    tools/dowse-reader-roster.py <source> <full roster> <record.hits.tsv> [--date YYYY-MM-DD] [--out-list]
+    tools/dowse-reader-roster.py <source> <full roster> <record.hits.tsv> [--date YYYY-MM-DD] [--out-list] [--text PREFIX …]
+
+--text keeps only the hits whose «text» column begins with PREFIX (repeatable), for the roster and the out-list: a source
+searched in two readings of the same pages whose readers read one (Espero's Russian side, 2026-11-09: «ocr-rendersearch-rus/»
+26,357 hits on 531 people, against about 3.4M on some 6,800 in the Latin reading «ocr-rendersearch-all/»; Miles).
 
 --out-list also writes dowse/<source>/out-list-<date>.md: the people the scope register or its candidates have out and the
 name search found in the source, for the brief (the dowse runbook, D6 point 7). People not on the roster are not matched.
@@ -23,13 +27,19 @@ def main():
     ap.add_argument("--date", default=datetime.date.today().isoformat())
     ap.add_argument("--out-list", action="store_true", help="also write out-list-<date>.md for the brief")
     ap.add_argument("--again", action="store_true", help="rewrite this tool's own two files of the date, if git does not track them")
+    # a source whose hits carry one year for texts of many (OV, dated 1888 by its item, its letters to 1917; 2026-11-04)
+    ap.add_argument("--text", action="append", default=[], metavar="PREFIX", help="only the hits whose «text» begins with PREFIX")
+    ap.add_argument("--last-year", type=int, help="the source's last year for the «out» list, in place of the hits' latest")
     a = ap.parse_args()
     out = os.path.join(G, "dowse", a.source, f"roster-reader-{a.date}.txt")
     if os.path.exists(out) and not again_ok(a, out): sys.exit(f"refusing: {out} exists")
     found, strong, years, items_seen = set(), set(), set(), set()
     with open(a.hits, encoding="utf-8") as fh:
-        rows = csv.DictReader((l for l in fh if not l.startswith("#")), delimiter="\t")
+        # QUOTE_NONE (2026-11-09; Miles: a «"» in an OCR reading swallowed the rows after it at csv's default quoting,
+        # Schuck's album 10,524 of 14,930 rows read, Midthus lost though hit exact): our TSVs are plain tab-split
+        rows = csv.DictReader((l for l in fh if not l.startswith("#")), delimiter="\t", quoting=csv.QUOTE_NONE)
         for r in rows:
+            if a.text and not (r.get("text") or "").startswith(tuple(a.text)): continue
             found.add(r["person"])
             if r["tier"] in STRONG: strong.add(r["person"])
             if re.fullmatch(r"1[89]\d\d|20\d\d", (r.get("year") or "").strip()): years.add(int(r["year"]))
@@ -39,12 +49,14 @@ def main():
             x = l.split("\t")
             if len(x) > 16 and x[0] in items_seen:
                 years |= {int(y) for y in re.findall(r"\b(1[89]\d\d|20\d\d)\b", x[5] + " " + x[16])}
-    a.last_year = max(years) if years else None    # the source's last year, for the «out» list
+    a.last_year = a.last_year or (max(years) if years else None)    # the source's last year, for the «out» list
     lines = [l.rstrip("\n") for l in open(a.roster, encoding="utf-8") if l.strip() and not l.startswith("#")]
     keep = [l for l in lines if l.split(" | ")[0].strip() in strong]
     head = (f"# La rolulo por la legiloj de {a.source} ({a.date}): nur la personoj, kiujn la nomserĉo trovis je la niveloj "
             f"exact, near aŭ confusion ({len(keep)} el {len(found)}; la ceteraj nur je join, majuskletoj aŭ radikoj, plejparte "
             f"bruo). Por la literumo de la NOMO nur; persono ne en la listo estas skribata kiel presite. "
+            + (f"Nur la trafoj en {', '.join(a.text)}. " if a.text else "") +
+            f""
             f"El {os.path.relpath(a.roster, G)} kaj {os.path.basename(a.hits)}, per tools/dowse-reader-roster.py.")
     open(out, "w", encoding="utf-8").write(head + "\n" + "\n".join(keep) + "\n")
     print(f"{len(keep)} of {len(found)} persons → {out}")

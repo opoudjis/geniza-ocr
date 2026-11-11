@@ -63,15 +63,47 @@ def shape(text):
     return sig
 
 
+PAGE = re.compile(r"^=== page (\d+) ===\s*$", re.M)
+
+def text_runs(path, cut):
+    """--text (2026-10-30, the jarlibroj's prose for legiloj): a whole text with «=== page N ===» markers, its pages in runs
+    of one shape (list, prose, short: under 6 lines), each with its PDF pages, its words, and the first line of each
+    prose run's first page, to choose the pages a legilo reads where a volume prints no usable contents page."""
+    t = open(path, encoding="utf-8", errors="ignore").read()
+    parts = PAGE.split(t)
+    runs = []
+    for i in range(1, len(parts) - 1, 2):
+        n, body = int(parts[i]), parts[i + 1]
+        s = shape(body)
+        kind = "short" if s is None else ("list" if s["score"] >= cut else "prose")
+        first = next((l.strip() for l in body.splitlines() if len(re.findall(r"[^\W\d_]{3,}", l)) >= 2), "")
+        if runs and runs[-1]["kind"] == kind and runs[-1]["hi"] == n - 1:
+            runs[-1]["hi"] = n; runs[-1]["words"] += len(body.split())
+        else:
+            runs.append({"kind": kind, "lo": n, "hi": n, "words": len(body.split()), "first": first[:70]})
+    return runs
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("patterns", nargs="+")
+    ap.add_argument("patterns", nargs="*")
     ap.add_argument("--cut", type=float, default=0.55)
     ap.add_argument("--list-only", action="store_true")
     ap.add_argument("--tsv", default=None, help="write a repass page list (stem<TAB>pages)")
     ap.add_argument("--top", type=int, default=20)
+    ap.add_argument("--text", nargs="+", help="whole texts with page markers: print each one's runs of list and prose pages")
     a = ap.parse_args()
+    if a.text:
+        for path in a.text:
+            runs = text_runs(path, a.cut)
+            w = {k: sum(r["words"] for r in runs if r["kind"] == k) for k in ("prose", "list", "short")}
+            print(f"\n## {os.path.basename(path)}: prose {w['prose']:,} words, list {w['list']:,}, short pages {w['short']:,}")
+            for r in runs:
+                if r["kind"] == "prose":
+                    print(f"  prose PDF {r['lo']}–{r['hi']} ({r['words']:,} words): «{r['first']}»")
+                else:
+                    print(f"  {r['kind']} PDF {r['lo']}–{r['hi']} ({r['words']:,} words)")
+        return
 
     files = sorted({f for p in a.patterns for f in glob.glob(p)})
     rows = []

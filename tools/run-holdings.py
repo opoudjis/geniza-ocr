@@ -93,7 +93,12 @@ def main():
     ap.add_argument("--list", required=True)
     ap.add_argument("--min-files", type=int, default=3)
     ap.add_argument("--mastheads", action="store_true", help="for each lead, the neighbours' masthead strings")
+    ap.add_argument("--report", help="write the report to this new file, not the console (2026-10-29: in place of `>`)")
     a = ap.parse_args()
+    if a.report:
+        import sys
+        if os.path.exists(a.report): sys.exit(f"exists: {a.report}")
+        sys.stdout = open(a.report, "x", encoding="utf-8")
     runs = collections.defaultdict(lambda: {"names": collections.Counter(), "items": []})
     paths = [l.strip() for l in open(a.list, encoding="utf-8") if l.strip()]
     # an ANNO file outside its run's -onb folder (a joined issue, cupel-batch-NN/joined/) goes to that run

@@ -15,8 +15,9 @@ Run by dowse-facts-assemble.py after each harvest (--after-readers step 9b2, --a
 
   python3 tools/dowse-done.py
 """
-import csv, glob, os, re, subprocess, sys
+import collections, csv, glob, os, re, subprocess, sys
 import sigla
+import page_date
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G = os.path.join(ROOT, "published", "heterophony-resources", "geniza")
@@ -59,6 +60,16 @@ def main():
                          for m in re.finditer(r" · ([A-Za-z0-9._-]+), (?:PDF \d|¶ ?\d|l\. ?\d)", l)}):
             it = bykey.get(k)
             if it and it not in its: its.append(it); texts.append(os.path.join("sources", "ocr-preferred", it + ".txt"))
+        # A PARSED SOURCE'S ITEMS (2026-11-10; Miles: seven Adresaro series parsed, read whole by the parse, missing here because
+        # they gave no facts line): every item of the latest parse table, dowse/<source>/adresaro-<date><tag>.tsv
+        if os.path.isdir(d):
+            pt = sorted(f for f in os.listdir(d) if re.fullmatch(r"adresaro-\d{4}-\d\d-\d\d\w*\.tsv", f))
+            if pt:
+                seen = []
+                for l in open(os.path.join(d, pt[-1]), encoding="utf-8"):
+                    it = l.split("\t", 1)[0]
+                    if it and it != "item" and it not in its and it not in seen: seen.append(it)
+                for it in seen: its.append(it); texts.append(os.path.join("sources", "born-digital-text", it + ".txt"))
         ntok, ys, sig = 0, [], set()
         for t, it in zip(texts, its):
             p = os.path.join(G, t) if t.endswith(".txt") else next(iter(glob.glob(os.path.join(G, "sources", "*", it + ".txt"))), "")
@@ -97,8 +108,9 @@ def main():
     for src, sg, n, yr, tok, nl, steps, gs, _l in rows:
         L.append(f"| {src} | {sg} | {n} | {yr} | {tok:,} | {nl:,} | {steps} | {gs} |")
     open(os.path.join(D, "DOWSED-LATEST.md"), "w", encoding="utf-8").write("\n".join(L) + "\n")
-    # THE PUBLISHED PAGE (2026-10-25; the editor, on prosopografio/README.md
-    #): prosopografio/legitaj-fontoj.md, in Esperanto, each source by its siglum and its
+    # THE PUBLISHED PAGE (2026-10-25; the editor, on prosopografio/README.md, asking that these
+    # be synced into this folder as readable pages): published/genizo/pages/legitaj-fontoj.md (in geniza/prosopografio/ until 2026-10-30,
+    # the editor: every site page's source in the one place), in Esperanto, each source by its siglum and its
     # work (profiles/SIGLA-EO.tsv), its years, items and fact lines; rewritten with the list
     sp = lambda x: f"{x:,}".replace(",", " ")   # 15 303, the Esperanto page's thousands
     eo = {}
@@ -143,6 +155,16 @@ def main():
             s = siglum_of(m.group(1)) if m else None
             if s in agg: agg[s]["lines"] += 1
     yrs = lambda ys: "—" if not ys else (str(min(ys)) if min(ys) == max(ys) else f"{min(ys)}–{max(ys)}")
+    # A MONOGRAPH'S YEAR OF PUBLICATION (Miles, 2026-11-11; the editor: the «Jaroj» column of Legitaj fontoj never
+    # empty for a monograph, since it gives the year of publication): where the item table gives no year, the year its signed
+    # siglum carries («Clark1907», «Eins1889a», «Künz2006»), else that of its Esperanto entry («… 1907. *…*»)
+    def sigyear(s):
+        m = re.search(r"(1[6-9]\d\d|20\d\d)[a-z]?$", s or "")
+        if m: return [int(m.group(1))]
+        e = eo.get(s, "")
+        if re.search(r"(1[6-9]\d\d|20\d\d)\s*[–-]", e): return []   # a run («1895–1914», «1904–»): not one year
+        ys = set(re.findall(r"\b(1[6-9]\d\d|20\d\d)\b", e))
+        return [int(ys.pop())] if len(ys) == 1 else []   # the entry's one year: «*Ora Libro …*. 1937.», «… aprilo 1914»
     out_n = len([r for r in rows if r[0] not in keep])
     # THE INTRO IS THE EDITOR'S (2026-10-25
     #): the tool writes only between the two marks, the counts and the table;
@@ -153,18 +175,84 @@ def main():
              "(la esperantistoj aliĝintaj antaŭ 1908, la idistoj aliĝintaj antaŭ 1931; la biografioj traktas la idistojn "
              "aliĝintajn antaŭ 1919). Fonto ne en ĉi tiu listo ankoraŭ ne estas legita: kion ĝi diras, ankoraŭ mankas en la "
              "profiloj. La sigloj: `siglaro.md`.", ""]
+    # THE STAGES (the editor, 2026-11-11;
+    # the blank and cupel sources listed too, each stage in a table of its own, by each source's current stage): from
+    # dowse/ETAPOJ.tsv (tools/source-stages.py snapshot, one per release); without it, the page as before
+    import importlib.util
+    _sp = importlib.util.spec_from_file_location("source_stages", os.path.join(ROOT, "tools", "source-stages.py"))
+    SS = importlib.util.module_from_spec(_sp); _sp.loader.exec_module(SS)
+    hist, hunit = SS.history()
+    staged = bool(hist)
+    # THE SINTER TABLE HOLDS ONLY WHAT HAS REACHED SINTER (Miles, 2026-11-11; the editor: Blan1999 listed among the sinter
+    # sources while at the cupel stage; the fix approved): a facts file appears as soon as a harvest chain assembles a source,
+    # before its harvest, so a source whose every item has a stage and none is at sinter goes to its own stage's table below,
+    # not here; the word count follows
+    if staged:
+        _now = {it: l[-1][1] for it, l in hist.items() if l}
+        for s in [s for s, a in agg.items() if all(it in _now for it in a["items"]) and not any(_now[it] == "sinter" for it in a["items"])]:
+            del agg[s]
+        _live = {src for a in agg.values() for src in a["srcs"]}
+        keep = {k for k in keep if k in _live}
     P = [BEGIN, "",
-         f"**{len(agg)} fontoj, {sp(sum(len(a['items']) for a in agg.values()))} eroj (numeroj, volumoj, libroj), "
+         (("## Etapo sinter: legitaj kaj kunfanditaj en la profilojn\n\n") if staged else "")
+         + f"**{len(agg)} fontoj, {sp(sum(len(a['items']) for a in agg.values()))} eroj (numeroj, volumoj, libroj), "
          f"{sp(sum(r[4] for r in rows if r[0] in keep))} vortoj, {sp(sum(a['lines'] for a in agg.values()))} faktoj.**"
          + (f" Ankoraŭ ne listigitaj: {out_n} fontoj legitaj per la pli frua metodo aŭ relegotaj." if out_n else ""), "",
-         "| Siglo | Fonto | Jaroj | Eroj | Faktoj |", "|---|---|---|---|---|"]
+         ("| Siglo | Fonto | Speco | Jaroj | Eroj | Faktoj | Etapo |" if staged else "| Siglo | Fonto | Speco | Jaroj | Eroj | Faktoj |"),
+         ("|---|---|---|---|---|---|---|" if staged else "|---|---|---|---|---|---|")]
     import unicodedata
     fold = lambda x: "".join(c for c in unicodedata.normalize("NFD", x.lower()) if unicodedata.category(c) != "Mn")
+    # PRIMARA OR SEKUNDARA (2026-10-27; the editor: «primara» and «sekundara», defined in the conventions,
+    # and a column of Legitaj fontoj): from the item table's «kind» of the source's items; both where they differ
+    KIND = {"PRIMARY": "primara", "SECONDARY": "sekundara"}
     for s in sorted(agg, key=fold):
         a = agg[s]
-        P.append(f"| {s} | {eo.get(s, s)} | {yrs(a['years'])} | {len(a['items'])} | {sp(a['lines'])} |")
+        ks = sorted({KIND.get((table.get(it, {}).get("kind") or "").strip(), "") for it in a["items"]} - {""})
+        kind = " kaj ".join(ks) if ks else "—"
+        # an organ's issues after the 1914 cutoff count as secondary for the period (Amerika Esperantisto 1915–1916): said so
+        if ks == ["primara", "sekundara"]:
+            sy = [int(m.group(1)) for it in a["items"] if (table.get(it, {}).get("kind") or "").strip() == "SECONDARY"
+                  for m in [re.search(r"(1[6-9]\d\d|20\d\d)", table.get(it, {}).get("year") or "")] if m]
+            if sy and min(sy) > 1914: kind = "primara; sekundara post 1914"
+        P.append(f"| {s} | {eo.get(s, s)} | {kind} | {yrs(a['years'] or sigyear(s))} | {len(a['items'])} | {sp(a['lines'])} |"
+                 + (f" {SS.etapo(a['items'], hist) or '—'} |" if staged else ""))
+    if staged:
+        # the sources below sinter, one table a stage, each source by its siglum or title key, its items at that stage now
+        now = {it: l[-1][1] for it, l in hist.items() if l}
+        HEAD = {"dowse": "## Etapo dowse: legitaj, ankoraŭ ne kunfanditaj en la profilojn",
+                "cupel": "## Etapo cupel: OSR-teksto preta, ankoraŭ ne legita",
+                "blank": "## Etapo blank: tenataj, ankoraŭ sen OSR-teksto"}
+        # a source with a signed siglum its own row, by the sigla as they stand now (not as at the snapshot: Miles folded 40
+        # signed rows in after it, 2026-11-11); the rest, without a siglum, consolidated into one row a kind (the editor,
+        # 2026-11-11: minor sources at one stage and with no siglum consolidated firmly,
+        # though in the end everything with a siglum gets its own entry)
+        signed = {row["siglum"] for _, row, _ in sigla.load() if row.get("status") == "signed"}
+        trows = SS.table()
+        for stage in ("dowse", "cupel", "blank"):
+            groups, minor = collections.defaultdict(list), collections.defaultdict(list)
+            for it, s in now.items():
+                if s != stage: continue
+                u = SS.unit_of(it, trows)
+                if u in signed: groups[u].append(it)
+                else: minor[KIND.get((table.get(it, {}).get("kind") or "").strip(), "—")].append(it)
+            if not groups and not minor: continue
+            n_minor = len({SS.unit_of(i, trows) for v in minor.values() for i in v})
+            P += ["", HEAD[stage], "", f"**{len(groups) + n_minor} fontoj, {sp(sum(len(v) for v in groups.values()) + sum(len(v) for v in minor.values()))} eroj.**", "",
+                  "| Siglo | Fonto | Speco | Jaroj | Eroj | Etapo |", "|---|---|---|---|---|---|"]
+            def row(label, title, its, kind=None):
+                ks = [kind] if kind else sorted({KIND.get((table.get(i, {}).get("kind") or "").strip(), "") for i in its} - {""})
+                ys = [int(m.group(1)) for i in its for m in [re.search(r"(1[6-9]\d\d|20\d\d)", table.get(i, {}).get("year") or "")] if m]
+                return f"| {label} | {title.replace('|', '/')} | {' kaj '.join(ks) or '—'} | {yrs(ys or sigyear(label))} | {sp(len(its))} | {SS.etapo(its, hist) or '—'} |"
+            for u in sorted(groups, key=fold):
+                its = groups[u]
+                title = eo.get(u) or next(((table.get(i, {}).get("title") or "").strip() for i in its if (table.get(i, {}).get("title") or "").strip()), u)
+                P.append(row(u, title, its))
+            for k in sorted(minor, key=fold):
+                its = minor[k]
+                nt = len({SS.unit_of(i, trows) for i in its})
+                P.append(row("—", f"aliaj fontoj sen siglo: {sp(nt)} " + ("titolo" if nt == 1 else "titoloj"), its, None if k == "—" else k))
     P += ["", END]
-    pp = os.path.join(G, "prosopografio", "legitaj-fontoj.md")
+    pp = os.path.join(ROOT, "published", "genizo", "pages", "legitaj-fontoj.md")
     if os.path.isdir(os.path.dirname(pp)):
         old = open(pp, encoding="utf-8").read() if os.path.exists(pp) else ""
         if BEGIN in old and END in old:
@@ -174,9 +262,10 @@ def main():
             head = head.replace("<!-- GENERATED by tools/dowse-done.py after every harvest. Do not edit here. -->\n\n", "")
             head = re.sub(r" Ankoraŭ ne listigitaj: \d+ fontoj legitaj per la pli frua metodo aŭ relegotaj\.", "", head)
             new = head.rstrip("\n") + "\n\n" + "\n".join(P) + "\n"
+        new = page_date.stamp(old, new)   # «_Aktualigita: …_», the day the list last changed (2026-10-31)
         open(pp, "w", encoding="utf-8").write(new)
         # (the page is on the site, page 125: a changed list is put to the editor for Miles's push, as the Siglaro's)
-        print(("NOTE the read-sources page (prosopografio/legitaj-fontoj.md) CHANGED: ask the editor whether to push it "
+        print(("NOTE the read-sources page (published/genizo/pages/legitaj-fontoj.md) CHANGED: ask the editor whether to push it "
                "(Miles: genizo-push.py legitaj-fontoj)") if new != old else "the read-sources page unchanged: nothing to push")
     print(f"the dowsed list: {len(rows)} sources, {len(items)} items, {sum(r[4] for r in rows):,} tokens → "
           f"{os.path.relpath(os.path.join(D, 'DOWSED-LATEST.md'), ROOT)}, DOWSED-ITEMS-LATEST.tsv")

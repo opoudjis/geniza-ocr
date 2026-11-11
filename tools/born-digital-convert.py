@@ -286,7 +286,10 @@ def paste_body(path):
     if rule is not None:
         return "\n".join(lines[rule + 1:])
     i = 0
-    while i < len(lines) and (not lines[i].strip() or lines[i].startswith("# ") or lines[i].lstrip().startswith("`[")):
+    # also a plain bracketed note line «[Pasted by the editor …]» (Miles, 2026-11-11: the saved Google Books pages of Ezri's
+    # hand lines open so; a line wholly in brackets, at the head only)
+    while i < len(lines) and (not lines[i].strip() or lines[i].startswith("# ") or lines[i].lstrip().startswith("`[")
+                              or (lines[i].lstrip().startswith("[") and lines[i].rstrip().endswith("]"))):
         i += 1
     return "\n".join(lines[i:])
 

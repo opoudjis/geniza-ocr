@@ -130,17 +130,42 @@ def stage_parts(D, stage):
 def parts_prep(a):
     """parts (2026-10-23; the editor): the recall sample of a batch read in parts (many texts,
     grouped readers, one brief a group, which «prep» cannot take). Whole parts drawn with a seed, 2% of the stage's parts,
-    at least 2 and at most 8 (--n to set it); each re-read blind by a second legilo on a brief of its own, filled by
+    at least 2 and at most 8 (--n to set it), evenly by place in the legilo; each re-read blind by a second legilo on a brief of its own, filled by
     dowse-brief-fill.py from the stage's own side files (--side-date), its return written in pieces as the stage's was."""
     D = os.path.join(G, "dowse", a.source); rtag = a.tag or f"{a.stage_date}r"
     out = os.path.join(D, f"recall-{rtag}.md")
     if os.path.exists(out): sys.exit(f"refusing: {os.path.relpath(out, ROOT)} exists")
-    ps = stage_parts(D, a.stage_date)
+    # --parts: the probe before a source's main run (2026-11-05; the editor): the parts named, read by the first legilo alone
+    ps = [] if a.parts else stage_parts(D, a.stage_date)
     n = a.n or min(8, max(2, round(len(ps) * 0.02)))
-    pick = sorted(random.Random(f"{a.source}|{a.stage_date}|recall").sample(ps, min(n, len(ps))))
+    # BY PLACE (2026-11-05; the editor; tier 1's sample fell third in its legilo for 8 of 10, by chance): an even
+    # share from each place in the legilo, the parts of an earlier sample of this stage left out, 4 parts at least for a source
+    # dowse-place-check.py flags. A stage without group briefs draws from all its parts
+    spec = importlib.util.spec_from_file_location("place_check", os.path.join(ROOT, "tools", "dowse-place-check.py"))
+    pc = importlib.util.module_from_spec(spec); spec.loader.exec_module(pc)
+    c = pc.check(a.source)
+    if c and c[4] and not a.n: n = max(n, 4)
+    seen = {int(x) for p in glob.glob(os.path.join(D, f"recall-{a.stage_date}r*.md")) if "compare" not in p
+            for m in [re.search(r"^parts: (.*)$", open(p, encoding="utf-8").read(), re.M)] if m for x in m.group(1).split(", ")}
+    place = {}
+    for b in glob.glob(os.path.join(D, f"facts-brief-{a.stage_date}-g*-*.md")):
+        g = re.search(r"-g(\d+)-(\d+)\.md$", b)
+        for k in range(int(g.group(1)), int(g.group(2)) + 1): place[k] = k - int(g.group(1))
+    rnd = random.Random(f"{a.source}|{a.stage_date}|recall")
+    left = [k for k in ps if k not in seen]
+    by = {}
+    for k in left: by.setdefault(place.get(k, 0), []).append(k)
+    for v in by.values(): rnd.shuffle(v)
+    pick = []
+    while len(pick) < min(n, len(left)):
+        for p in sorted(by):
+            if by[p] and len(pick) < n: pick.append(by[p].pop())
+    pick = sorted(int(x) for x in a.parts.split(",")) if a.parts else sorted(pick)
     cmd = [sys.executable, os.path.join(ROOT, "tools", "dowse-brief-fill.py"), a.source, rtag, "--per-reader", "--write-returns",
            "--only", ",".join(map(str, pick)), "--side-date", a.side_date or a.stage_date,
            "--partial", f"the recall sample (the runbook, step 11): a second reading of parts {','.join(map(str, pick))}, blind to the first"]
+    if a.readers_file: cmd += ["--readers-file", a.readers_file]   # a redowse's stage (the option's note, in main)
+    if a.context: cmd.append("--context")
     import subprocess
     p = subprocess.run(cmd, capture_output=True, text=True)
     if p.returncode: sys.exit(f"refusing: the brief filler stopped:\n{(p.stdout + p.stderr)[-1500:]}")
@@ -187,10 +212,18 @@ def parts_compare(a):
         miss += [f"  - part {k}, the stage lacks: {x[3]}" for x in s2 if not found(x, s1)]
     m = max(1, min(M1, M2))
     est = N1 * N2 / m if N1 and N2 else 0
+    # BOTH DIRECTIONS (2026-11-05; the editor): noise goes both ways, a thin
+    # first reading one way. 16 earlier sources pooled: the first lacks 13%, the second 10%, 1.09 times the lines. One-sided: the second
+    # wrote 1.25 times the lines or more, and the first lacks at least twice what the second lacks, on 50 second lines or more.
+    lack1, lack2 = (100 * (N2 - M2) / N2, 100 * (N1 - M1) / N1) if N1 and N2 else (0, 0)
+    ratio = N2 / N1 if N1 else 0
+    one_sided = N2 >= 50 and ratio >= 1.25 and lack1 >= 2 * max(lack2, 1)
     head = [f"# The recall comparison of {a.source} ({a.tag})", "",
             f"`[tools/dowse-recall.py parts-compare: parts {', '.join(map(str, pick))}; the stage {a.stage_date} against the second reading.]`", "",
             f"**The stage readers:** {N1} lines; **the second:** {N2}; matched {M1} / {M2}.",
             f"**The stage's miss rate** (the second's lines the stage lacks): {100 * (N2 - M2) / N2:.0f}%." if N2 else "**The stage's miss rate:** no second lines.",
+            f"**Both directions:** the stage lacks {lack1:.0f}% of the second's lines, the second {lack2:.0f}% of the stage's; the second wrote {ratio:.2f} times the lines. "
+            + ("**FLAGGED, ONE-SIDED: the stage reads thinner than noise explains; more parts by `parts` (it draws anew), runbook step 11.**" if one_sided else "Within noise (the corpus: about 10–13% both ways, 1.09 times)."),
             f"**Lincoln–Petersen** (the facts on these parts): about {est:.0f}; the stage holds {100 * N1 / est:.0f}% of them." if est else "", ""]
     text = "\n".join(head + rep + ["", "## The lines the stage lacks", ""] + (miss or ["(none)"])) + "\n"
     open(rp, "x", encoding="utf-8").write(text)
@@ -201,8 +234,14 @@ def parts_compare(a):
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("mode", choices=["sections", "prep", "compare", "parts", "parts-compare"]); ap.add_argument("source"); ap.add_argument("tag", nargs="?", default="")
     ap.add_argument("--n", type=int, default=0, help="parts: how many parts to draw (default 2%% of the stage's, 2 to 8)")
+    ap.add_argument("--parts", default="", help="parts: these parts, no draw, no agents file needed: the probe before a main run, «1,2»")
     ap.add_argument("--side-date", default="", help="parts: the date of the stage's roster, «out» list and namesakes, where it differs from the stage's tag (Ruslanda Esperantisto: stage 2026-10-17c, side files 2026-10-17)")
     ap.add_argument("--json", action="store_true", help="parts: print the readers' {label, prompt, agentType} for carney-readers.js")
+    # A REDOWSE'S RECALL (2026-11-10, Miles, the roster-cut redowse's batch 1): a stage tag made by redowse-pages.py prep
+    # numbers its readers by its own readers file, not by brief-config.json's «readers»; without these the second
+    # reading would be given other pages under the same numbers
+    ap.add_argument("--readers-file", default="", help="parts: the stage's readers file (redowse-readers-<tag>.txt), passed to the brief filler")
+    ap.add_argument("--context", action="store_true", help="parts: the stage's marked context pages, as the redowse's own briefs had (--context)")
     ap.add_argument("--ranges", help="whole chapters or sections, «45-50,70-79»"); ap.add_argument("--stage-date", default="2026-10-14")
     ap.add_argument("--write", action="store_true", help="compare: the full report to dowse/<source>/recall-compare-<tag>.md "
                     "(create-only), only the rates on screen; so no shell redirect is needed (the editor, 2026-10-15)")

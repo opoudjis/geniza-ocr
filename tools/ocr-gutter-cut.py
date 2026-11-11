@@ -81,6 +81,7 @@ def profile(p, mult):
 def find(g, ks=(4, 3, 2), tolf=0.08):
     """(k, cuts in page x, ink matrix of the paper, paper box) for a grey page array"""
     x0, x1, y0, y1 = page_box(g); p = g[y0:y1, x0:x1]
+    if min(p.shape) < 50: return 1, [], None, (x0, x1, y0, y1)   # a degenerate paper box (cupel19b 2026-10-29, failure map R80)
     ink, sm = profile(p, 0.85); W = len(sm)
     if W < 50: return 1, [], None, (x0, x1, y0, y1)
     if np.median(sm[int(.15 * W):int(.85 * W)]) < 0.04:
@@ -224,7 +225,11 @@ def cut_page(job):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("root"); ap.add_argument("--pdfs", required=True); ap.add_argument("--list", required=True)
+    ap.add_argument("root"); ap.add_argument("--pdfs", required=True); ap.add_argument("--list")
+    # --items (2026-10-28, cupel19a's G5 failure on Germana-Aŭstria Esperantisto, two German columns read across): every
+    # base page of the named items, instead of a --list of item⇥page rows; only pages found in columns are written
+    ap.add_argument("--items", action="append", default=[], help="an item whose every page is tried (repeatable)")
+    ap.add_argument("--items-file", help="a JSON list of items (a batch's columns-items.json), each item's every page tried")
     ap.add_argument("--lang", required=True); ap.add_argument("--journal", required=True); ap.add_argument("--progress", required=True)
     ap.add_argument("--jobs", type=int, default=7); ap.add_argument("--chunk", type=int, default=50)
     ap.add_argument("--dry", action="store_true"); ap.add_argument("--look")
@@ -232,7 +237,16 @@ def main():
     if a.look: os.makedirs(a.look, exist_ok=True)
     pdfn = {unicodedata.normalize("NFC", os.path.splitext(os.path.basename(l.strip()))[0]): l.strip() for l in open(a.pdfs) if l.strip()}
     jobs = []
-    for it, pg in (l.rstrip("\n").split("\t")[:2] for l in open(a.list, encoding="utf-8") if l.strip() and not l.startswith("#")):
+    if a.items_file:
+        import json
+        a.items += [unicodedata.normalize("NFC", x) for x in json.load(open(a.items_file, encoding="utf-8"))]
+    if not a.list and not a.items: sys.exit("give --list, --items or --items-file")
+    rows = [l.rstrip("\n").split("\t")[:2] for l in open(a.list, encoding="utf-8") if l.strip() and not l.startswith("#")] if a.list else []
+    for it in a.items:
+        for f in sorted(os.listdir(os.path.join(a.root, it))):
+            m = re.fullmatch(r"page-(\d+)\.txt", f)
+            if m: rows.append([it, m.group(1)])
+    for it, pg in rows:
         it = unicodedata.normalize("NFC", it); n = int(pg)
         base = os.path.join(a.root, it, f"page-{n:04d}")
         src = next((base + x for x in (".blocks.txt", ".cols.txt", ".reocr.txt", ".txt") if os.path.exists(base + x)), None)

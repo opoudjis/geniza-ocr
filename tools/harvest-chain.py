@@ -29,7 +29,7 @@ Poŝkalendaro's own tags).
 run was on the second account (its journal under ~/.claude-second). The record: dowse/chains/NAME.json and NAME.log;
 `status` writes dowse/chains/STATUS.md, every chain's stage and what it waits on, which the QUEUE's «STARTED, NOT
 FINISHED» list points to. Nothing is launched by this tool: a legilo stage stops for the editor's ruling. Ezri."""
-import argparse, datetime, json, os, subprocess, sys
+import glob, argparse, datetime, json, os, re, subprocess, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G = os.path.join(ROOT, "published", "heterophony-resources", "geniza")
 T = os.path.join(ROOT, "tools")
@@ -72,6 +72,38 @@ def run(c, label, args, picard=False, ok_codes=(0,)):
     log(c, f"ok  {label}: {last}")
     return out
 
+def par(c, jobs, picard=False):
+    """THE SOURCES SIDE BY SIDE (2026-11-11; the editor): JOBS, a
+    list of (label, args), run at once on half the cores (the venture's shared-cores default), each a per-source step that
+    writes only its own source's folder (the after-readers steps to 8b, the dedupe brief, the after-dedupe and
+    after-undated steps with --no-harvest); the harvest is never one of them. Each output goes to the chain's log whole,
+    in the jobs' order; any failure stops the chain after all have ended, naming the first."""
+    if DRY or len(jobs) < 2:
+        return [run(c, l, a, picard) for l, a in jobs]
+    import concurrent.futures
+    env = dict(os.environ)
+    if picard: env["CLAUDE_CONFIG_DIR"] = os.path.expanduser("~/.claude-second")
+    def one(j):
+        p_ = subprocess.run([sys.executable] + j[1], capture_output=True, text=True, env=env)
+        return p_.returncode, p_.stdout + p_.stderr
+    # a quarter of the cores, not half (2026-11-11 15:2x: the session crashed with nine assemblers at once, each loading
+    # the whole corpus; four at a time on 18 cores)
+    n = max(1, (os.cpu_count() or 4) // 4)
+    with concurrent.futures.ThreadPoolExecutor(n) as ex:
+        res = list(ex.map(one, jobs))
+    bad, outs = None, []
+    for (label, args), (code, out) in zip(jobs, res):
+        with open(path(c["name"], "log"), "a", encoding="utf-8") as fh: fh.write(f"\n## {label}\n$ {' '.join(args)}\n{out}\n")
+        last = (out.strip().split("\n") or [""])[-1][:180]
+        if code != 0:
+            log(c, f"STOP {label}: {last}"); bad = bad or label
+        else: log(c, f"ok  {label}: {last}")
+        outs.append(out)
+    if bad:
+        c["waits"] = f"Ezri: {bad} failed (and any other STOP above), see {os.path.relpath(path(c['name'], 'log'), ROOT)}"
+        save(c); sys.exit(1)
+    return outs
+
 NOHV = False   # next --no-harvest: the stage's harvest left to another chain's, one harvest for both (2026-10-28)
 def harvest(c):
     """The stage's one harvest, and what follows every harvest (the dowsed list, the items' online locations, the sigla
@@ -79,9 +111,13 @@ def harvest(c):
     if NOHV:
         log(c, "the harvest: left to another chain's (next --no-harvest)")
         c.setdefault("harvests", []).append(f"{datetime.datetime.now():%Y-%m-%d %H:%M} {c['stage']}: left to another chain's harvest"); return
-    run(c, "the check", [os.path.join(T, "harvest-facts.py"), "--check", "--quiet"])
+    # no separate check first (2026-11-06; the editor): the harvest scans as --check does and
+    # refuses to write on a format error
     out = run(c, "the harvest", [os.path.join(T, "harvest-facts.py"), "--quiet"])
     run(c, "the dowsed list", [os.path.join(T, "dowse-done.py")])
+    run(c, "the fold candidates", [os.path.join(T, "name-fold-candidates.py"), "--write"])
+    run(c, "the same acts: the candidate disputes", [os.path.join(T, "same_act.py"), "--write"])
+    run(c, "the parts by place, the recall in both directions", [os.path.join(T, "dowse-place-check.py"), "--write"])
     run(c, "the items' online locations", [os.path.join(T, "online-locations.py"), "--again"], ok_codes=(0, 1))
     run(c, "the sigla page", [os.path.join(T, "sigla-propose.py"), "--page", os.path.join(ROOT, "published", "genizo", "pages", "siglaro.md")], ok_codes=(0, 1))
     miss = next((l for l in out.split("\n") if l.startswith("missing-facts report")), "")
@@ -110,31 +146,68 @@ def stage_assemble(c):
     and that source's dedupe brief), `--from 9c` for the others (their dedupe briefs and workflow files)."""
     first, rest = c["sources"][0], c["sources"][1:]
     again = set()   # reassembled at their own tag: their dedupe brief at that tag already written, and asked
+    jobs = []
     for s in c["sources"]:
-        lp = os.path.join(D(s), f"after-readers-{tg(c, s)}.log")
-        if os.path.exists(lp) and "\n## 7e, assemble" in open(lp, encoding="utf-8").read():   # to 8b already, at its own tag
-            run(c, f"{s}: reassembled (7e; to 8b already at {tg(c, s)})", [ASM, s, "--replace"]); again.add(s)
+        # its after-readers logs at its tag, the plain one and any «-from-STEP» one of a run resumed by hand (2026-11-11:
+        # a source stopped at 6b, fixed and taken on by hand `--from 6b --until 8b`)
+        lps = glob.glob(os.path.join(D(s), f"after-readers-{tg(c, s)}.log")) + glob.glob(os.path.join(D(s), f"after-readers-{tg(c, s)}-from-*.log"))
+        if any("\n## 7e, assemble" in open(lp, encoding="utf-8").read() for lp in lps):   # to 8b already, at its own tag
+            jobs.append((f"{s}: reassembled (7e; to 8b already at {tg(c, s)})", [ASM, s, "--replace"]))
+            # its dedupe brief skipped only if it was written at that tag (2026-11-11: one resumed by hand had none)
+            if os.path.exists(os.path.join(D(s), f"dedupe-brief-{tg(c, s)}.md")): again.add(s)
         else:
-            run(c, f"{s}: assembled to 8b", [ASM, s, "--after-readers", tg(c, s), "--until", "8b"])
+            jobs.append((f"{s}: assembled to 8b", [ASM, s, "--after-readers", tg(c, s), "--until", "8b"]))
+    par(c, jobs)
     out = run(c, f"{first}: the harvest, for all (9a)", [ASM, first, "--after-readers", tg(c, first), "--from", "9a"])
     miss = next((l for l in out.split("\n") if "9b, the harvest" in l), "")
     c.setdefault("harvests", []).append(f"{datetime.datetime.now():%Y-%m-%d %H:%M} assemble: {miss[:120]}")
+    jobs = []
     for s in rest:
         # (2026-11-01, books-2026-11-01r: the prose books' 9c at their own tag refused, its log there since the chain before)
         if s in again: log(c, f"{s}: the dedupe brief (9c) already written at {tg(c, s)}, its dedupe asked: skipped"); continue
-        run(c, f"{s}: the dedupe brief (9c)", [ASM, s, "--after-readers", tg(c, s), "--from", "9c"])
+        jobs.append((f"{s}: the dedupe brief (9c)", [ASM, s, "--after-readers", tg(c, s), "--from", "9c"]))
+    par(c, jobs)
     # a redowse writes no dedupe brief here: the alignment (D6c step 10) comes first, by hand
     c["align"] = [s for s in c["sources"] if s not in again and not has(os.path.join(D(s), f"workflow-dedupe-{tg(c, s)}.json"))]
     if c["align"]: log(c, f"no dedupe workflow (a redowse: the alignment, D6c step 10, first): {', '.join(c['align'])}")
     p = pool(c, "dedupe", [os.path.join(D(s), f"workflow-dedupe-{tg(c, s)}.json") for s in c["sources"] if s not in again])
     c["stage"] = "dedupe" if p else "dedupe-none"
 
+DSTEPS = ["d1", "d2", "d3", "d4", "d5", "d6", "d6b", "d7", "d8", "d9", "d10"]
+def resume_after_dedupe(s, tag):
+    """None if the source has no after-dedupe log at TAG; «done» if one reached d10 with output; else the step after the
+    last one with output in its logs (a step whose header has no output after it is run again). d6 and d6b, the harvest,
+    are --no-harvest's to skip, so a source cut after d5 resumes at d7."""
+    lps = glob.glob(os.path.join(D(s), f"after-dedupe-{tag}.log")) + glob.glob(os.path.join(D(s), f"after-dedupe-{tag}-from-*.log"))
+    if not lps: return None
+    done = set()
+    for lp in lps:
+        secs = re.split(r"^## ", open(lp, encoding="utf-8").read(), flags=re.M)[1:]
+        for sec in secs:
+            name = sec.split(",")[0].split()[0]
+            body = sec.split("\n", 1)[1] if "\n" in sec else ""
+            if name in DSTEPS and body.strip(): done.add(name)
+    last = max((DSTEPS.index(x) for x in done), default=-1)
+    if last == len(DSTEPS) - 1: return "done"
+    nxt = DSTEPS[last + 1]
+    return "d7" if nxt in ("d6", "d6b") else nxt
+
 def stage_dedupe(c, rid, picard):
+    # the run's agents files, every source's at once, before the sources go side by side (each d1 then finds its own)
+    run(c, "the run's agents files", [os.path.join(T, "workflow-agents.py"), rid, "--write"], picard, ok_codes=(0, 1))
+    jobs = []
     for s in c["sources"]:
         # a source with no pair to ask had no dedupe reader: its steps from d7 on (the undated list and brief, the
         # accuracy sample) still run (2026-10-29, the 1905 report: d1 found no agents file of its own and stopped)
         own = has(os.path.join(D(s), f"workflow-dedupe-{tg(c, s)}.json"))
-        run(c, f"{s}: after the dedupe", [ASM, s, "--after-dedupe", tg(c, s), rid, "--no-harvest"] + ([] if own else ["--from", "d7"]), picard)
+        frm = [] if own else ["--from", "d7"]
+        # A RUN CUT OFF (2026-11-11 15:2x: the session crashed with eight sources part-way, their logs left at d5): a
+        # source whose after-dedupe log exists resumes after its last step with output, and one past d10 is skipped
+        nxt = resume_after_dedupe(s, tg(c, s))
+        if nxt == "done": log(c, f"{s}: after the dedupe already done (its log to d10): skipped"); continue
+        if nxt: frm = ["--from", nxt]
+        jobs.append((f"{s}: after the dedupe" + (f" (resumed {nxt})" if nxt else ""), [ASM, s, "--after-dedupe", tg(c, s), rid, "--no-harvest"] + frm))
+    par(c, jobs, picard)
     harvest(c)
     c["accuracy_date"] = datetime.date.today().isoformat()
     files = [os.path.join(D(s), f"workflow-{k}-{tg(c, s)}.json") for s in c["sources"] for k in ("undated", "accuracy")]
@@ -148,10 +221,9 @@ def stage_undated(c, rid, picard):
         if has(os.path.join(D(s), f"workflow-accuracy-{tg(c, s)}.json")) and \
            not has(os.path.join(D(s), f"workflow-undated-{tg(c, s)}.json")):   # the accuracy return alone
             run(c, f"{s}: the accuracy return filed", [os.path.join(T, "dowse-file-returns.py"), os.path.join(D(s), f"agents-{rid}.tsv")])
-    for s in c["sources"]:
-        if has(os.path.join(D(s), f"workflow-undated-{tg(c, s)}.json")):
-            run(c, f"{s}: after the undated pass", [ASM, s, "--after-undated", tg(c, s), rid], picard)
-            run(c, f"{s}: the undated check", [os.path.join(T, "dowse-undated-check.py"), s, tg(c, s), "--n", "40"])
+    us = [s for s in c["sources"] if has(os.path.join(D(s), f"workflow-undated-{tg(c, s)}.json"))]
+    par(c, [(f"{s}: after the undated pass", [ASM, s, "--after-undated", tg(c, s), rid]) for s in us], picard)
+    par(c, [(f"{s}: the undated check", [os.path.join(T, "dowse-undated-check.py"), s, tg(c, s), "--n", "40"]) for s in us])
     c["stage"] = "undated-read"
 
 def prep_page(c, s, kept_tag):
@@ -214,6 +286,10 @@ def main():
                 for s in c["sources"]: prep_page(c, s, a.kept_tag)
             return walk(c)
         save(c); log(c, f"chain {a.name} started at «{a.at}»: tag {a.tag}, {', '.join(a.sources)}")
+        # the recall comparison comes before the dress (2026-11-05; the editor), so a thin reading costs no dress: said, not refused
+        for s in c["sources"]:
+            if a.at == "assemble" and not glob.glob(os.path.join(D(s), "recall-compare-*.md")):
+                log(c, f"⚠ {s}: no recall comparison yet: the dowse runbook, step 5, has it before the dress")
         if a.at == "assemble": stage_assemble(c)
         else:   # sources part-way: a legilo stage pools the workflow files their after-modes already wrote
             if a.at == "page" and a.kept_tag:   # the page looks owed (UNDATED-KEPT's PAĜO of an earlier pass), prepared here
@@ -225,7 +301,10 @@ def main():
     else:
         c = load(a.name); st = c["stage"]
         if st in ("dedupe", "undated", "page") and not a.run: sys.exit(f"the stage «{st}» needs its workflow's run id: next {a.name} --run RUN")
-        if st == "dedupe": stage_dedupe(c, a.run, a.picard)
+        # a chain stopped in its assemble stage (2026-11-11, harvest-2026-11-11a at its first source's 6b): `next` runs the
+        # stage again once the stop is mended; the sources already at 7e are reassembled (--replace), not run again
+        if st == "assemble": stage_assemble(c)
+        elif st == "dedupe": stage_dedupe(c, a.run, a.picard)
         elif st == "dedupe-none": c["stage"] = "written"
         elif st == "undated": stage_undated(c, a.run, a.picard)
         elif st in ("undated-read", "written"):

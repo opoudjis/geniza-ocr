@@ -11,6 +11,8 @@ Prints the counts and the unmatched lines, by person. Writes nothing, unless --w
 lines go whole into the settings' «restore», for the alignment pass (the runbook, D6 point 8). Ezri, 2026-10-14."""
 import argparse, collections, glob, importlib.util, json, os, re, subprocess, sys
 from collections import defaultdict
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import factline as FL   # a line's own fields, the source's words left out (2026-10-28)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G = os.path.join("published", "heterophony-resources", "geniza")
 STOP = set("la de en kaj al li lia sia ke por kun estis estas el pri ne sed ĉe kiu kiuj tiu oni ĝi ili mi da per sur kiel ankaŭ post antaŭ jam nur".split())
@@ -25,6 +27,7 @@ def main():
     ap.add_argument("--missing", metavar="DATE", help="work this source's lines of the harvest's missing-facts report: write dowse/<source>/missing-DATE.md, the unexplained first")
     ap.add_argument("--strict", type=float, default=0, metavar="F", help="probe: a match also needs this share of the old line's fact words in the new line")
     ap.add_argument("--probe", nargs=2, metavar=("OLD", "NEW"), help="compare two sets of returns in dowse/<source>/ (globs, e.g. 'facts-return-2026-10-17-?.md' 'facts-return-2026-10-17pb-*.md'): the old lines the new set does not reproduce; writes nothing")
+    ap.add_argument("--report", help="with --missing: a kept missing-facts report in place of profiles/build/MISSING-FACTS-LATEST.md (2026-11-03)")
     ap.add_argument("--restore-missing", metavar="DATE", help="add the unexplained lines of dowse/<source>/missing-DATE.md to «restore», for an alignment of those lines only")
     ap.add_argument("--clear-restore", action="store_true", help="empty the settings' «restore» (the lines --write-restore added), e.g. after a wrong comparison; the count is printed")
     a = ap.parse_args()
@@ -66,17 +69,21 @@ def main():
         return out
     old_txt = subprocess.run(["git", "show", f"{a.old}:{G}/profiles/by-source/{a.source}-dowse.md"], capture_output=True, text=True).stdout.split("\n")
     cfg = json.load(open(f"{G}/dowse/{a.source}/facts-config.json", encoding="utf-8"))
-    new_txt = [l for r in cfg["returns"] for l in open(f"{G}/dowse/{a.source}/{r}", encoding="utf-8")] + cfg.get("restore", [])
+    def expanded(f):
+        # the lean brief's lines expanded from each return's own pages file first (2026-10-18, the DeepSeek test:
+        # «(prese M) l. K» names no page until harvest-facts.py's expand_lean has read the pages file)
+        mr = re.fullmatch(r"facts-return-(.+)-(\d+)\.md", os.path.basename(f))
+        pf = f"{G}/dowse/{a.source}/facts-pages-{mr.group(1)}-{mr.group(2)}.txt" if mr else ""
+        pages = open(pf, encoding="utf-8").read().split("\n") if pf and os.path.exists(pf) else None
+        # the source's item for a pages file with no «=== teksto: … ===» (2026-11-05: the Leteroj's lines stayed unexpanded, 2,189 of 5,232 unparsed, the rest with no ¶)
+        return [hf.expand_lean(l.rstrip("\n"), pages, cfg.get("item", "")) + "\n" if pages and l.startswith("- $$$") else l for l in open(f, encoding="utf-8")]
+    # the returns too, not only the probe's (2026-11-06: OV and the Leteroj's second readings, raw, gave no ¶ to match on, so 2,131 of OV's 2,338 old lines counted as lost)
+    new_txt = [l for r in cfg["returns"] for l in expanded(f"{G}/dowse/{a.source}/{r}")] + cfg.get("restore", [])
     if a.probe:   # P2 of DOWSE-THROUGHPUT-PROPOSAL-2026-10-17.md: two sets of returns on the same pages, the baseline as «old»
         def pick(g):
-            # the lean brief's lines expanded from each return's own pages file first (2026-10-18, the DeepSeek test:
-            # «(prese M) l. K» names no page until harvest-facts.py's expand_lean has read the pages file)
             out = []
-            for f in sorted(glob.glob(f"{G}/dowse/{a.source}/{g}")):
-                mr = re.fullmatch(r"facts-return-(.+)-(\d+)\.md", os.path.basename(f))
-                pf = f"{G}/dowse/{a.source}/facts-pages-{mr.group(1)}-{mr.group(2)}.txt" if mr else ""
-                pages = open(pf, encoding="utf-8").read().split("\n") if pf and os.path.exists(pf) else None
-                out += [hf.expand_lean(l.rstrip("\n"), pages, "") + "\n" if pages and l.startswith("- $$$") else l for l in open(f, encoding="utf-8")]
+            for f in sorted(x for x in glob.glob(f"{G}/dowse/{a.source}/{g}") if not re.search(r"-p\d+\.md$", x)):   # a joined return, not its pieces too
+                out += expanded(f)
             return out
         old_txt, new_txt = pick(a.probe[0]), pick(a.probe[1])
         # the two form faults of the cut brief (P2(a)), repaired as the assembler would: a bare «[sen dato]» or
@@ -100,7 +107,8 @@ def main():
         m = re.search(r"\b(1[5-9]\d\d|20\d\d)(-\d\d)?(-\d\d)?", d or "")
         return 0 if not m else 1 + bool(m.group(2)) + bool(m.group(3))
     def kun(raw):
-        m = re.search(r"kun: ([^};]*)", raw or "")
+        f = FL.fields(raw or "")   # the kind field's «kun:», not one the fact or the anchor prints (the trigger audit, 41)
+        m = re.search(r"kun: ([^};]*)", f["kind"] if f else (raw or ""))
         return [fold(re.sub(r"\s*\(.*?\)", "", x)).strip() for x in m.group(1).split(" kaj ")] if m else []
     STRICT = a.strict
     def same(o, n):
@@ -133,7 +141,8 @@ def main():
         # listed first, for the editor. Writes dowse/<source>/missing-<DATE>.md, create-only.
         rp = f"{G}/dowse/{a.source}/missing-{a.missing}.md"
         if os.path.exists(rp): sys.exit(f"{rp} exists: not overwritten")
-        rep = open(f"{G}/profiles/build/MISSING-FACTS-LATEST.md", encoding="utf-8").read().split("\n")
+        # --report: a kept report (2026-11-03: Progreso's losses were in the build before the last one)
+        rep = open(a.report or f"{G}/profiles/build/MISSING-FACTS-LATEST.md", encoding="utf-8").read().split("\n")
         mine, on = [], False
         for l in rep:
             if l.startswith("### "): on = l[4:].startswith(f"{a.source}-dowse.md")
@@ -249,7 +258,7 @@ def main():
         PAT = re.compile(r"pruvo:|identig|korektit|kalkulit|ne kontrolita|verŝajne|OCR", re.I)
         def adds(rawline):
             m = re.search(r"\(([^()]*(?:\([^()]*\)[^()]*)*)\)\s*$", rawline)
-            return [s.strip() for s in re.split(r";\s*", m.group(1)) if PAT.search(s)] if m else []
+            return [s.strip() for s in re.split(r";\s*", m.group(1)) if PAT.search(FL.noquotes(s))] if m else []   # audit 41
         newraw = defaultdict(list)
         for n in new: newraw[(n[0], n[1])].append(n[6] or n[4])
         tot = lost = 0; per = collections.Counter(); shown = 0

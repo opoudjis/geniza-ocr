@@ -132,7 +132,11 @@ BPEAPE = [
     (r"^EsperantoRuslando\.", 3464, "Esperanto (Russia)", "«la unua rusa-Esperanta gazeto eldonita en Rusujo», permitted 1904; files 1905"),
     (r"^EsperantisteCatholique\.", 3292, "L’Espérantiste Catholique", "the French Catholic monthly (an Illustré variant is n-ro 3291); files 1910"),
     (r"^UniversalaJhurnalo_", 13231, "Universala Ĵurnalo", "Ruslanda Esperantista Ligo, St Petersburg, 1910–Apr 1911; file n01, Apr 1911"),
-    (r"^TheEsperantist\.", 3189, "The Esperantist", "«la unua Brituja esperantista gazeto», London; the file named «1903-1904.v1» holds vols. 1 AND 2: vol. 1 Nov 1903–Dec 1904, PDF pages 11–268; vol. 2, the whole of 1905, «VOL. II» title page at PDF page 269, issues to PDF page 500 (2026-10-10)"),
+    (r"^TheEsperantist\.", 3189, "The Esperantist", "«la unua Brituja esperantista gazeto», London; the file named «1903-1904.v1» holds vols. 1 AND 2: vol. 1 Nov 1903–Dec 1904, PDF pages 11–268; vol. 2, the whole of 1905, «VOL. II» title page at PDF page 269, issues to PDF page 500 (Ezri, 2026-10-10 22:00)"),
+    # cupel21 (2026-11-04, Miles, against bpeape-entries.tsv): the ÖNB issue files of the same two titles
+    (r"^ANNO_e2a_", 3189, "The Esperantist", "ÖNB / ANNO e2a, the issues one file each, Nov 1903–Dec 1905 (entry: London, nov. 1903–dec. 1905, 26 n-roj); the ÖNB copy of TheEsperantist.1903-1904.v1's run (cupel21)"),
+    (r"^ANNO_e1c_", 10933, "Pola Esperantisto",
+     "ÖNB / ANNO e1c, a volume a year 1906–1914 with its wrappers (0001), contents (0002), text (0004) and inserts (0008) (entry: Lwów, first series Jul 1906–Dec 1907, then the monthly of the Polish Esperantists); the ÖNB copy of the Jagiellonian runs above (cupel21)"),
     (r"^BulletinSectionPropagandeLigueBelge\.", 1282, "Bulletin de la Section de Propagande de la Ligue Belge", "Brugge, 1914; file 1914.1"),
     (r"^EsperantoEtCroixRouge\.", 3672, "Esperanto et Croix-Rouge", "bulletin of the Société Française Esperanto-Croix-Rouge; file 1910.1"),
     (r"^InternaciaMedicino\.", 6714, "Internacia Medicino", "TEKA's monthly, Dresden, Jan–Feb 1911, 2 n-roj; file 1911.1"),
@@ -141,6 +145,8 @@ BPEAPE = [
     # cupel17 (signed 2026-10-23; Ezri's request through the editor, 14:3x: titles before any is dowsed), matched by Miles
     # against bpeape-entries.tsv: the entry's place and years against the files' years
     (r"^ANNO_e7a_", 541, "Antaŭen Esperantistoj", "Lima, Perua Esperanto Societo (Villaréal); first epoch Jul 1903–Jun 1910, second Jul 1913–1916; files 1903–1914"),
+    (r"^ANNO_e1a_190[789]000[78]$", 8803, "Liberaj Horoj", "Berlin, the literary supplement of Germana Esperantisto, Jan 1907–Dec 1909; ANNO files it inside e1a's volumes (1907 0008, 1908 and 1909 0007); Miles 2026-11-01, cupel20a"),
+    (r"^ANNO_e1a_", 5074, "Germana Esperantisto (Der Deutsche Esperantist)", "Berlin, Jan 1905–1935; the ÖNB's ANNO run (e1a), files 1905–1910 in cupel20a; the same entry as Lublin's files; Miles 2026-11-01"),
     (r"^ANNO_e0d_", 2465, "Ĉirkaŭ la Mondo / Rund um die Welt", "Prague-Weinberge, Wolfenbüttel, Dresden (Schramm, Lederer), Sep 1909–1914; files 1909–1914"),
     (r"^ANNO_e1w_", 11946, "Scienca Gazeto", "Paris, the ISAE organ (Verax), Jan 1912–Jul/Aug 1914; files 1912–1914"),
     (r"^ANNO_e1v_", 11745, "Rondiranto", "Plovdiv, Klubo «Stelo» (Oreŝkov), Feb 1902–1904/05, bilingual; the same paper is also BPEAPE 11740; files 1902–1904"),
@@ -163,7 +169,57 @@ BPEAPE = [
     (r"^ANNO_e7r_", 11713, "Roma Esperantisto", "Roma, the Società Esperantista Romana's bilingual monthly (Giambene), from Jan 1907; files 1908"),
     (r"^ANNO_e6w_", 12441, "Stelo Kataluna", "Barcelona and Igualada, Jan–Jun 1908, 6 numbers; files 1908"),
     (r"^ONB_e3k_", 3488, "Esperanto, L'", "S. Vito al Tagliamento (Paolet), the Cattedra Italiana di Esperanto's fortnightly, first period Jan 1913–Dec 1922 (ÖNB files it as «Itala Esperanto-revuo»); files 1913–1914"),
+    (r"^ANNO_e4c_(19100001|19100002|19100005|19110012|19110020|19120012|19130012|19130020|19140012)$", 10478, "Oficiala Dokumentaro de la kongresoj de UEA", "ANNO files the congress documents under e4c with the yearbook (cupel22, by their title pages)"),
+    (r"^ANNO_e4c_(1908|1909|1910)", 10502, "Oficiala Jarlibro de Universala Esperanto-Asocio", "1908, then the editions of 1909-1910 (cupel22)"),
+    (r"^ANNO_e4c_", 10500, "Oficiala Jarlibro", "Universala Esperanto-Asocio, Geneve, first series 1911-1914, with 1916 (cupel22)"),
     (r"^ANNO_e4d_", 13128, "Tutmonda Jarlibro Esperantista", "Paris (Hachette), with Zamenhof's address lists, first series 1904–1910 (the Aldono of 1913–14 is n-ro 288); files 1904–1910"),
+    # cupel19a (signed 2026-10-28 17:04), matched by Miles against bpeape-entries.tsv, the entry's place and years against
+    # the files' (a Read-only reader's lookup, 2026-10-28 17:1x)
+    # 1908 first: its issues' mastheads read «Esperanto en la servo de la Dia regno. Monataj raportoj pri la disvastigo de
+    # Esperanto inter Kristanaj Unuigoj de Junaj Viroj», «Eldonata per: P. Hübner, Mülheim a. Rhein» (page 1 of files 52
+    # and 54, read by Miles 2026-10-28 17:2x): BPEAPE 3643, not 2613
+    (r"^ANNO_e1q_1908", 3643, "Esperanto en la servo de la Dia Regno", "Mülheim am Rhein, Köln (Hübner), «Monataj raportoj pri la disvastigo de Esperanto inter Kristanaj Unuiĝoj de Junaj Viroj (K.U.J.V.)», Feb–Dec 1908, 11 n-roj, «Poste: Dia Regno»; the 1908 mastheads agree; files 1908"),
+    (r"^ANNO_e1q_", 2613, "Dia Regno", "Mülheim bei Köln, Dellbrück (Hübner), the K.U.J.V.'s monthly, first period Jan 1908–Aug 1914 (its 1908 issues are n-ro 3643, above); files 1909–1912"),
+    (r"^ANNO_e0y_1910", 5070, "Germana-Aŭstria Esperantisto (1910)", "Wien, the free German-language supplement («Gratisblatt») of «Informaj Raportoj», 1910, 12 n-roj; files 1910 Nr. 1–12 (the same paper is also n-ro 5099, «German-Aŭstria Esperantisto», first series May–Dec 1910)"),
+    (r"^GermanAustriaEsperantisto_19", 2600, "Deutsch-Österreichischer Esperantist (German-Aŭstria Esperantisto)", "Wien (Ahlgrimm, Sós), Jan 1911–May? 1914, the only entry with the 1911 start; also n-ro 5099 (second series 1912–Dec 1914); the ÖNB volumes 1911–1913 and 1914"),
+    (r"^ANNO_e0l_", 6483, "Internacia Bulteno", "Berlin, Dresden (Ellersiek), «Germana bulteno pri la milito», Nov 1914–Jan 1919, 60 + 1 kajeroj in 4 volumes (the files' own subtitle «Germana informilo pri la milito», Deutscher Esperanto-Dienst); files 1914–1918"),
+    # cupel19b (signed 2026-10-29). ANNO's February 1913 issue is the American edition: its cover «AMERICAN EDITION»
+    # (OCR «AMERICAN BOTH»), «Annual Subscription, 50c … Single Copy, 5c», the United States Esperanto Association's
+    # notices (Schaller, Iowa) inside; the other 1913 covers read «BRITISH EDITION» (Miles 2026-10-29 15:2x, from the texts)
+    (r"^ANNO_e0x_19130052$", 4004, "The Esperanto Monthly (American edition)", "Schaller, Iowa, the United States Esperanto Association's edition, Jan 1913 –?; ANNO's February 1913 issue, its cover «AMERICAN EDITION»"),
+    (r"^ANNO_e0x_", 4003, "The Esperanto Monthly", "London, the British Esperanto Association, Jan 1913–Dec 1919, 84 n-roj, 7 volumes (ed. W. W. Mann to 1914, then W. M. Page); the 1913 covers «BRITISH EDITION» (February 1913 is n-ro 4004, above); files 1913–1919"),
+    # cupel19c (signed 2026-10-31), matched by Miles against bpeape-entries.tsv, the entry's place and years against the
+    # files' (2026-10-31 12:0x)
+    (r"^ANNO_e5i_", 3553, "Esperanto-Bladet: Helpa Lingvo", "Köbenhavn, «Societo de Esperantistoj» (Wiehe), the first Danish Esperanto paper, Jan 1907–1908, 12 n-roj; «Poste: Dana Esperantisto»; files 1907"),
+    (r"^ANNO_e5g_", 2486, "Dana Esperantisto", "Köbenhavn, the Centra Dana Esperantista Ligo's organ (Skeel-Giörling, Nissen), Jan 1908–Mar 1912; «Antaŭe: Esperanto Bladet», «Poste: Danlando»; files 1908–1912"),
+    (r"^ANNO_e5k_", 2496, "Danlando", "Köbenhavn (Nissen), «por anstataŭigi la ĉesintan revuon Dana Esperantisto», Jul 1912–Nov? 1913, 7 n-roj; «Poste: Esperanto-Raporto»; files 1912–1913"),
+    (r"^ANNO_e5j_", 4112, "Esperanto-Raporto (Centra Dana Esperantista Ligo)", "Köbenhavn, the league's organ (Hindrichsen, Heilskov), Dec 1913–Dec 1918, second series 1919–1920; files 1913–1919 bear out Takács («ĝi aperis dum la milito»); not entry 4111, Wien 1923"),
+    (r"^ANNO_e3b_", 5480, "Hungara Esperantisto", "Budapest, the Hungara Esperantista Societo's monthly (Schatz, Miletz, Medgyesi), first series Mar 1909–1911; files 1909–1910"),
+    (r"^ONB_e6e_", 8441, "Kroata Esperantisto", "Zagreb, the «Društvo Hrvatskih Esperantista»'s organ (Ŝpicer, Bedekoviĉ), first series Apr 1909–Aug 1911, 31 n-roj, IEMW 700.084-C; files 1909–1911"),
+    (r"^ANNO_e1x_", 12433, "La Stelo de l' Feliĉo", "Dellbrück, Quedlinburg (Hübner), the literary supplement of «Dia Regno», Jan 1912–1913; files 1912"),
+    (r"^13162CBF_iiif$", 13089, "Tutmonda Adresaro de katolikaj esperantistoj kaj de honestaj malkaraj hoteloj", "S. Vito al Tagliamento (Paolet), 1914–1915, «Aperis en 1913», 127 p., IEMW 706.189-A = ÖNB 706189-A"),
+    (r"^100468F5_iiif$", 2417, "Ĉenero Esperantista", "Peterburg, Societo «Espero», first series 1906, 14 p. (Radvan-Ripinski), IEMW 704.819-B = ÖNB 704819-B"),
+    (r"^10035102_iiif$", 126, "Adresaro de l' kongresanoj (4th UK, Dresden 1908)", "«I-a listo … Dresden (DE). LKK de IV.1908, 18 p.»"),
+    (r"^131D09F0_iiif$", None, "Tutmonda Amikaro de Publikoficistoj: Raporto de la Komitato (1912)", "no entry for the report (searched by the society's name); its own text puts off «la publikigo de speciala bulteno», so it is before the society's paper «La Publikoficisto» (entry 11323, Paris, Dec 1912–1914)"),
+    (r"^ANNO_e4g_", 13335, "Universo","«Internacia Revuo por la Belo», founded by Albert Schramm, Dresden / Wolfenbüttel (Heckners Verlag), Sept 1909–1912, supplement to «Germana Esperanto-Gazeto» (ed. Siegfried Lederer to Sept 1911, then Schramm); files 1909–1912 (not n-ro 13336, the München collectors' club organ of 1919–1921)"),
+    # cupel23 (signed 2026-11-07; Miles, against bpeape-entries.tsv, the first pages' text and sources/_INVENTORY.md)
+    (r"^ANNO_e7d_", 4608, "Fervoja Esperantisto", "organ of the Internacia Asocio de la Esperantistaj Fervojistoj, Parennes, Colombes, Villeneuve, Dec 1910–Jul 1914 (the masthead of March 1912 agrees); files 1910–1914. The 17 Bitarkivo PDFs in FervojaEsperantisto/ never went through a cupel"),
+    (r"^ANNO_e5c_", 6731, "Internacia Pedagogia Revuo", "organ of the Internacia Asocio de Instruistoj, first series Nov 1908 on (the mastheads of 1913 and 1914 agree); files 1908–1914. The 13 Lublin PDFs in InternaciaPedagogiaRevuo/ never went through a cupel"),
+    (r"^ANNO_e3j_", 13187, "Ukraina Stelo", "Kolomea and Stanislaviv, first series Jan 1913–May 1914 (ed. Orest Kuzma, as the masthead); files 1913–1914; not n-ro 13188, Kiev 1991"),
+    (r"^HispanaEsperantisto_", 5387, "Hispana Esperantisto", "Madrid (Mangada), Jan 1917–1923 (the masthead «MADRIDO»); file no. 25, Jan 1919; not n-ro 5386, Murcia 1905–1906"),
+    (r"^ANNO_e6q_", 11090, "La Praktiko", "Internacia Cseh-Instituto, Den Haag, first series 1932–1941; file 1940; not n-ro 11091, the sound tape of 1961–1963"),
+    (r"^ONB_e2j_", 5347, "Heroldo de Esperanto", "Teo Jung's weekly, Horrem to autumn 1928, then Köln (the masthead's Köln address, «Sendependa organo de la Esperanto-movado»); file 31 Jan 1930"),
+    (r"^Espero\.de\.Katalunjo$", 4308, "Espero de Katalunujo", "Céret, Jan–Apr 1905, 3 numbers (Berthelot, Julia, as ÖNB's cover sheet)"),
+    (r"^Kataluna\.nacio\.", 7764, "Kataluna Nacio", "Barcelona, Apr 1909, the only number"),
+    (r"^klubaj\.raportoj\.vieno$", 7884, "Klubaj Raportoj", "the Esperanta Klubo Wien's quarterly; IEMW 700.130-C, ÖNB's own signature; the entry gives 2 numbers of 1907–1908, bound with «Informaj Raportoj» and «Deutsch-Österreichischer Esperantist», and ÖNB's cover sheet the whole volume, 1907–1914; not n-ro 7883, of 1967"),
+    (r"^Filipina_Esperantisto$", 4661, "Filipina Esperantisto", "Manila, Aug 1907–Jun 1909; the item also binds four other journals' numbers (ORIGIN_STATED)"),
+    (r"^esperanto-triumfonta-", 4199, "Esperanto Triumfonta", "weekly, first series Apr 1920–Dec 1924; file no. 156, 1923, fetched alone for one obituary; the run above stops at 1922"),
+    (r"^ruslanda\.adresaro$", 11826, "Ruslanda Adresaro", "Moskva, the Librejo «Esperanto», 1912, vol. 1; not n-ro 11827, of 1973"),
+    (r"^EsperantoKajLaBlinduloj$", 3837, "Esperanto kaj la blinduloj", "the yearbook for 1910 of Esperanta Ligilo, Paris"),
+    (r"^internacia\.revuo\.medicina$", 6765, "Internacia Revuo Medicina", "Paris (Verax, Vallienne), Jan–Apr 1906; IEMW 703.382-C, ÖNB's own signature"),
+    (r"^couturat-leau-1908-", None, "Les nouvelles langues internationales (Couturat and Leau)", "a book, not a periodical: outside BPEAPE's scope"),
+    (r"^dulichenko-1990-", None, "Meždunarodnye vspomogatel'nye jazyki (Dulichenko)", "a book, not a periodical: outside BPEAPE's scope"),
+    (r"^stojan-bibliografio-1929$", None, "Bibliografio de Internacia Lingvo (Stojan)", "a book, not a periodical: outside BPEAPE's scope"),
 ]
 
 # Outside BPEAPE: the editor ruled on 2026-10-08 11:5x that Helvetia is Occidental, and that Ido, Novial and Occidental
@@ -176,6 +232,12 @@ OUTSIDE = [
     (r"^ido\.\d{4}", "Ido (the title)"),
     (r"^Ido_Saluto_", "Ido (the title)"),
     (r"^posta[-_]mundi[-_]", "an inter-IAL newsletter (page 1 of posta_mundi_32: «Jurnal inter IAL», 2020)"),
+    # cupel19c (signed 2026-10-31)
+    (r"^13(0388DF|0387FE|038337|037E5E|16679C)_iiif_1-14$", "Ido (Nuva adresaro dokumentizita, Verdun-sur-Meuse 1909–1910: a list of Idists; its title page stamped «Ido Societo Progreso»)"),
+    (r"^progres$", "Idiom Neutral (Progres, St Petersburg 1906–1908, «organ de Grup Neutralparlant»; BPEAPE's «Progres», entry 11222, is a Warsaw paper of 1931, not this)"),
+    # cupel23 (signed 2026-11-07), the general press: each for one obituary, presence only
+    (r"^ONB_kra_", "the general press (Dziennik Krakowski, a Polish daily, by its masthead, 24 Feb 1897)"),
+    (r"^przeglad-tygodniowy-", "the general press (Przegląd Tygodniowy, a Warsaw weekly, by its masthead, R. 32, 1897, no. 9)"),
 ]
 LANG_OUTSIDE = {"ido": "Ido", "occidental": "Occidental", "novial": "Novial", "latino-sine-flexione": "Latino sine flexione"}
 # A TITLE FOR A RUN BPEAPE DOES NOT NAME (2026-10-24, the editor 22:2x on La Genizo's OSR page, its list of the signed
@@ -205,6 +267,10 @@ TITLE_BY_ITEM = [   # (2026-10-24 23:0x) the Volapük runs of cupel15–16 filed
     (r"^vom_guten_das_beste", "Vom Guten das Beste"), (r"^vpagased_lostanik", "Volapükagased lostanik"),
     (r"^vpabled_talik|^Volapukabled_talik", "Volapükabled tälik"), (r"^volapuk_journal_london", "Volapük Journal"),
     (r"^kosmopolan_contents", "Kosmopolan"), (r"^vpaflen_jveizik", "Volapükaflen jveizik"),
+    # cupel19c (signed 2026-10-31), outside BPEAPE: the Ido address list and the Idiom Neutral paper
+    (r"^13(0388DF|0387FE|038337|037E5E|16679C)_iiif_1-14$", "Nuva adresaro dokumentizita"), (r"^progres$", "Progres"),
+    # cupel23 (signed 2026-11-07), the general press, outside BPEAPE
+    (r"^ONB_kra_", "Dziennik Krakowski"), (r"^przeglad-tygodniowy-", "Przegląd Tygodniowy"),
 ]
 
 # ORIGIN (as the proposal on citable hits asks, an internal record, 2026-10-08, not published: the source's own names,
@@ -217,6 +283,22 @@ SOURCES = os.path.join(HERE, "..", "published", "heterophony-resources", "geniza
 
 # Origins stated once for a whole run, where no per-file record exists; quoted from the record that states them.
 ORIGIN_STATED = [
+    # cupel23 (signed 2026-11-07), each as sources/_INVENTORY.md and sources/_WEB-DOWNLOADS.tsv record it
+    (r"^HispanaEsperantisto_1919_n025_jan$", "archive.org, https://archive.org/details/HispanaEsperantisto_1919_n025_jan"),
+    (r"^ONB_e2j_19300131$", "ÖNB / ANNO, title code e2j, https://anno.onb.ac.at/cgi-content/anno?aid=e2j&datum=19300131, downloaded by the editor"),
+    (r"^ONB_kra_18970224$", "ÖNB / ANNO, title code kra, https://anno.onb.ac.at/cgi-content/anno?aid=kra&datum=18970224, downloaded by the editor"),
+    (r"^przeglad-tygodniowy-1897-no09$", "the University of Warsaw's digital library, downloaded by the editor (the URL not recorded)"),
+    (r"^couturat-leau-1908-", "Wikimedia Commons, by https://fr.wikisource.org/wiki/Livre:Couturat,_Leau_-_Les_nouvelles_langues_internationales,_1908.pdf"),
+    (r"^esperanto-triumfonta-1923-no-156$", "Bitarkivo, https://tempa.bitarkivo.org/gazetoj/EsperantoTriumfonta/esperanto-triumfonta-jurnalo-internacia-universale-sendependa-1923-no-156.pdf"),
+    (r"^Espero\.de\.Katalunjo$", "ÖNB, https://data.onb.ac.at/rep/1003C272, downloaded by the editor"),
+    (r"^Kataluna\.nacio\.1909\.apr$", "ÖNB / ANNO, title code e6b, downloaded and named by the editor"),
+    (r"^klubaj\.raportoj\.vieno$", "ÖNB, https://data.onb.ac.at/rep/1001CE20, downloaded by the editor"),
+    (r"^ruslanda\.adresaro$", "ÖNB, https://data.onb.ac.at/rep/131C9E4F, downloaded by the editor"),
+    (r"^EsperantoKajLaBlinduloj$", "ÖNB, https://data.onb.ac.at/rep/13162CB9, downloaded by the editor"),
+    (r"^internacia\.revuo\.medicina$", "ÖNB, https://data.onb.ac.at/rep/117C81DF, downloaded by the editor"),
+    (r"^(stojan-bibliografio-1929|dulichenko-1990-)", "placed by the editor 2026-11-05 (sources/_INVENTORY.md)"),
+    (r"^Esperanto-UEA_(1918_n219|1921_n245|1929_n342|1936_n425|1937_n442|1938_n462|1940_n486|1942_n491|1946_n0497|1960_n0653|1970_n0775|1980_n0892)", "archive.org or Bitarkivo, this file's own URL in sources/_WEB-DOWNLOADS.tsv (web-2026-11-06-obit-issues/)"),
+    (r"^Filipina_Esperantisto$", "a Google Books PDF of the University of Michigan's bound volume (sources/_INVENTORY.md), one item as bound (the editor, 2026-11-06, cupel23): Filipina Esperantisto to PDF 440; Esperantisten (Sala), September 1908, no. 9, from PDF 441; The British Esperantist no. 47, November 1908, from PDF 461; Antaŭen Esperantistoj, November 1908, from PDF 487; Pola Esperantisto, 1908, from PDF 506"),
     (r"^RuslandaEsperantisto1905\.2$", "archive.org / Bitarkivo (sources/_INVENTORY.md, Ruslanda Esperantisto: «1905.2 from archive.org/bitarkivo»)"),
     (r"^RuslandaEsperantisto1910\.(1|2-3)$", "Bitarkivo, tempa.bitarkivo.org JPEG spreads, assembled 2026-09-12 (sources/_INVENTORY.md; the downloads kept as sources/ruslanda_esperantisto_1910_n_*_pbf.zip)"),
     (r"^(Lingvo Internacia |LEsperantiste\.|larevuo\.|juna\.esperantisto\.|ondodeesperanto\.|lamarto\.|RuslandaEsperantisto)",
@@ -408,10 +490,20 @@ ANNO_TITLES = {
     # cupel18a (signed 2026-10-24), by the mastheads seen at its C1
     "e5a": "svisa-espero", "e3s": "franca-esperantisto", "e4h": "bulgara-esperantisto",
     # cupel18b (signed 2026-10-26), by the title pages and running heads seen at its C1 and C6 looks
+    "e4c": "oficiala-jarlibro-uea",
     "e4d": "tutmonda-jarlibro-esperantista",
     # cupel18c (signed 2026-10-27), by the mastheads and title pages seen at its C1 and C6 looks
     "e7p": "danubo", "e7s": "itala-esperantisto", "e1k": "informaj-raportoj", "e7i": "teka-jarlibro",
     "e7r": "roma-esperantisto", "e6w": "stelo-kataluna",
+    # cupel19a (signed 2026-10-28), by the mastheads seen at its C1 and C6 looks (board 2026-10-27)
+    "e1q": "dia-regno", "e0y": "german-austria-esperantisto", "e0l": "internacia-bulteno",
+    # cupel19b (signed 2026-10-29), by the mastheads seen at its C1 look
+    "e0x": "the-esperanto-monthly", "e4g": "universo",
+    # cupel19c (signed 2026-10-31), by the mastheads seen at its C1 and C6 looks and sources/_INVENTORY.md
+    "e5g": "dana-esperantisto", "e5k": "danlando", "e5i": "esperanto-bladet", "e5j": "esperanto-raporto",
+    "e3b": "hungara-esperantisto", "e1x": "la-stelo-de-l-felico",
+    # cupel23 (signed 2026-11-07), by _INVENTORY's masthead and the download record
+    "e3j": "ukraina-stelo", "e6q": "la-praktiko",
 }
 # By the folder the PDF is in (relative to geniza/sources/): the work all its files belong to.
 FOLDER_PREFIX = {
@@ -428,6 +520,8 @@ FOLDER_PREFIX = {
 KEY_PINNED.update({
     "117C5F54_pdf_1-76": "oficiala-bulteno-de-teka-1911-1912-onb-117c5f54",          # _INVENTORY: the Oficiala Bulteno de T.E.K.A. 1911–1912 (ÖNB 117C5F54)
     "10B83C47_pdf_1-291": "cart-vocabulaire-francais-esperanto-1907-onb-10b83c47",   # _INVENTORY: Cart's dictionary, 5th ed. 1907 (ÖNB 10B83C47)
+    "GermanAustriaEsperantisto_1911-1913": "german-austria-esperantisto-1911-1913-onb",  # cupel19a: the ÖNB volume (renamed 2026-10-17)
+    "GermanAustriaEsperantisto_1914": "german-austria-esperantisto-1914-onb",            # cupel19a: the ÖNB volume (renamed 2026-10-17)
     "LM_1931-07c": "literatura-mondo-1931-07c",                                      # _INVENTORY: Literatura Mondo, the Kabe item
     "mat_0769-3206_1994_num_34_1_402776": "panteleiev-1994-materiaux-histoire-34",   # _INVENTORY: Panteleiev, Matériaux … 34 (1994), Persée
     "LLZ-Bio-En": "korzhenkov-2009-zamenhof-life-works-ideas-en",                    # p. 1: Korzhenkov, «Zamenhof: The Life, Works, and Ideas …», tr. Richmond, ESF 2009
@@ -444,6 +538,17 @@ KEY_PINNED.update({
     "KK_1914_Gazeto_n1-8": "gazeto-de-la-deka-kongreso-1914-paris-n1-8",
     "Lo-328demo": "la-ondo-de-esperanto-328-demo",        # La Ondo de Esperanto, a demo issue
     "UN_75jara": "kunzli-2020-un-75-jara",                # p. 1: «UN 75-jara … De Andreas Künzli»; the UN's 75th year, 2020
+    # cupel19c (signed 2026-10-31): the ÖNB address lists fetched by IIIF, by their title pages (sources/_INVENTORY.md,
+    # «Nuva adresaro dokumentizita» and «Four Esperanto address lists of the period»)
+    "130388DF_iiif_1-14": "nuva-adresaro-dokumentizita-1-1909-11-onb-130388df",   # folyo 1, November 1909 (Ido)
+    "130387FE_iiif_1-14": "nuva-adresaro-dokumentizita-2-1909-12-onb-130387fe",   # folyo 2, December 1909
+    "13038337_iiif_1-14": "nuva-adresaro-dokumentizita-3-1909-12-onb-13038337",   # folyo 3, December 1909
+    "13037E5E_iiif_1-14": "nuva-adresaro-dokumentizita-4-1910-01-onb-13037e5e",   # folyo 4, January 1910
+    "1316679C_iiif_1-14": "nuva-adresaro-dokumentizita-5-1910-02-onb-1316679c",   # folyo 5, February 1910
+    "13162CBF_iiif": "tutmonda-adresaro-katolikaj-esperantistoj-1914-1915-onb-13162cbf",  # the cover: «Jaroj 1914-1915»
+    "131D09F0_iiif": "tutmonda-amikaro-publikoficistoj-raporto-1912-onb-131d09f0",       # PDF p. 6: «Raporto de la Komitato»
+    "100468F5_iiif": "cenero-esperantista-1906-onb-100468f5",                         # «1-a serio», St Petersburg 1906
+    "10035102_iiif": "adresaro-de-l-kongresanoj-dresden-1908-onb-10035102",           # «1a listo», the Fourth Congress
 })
 CYR = dict(zip("абвгдеёжзийклмнопрстуфхцчшщъыьэюяіїєґў",
                ["a","b","v","g","d","e","e","zh","z","i","i","k","l","m","n","o","p","r","s","t","u","f","kh","ts","ch","sh",
@@ -460,6 +565,10 @@ def work_key(it, folder):
     if m: return f"vespera-horo-{m.group(1)}-{m.group(2)}-{m.group(3)}"
     m = re.match(r"^ONB_e3k_(1[89]\d\d)(\d\d)(\d\d)$", it)  # cupel18c: L'Esperanto (S. Vito al Tagliamento), ÖNB's «Itala Esperanto-revuo», by date
     if m: return f"l-esperanto-s-vito-{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    m = re.match(r"^ONB_e6e_(1[89]\d\d)(\d\d)(\d\d)$", it)  # cupel19c: Kroata Esperantisto (Zagreb), ÖNB, by date
+    if m: return f"kroata-esperantisto-{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    m = re.match(r"^ONB_(e2j|kra)_(1[89]\d\d)(\d\d)(\d\d)$", it)  # cupel23: Heroldo de Esperanto; Dziennik Krakowski, ÖNB, by date
+    if m: return f"{ {'e2j': 'heroldo-de-esperanto', 'kra': 'dziennik-krakowski'}[m.group(1)] }-{m.group(2)}-{m.group(3)}-{m.group(4)}"
     m = re.match(r"^jbc\.bj\.uj\.edu\.pl\.NDIGCZAS(\d+)_(.+)$", it)
     if m: return f"pola-esperantisto-jbc-{m.group(1)}-{slug(m.group(2))}"
     m = re.match(r"^dlibra\.kul\.pl\.(\d+)$", it)
@@ -562,7 +671,19 @@ SPAN_READ = {   # stem → (years, volumes, what was read); the file's own name 
 # text (2026-10-11 02:28: the life dates in its file name had apparently been read as its year; checked).
 YEAR_READ = {   # stem → (year, what was read)
     "Contribution_of_A_Jakstas-Dambrauskas_1860-1938_to": ("2017", "PDF page 1: «Advances in Historical Studies, 2017, 6, "
-        "1-17» · «Banionis, J. (2017)»; 1860-1938 are A. Jakštas-Dambrauskas's life dates (read 2026-10-11)"),
+        "1-17» · «Banionis, J. (2017)»; 1860-1938 are A. Jakštas-Dambrauskas's life dates (read by Miles 2026-10-11)"),
+    # cupel19c (signed 2026-10-31): files named by ÖNB's ID, no year in the name; each year from its title page or text,
+    # as sources/_INVENTORY.md records them
+    "130388DF_iiif_1-14": ("1909", "folyo 1, November 1909 (title page; sources/_INVENTORY.md)"),
+    "130387FE_iiif_1-14": ("1909", "folyo 2, December 1909 (sources/_INVENTORY.md)"),
+    "13038337_iiif_1-14": ("1909", "folyo 3, December 1909 (sources/_INVENTORY.md)"),
+    "13037E5E_iiif_1-14": ("1910", "folyo 4, January 1910 (sources/_INVENTORY.md)"),
+    "1316679C_iiif_1-14": ("1910", "folyo 5, February 1910 (sources/_INVENTORY.md)"),
+    "13162CBF_iiif": ("1914–1915", "the cover: «Jaroj 1914-1915»; begun in Rome in September 1913 (the «Declaratio», canvas 8; read by Miles 2026-10-27)"),
+    "131D09F0_iiif": ("1912", "the committee's report, its accounts to «la 1-a de Oktobro 1912» (PDF p. 6); ÖNB's date 1912"),
+    "100468F5_iiif": ("1906", "«1-a serio», St Petersburg 1906 (ÖNB's record; BPEAPE entry 2417)"),
+    "10035102_iiif": ("1908", "«1a listo», Dresden 1908, the Fourth Congress (ÖNB's record; BPEAPE entry 126)"),
+    "progres": ("1906–1908", "ÖNB's record: «Jahr 1906-1908», Signatur 705198-B.1906-1908 (sources/_INVENTORY.md)"),
 }
 ISSUES_READ = {
     "46027": ("1957", "1", "Sept–Oct", "masthead «N-RO 1 — JARO 32 [37] — 1957»; first issue of the renewed series; Zamenhof commemoration of 14 Apr 1957"),
@@ -780,6 +901,12 @@ def main():
             x = dt[r["item"]]
             r["written"], r["kind"] = x[1], x[3]
             r["written_from"] = x[2] + (f" ({x[4]})" if len(x) > 4 and x[4] else "")
+            # a born-digital row has no name parse, so no year of its own: where the dates file's year is RULED (read on the
+            # item: a masthead, the minutes it prints), that year is its year (2026-10-29, Ezri: the handwritten Svisa Espero
+            # 1903 and Juna Esperantisto 1903–1904 missing from the sources page's years). Not the other dating methods: a
+            # book's year of writing is not its edition's year
+            if r["parsed_by"] == "BD" and not r["year"] and x[2] == "ruled" and re.fullmatch(r"\d{4}", x[1] or ""):
+                r["year"] = x[1]
         elif r["year"]:
             r["written"], r["written_from"] = r["year"], "the item's year"
             y0 = re.match(r"\d{4}", r["year"])   # a volume may span two years («1906–1907»): its first year

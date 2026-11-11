@@ -38,6 +38,7 @@ import concurrent.futures as fut
 from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ocr_page_images import page_images
+import ocr_withdrawn as WD
 
 
 def _otsu(hist, tot):
@@ -150,6 +151,8 @@ def test_corpus(job):
         m = re.fullmatch(r"page-(\d+)\.txt", os.path.basename(f))
         if m:
             pages[int(m.group(1))] = os.path.getsize(f)
+    for n in WD.pages(stem):   # a duplicate page withdrawn (2026-10-30): emptied on purpose, not a page we failed to read
+        pages.pop(n, None)
     if len(pages) < 3:
         return None
     med = statistics.median(pages.values())

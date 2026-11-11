@@ -42,3 +42,56 @@ class FoldedPortuguese(set):
 
     def __contains__(self, w):
         return set.__contains__(self, w) or (len(w) >= 4 and fold_portuguese(w) in self.folded)
+
+
+# GERMAN AND SWEDISH (2026-10-31, the editor 19:5x, then approved: measured,
+# then built; geniza/ocr/runs/OLD-SPELLING-MEASURE-2026-10-31.md). German before 1901 (thun, Theil, Thätigkeit;
+# Redaction, Correspondenz, October; broschirt; giebt) and before 1996 (daß, muß, Kongreß: `german.txt` is the 1996
+# spelling): 18,205 tokens recovered in 630 of 726 items, every top form a true old spelling. Swedish before 1906 (hvad,
+# hvilken, qvinna, öfver, hafva, af): 1,524 tokens in 25 of 49 items. A word is tried as printed, then in each variant;
+# the word on the page is never changed. (Hungarian «cz»: 14 tokens, place names; not folded. Dutch: judged by Hunspell
+# behind its list, with its own variants, tools/hunspell_words.py.)
+import itertools, re
+
+
+def german_variants(w):
+    v = w.lower().replace("ß", "ss").replace("giebt", "gibt").replace("th", "t")
+    v = re.sub(r"ir(en|t|te|ten|ung|ungen|bar)$", r"ier\1", v)          # marschiren, studirt
+    v = re.sub(r"niss$", "nis", v)                                        # Kenntniß → Kenntnis
+    out = {v}
+    cs = [m.start() for m in re.finditer(r"c(?![hk])", v)][:2]           # Concert, Citrone, Centrum
+    for combo in itertools.product("kz", repeat=len(cs)):
+        x = list(v)
+        for i, c in zip(cs, combo):
+            x[i] = c
+        out.add("".join(x))
+    return out
+
+
+def swedish_variants(w):
+    v = w.lower().replace("hv", "v").replace("qv", "kv").replace("fv", "v")
+    v = re.sub(r"(?<=[aeiouyåäö])f$", "v", v)                            # af → av, haf → hav
+    return {v, re.sub(r"dt$", "t", v), re.sub(r"dt$", "d", v)}
+
+
+def dutch_variants(w):
+    """Dutch before 1947: a final «sch» (Duitsch, wensch, tusschen), doubled vowels in open syllables (vereeniging,
+    zooals, noodig), «ae» for «aa», «y» for «ij». Tried by tools/hunspell_words.py when Hunspell rejects the word."""
+    v = re.sub(r"sch(e|en|er)?$", lambda m: "s" + (m.group(1) or ""), w.lower())
+    out = {v, v.replace("ae", "aa"), v.replace("y", "ij")}
+    for x in list(out):
+        out |= {x.replace("oo", "o"), x.replace("ee", "e"), x.replace("oo", "o").replace("ee", "e")}
+    return out
+
+
+class FoldedVariants(set):
+    """A word list whose membership tries the word as printed, then (4 letters or more) each old-spelling variant."""
+
+    def __init__(self, base, variants):
+        super().__init__(base)
+        self.variants = variants
+
+    def __contains__(self, w):
+        # «muß» (1,066 tokens) is three letters: a word with «ß» is folded whatever its length
+        return set.__contains__(self, w) or ((len(w) >= 4 or "ß" in w)
+                                             and any(v != w and set.__contains__(self, v) for v in self.variants(w)))

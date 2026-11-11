@@ -65,7 +65,11 @@ ADDR = re.compile(r"\d|\w(?:str|strasse|straße|gatan|gade|weg|gasse|platz|ulica
                   r"plaza|via|straat|laan|boul|bd)\b\.?", re.I)
 STREET = re.compile(ADDR.pattern.split("|", 1)[1], re.I)
 DEGREE = re.compile(r"^(?:esq|B\.\s?A|M\.\s?A|L\.\s?L\.\s?D|C\.\s?I\.\s?E|F\.\s?R\.\s?P\.\s?S|D\.\s?lit|A\.\s?C\.\s?P|F\.\s?B\.\s?E\.\s?A|\[[PS]\]?|\(?[PS]\)?)\.?$", re.I)
-STOPW = {"esq", "kaj", "de", "la", "en", "ĉe", "of", "the", "and", "von", "van", "der", "den", "le", "du", "des", "y"}
+STOPW = {"esq", "kaj", "de", "la", "en", "ĉe", "of", "the", "and", "von", "van", "der", "den", "le", "du", "des", "y",
+         # titles, read or misread, never a forename («Blondel … laŭ la persona nomo Fino», F^ino; «Abato Boudier»:
+         # the members' run w, 2026-10-31)
+         "fino", "fine", "fire", "fin", "sino", "simo", "siuo", "abato", "pastro", "doktoro", "docteur", "madame", "mademoiselle",
+         "monsieur", "miss", "mrs", "mme", "mlle", "sra", "srta", "fils", "père"}
 
 def page_lines(item):
     """{pdf page: [(line number in the text, line)]} of the item's preferred text."""
@@ -99,7 +103,12 @@ def entries(pages, runs, late=False):
         if len(re.sub(r"[^A-Za-zÀ-ž]", "", head)) < 4:
             j = i - 1
             while j >= 0 and len(seq[j][2].strip()) < 4: j -= 1
-            head = seq[j][2].strip(" ,;|") if j >= 0 else ""
+            above = seq[j][2].strip(" ,;|") if j >= 0 else ""
+            # a region in brackets on a line of its own, under the town's heading («Johnstown» / «(G. Wales),» / «E. G.,
+            # fondita …», 1910 PDF 102; «Brisbane» / «(Queensland).» / «k E. K., fondita …», 1909): no name, the short
+            # one before «fondita» stands («E. G.»: the third check, 2026-10-27, lines 25 and 34)
+            if re.fullmatch(r"\W*\([^()]{2,40}\)\W*", above) and re.sub(r"[^A-Za-zÀ-ž]", "", head): j = i
+            else: head = above
         # a name over two lines («Societo Esperanto por ellernado kaj dissemado de Esperanto» / «inter Angleparolantaj
         # popoloj,»): the line above joins it when this one starts in lower case
         if head[:1].islower() and j > 0:
@@ -113,8 +122,13 @@ def entries(pages, runs, late=False):
     # the heading with the margin's junk taken off both ends («Paisley I», «| Preston. 3», «iu Oldham. E», 1908); a line in
     # capitals is a running head or a country, never a town
     place = {x: re.sub(r"(?:\s+(?:[^\w\s]+|\d+|[A-Za-z]|[A-Z]{2,3}))+\s*$", "", lead(t.strip())) for x, (p, n, t) in enumerate(seq)} if late else {}
+    # (nor an address's last word run on to a line of its own: «… 49, Kleine» / «Beerstraal.», 1908 PDF 83, taken for the
+    # Antwerp group's town, Istace «loĝas en Beerstraal»: the third accuracy check, 2026-10-27, line 18)
     heads = [x for x, (p, n, t) in enumerate(seq) if late and PLACEHEAD.match(place[x]) and not FOND.search(t)
-             and not ROLE.search(t) and len(place[x].split()) <= 4 and not place[x].isupper() and not ADDR.search(place[x])] if late else []
+             and not ROLE.search(t) and len(place[x].split()) <= 4 and not place[x].isupper() and not ADDR.search(place[x])
+             and not STREETW.search(place[x].strip(" ."))
+             # a capital first (PLACEHEAD's «À-Ž» takes in «ĉ»: «ĉiu grupo.», 1908 PDF 83, the town of «La Verda Stelo»)
+             and re.sub(r"^\W+", "", place[x])[:1].isupper()] if late else []
     out = []
     for k, (j, i, head) in enumerate(starts):
         end = starts[k + 1][0] if k + 1 < len(starts) else len(seq)
@@ -146,6 +160,12 @@ def entries(pages, runs, late=False):
            "towns": sorted(towns)}
     for e in out: e["sig"] = sig
     return out
+
+# a street's word ending a heading: no town («Beerstraal», the OCR's «Beerstraat»)
+STREETW = re.compile(r"(?:straat|straal|strasse|straße|str|gasse|gatan|gata|gade|vej|vägen|ulica|rue|road|street|lane)$", re.I)
+# a firm's address after the person's own («Monteusstraal, 59 (Bergerhoul): F» [rma Verbeeck. Walvisch str., 23»: the
+# third check's line 18, two addresses run together): the person's address stops before it
+FIRM = re.compile(r"\bF\W{0,3}[i\[|]?\W{0,2}rma\b|\bFirmo\b|\bc/o\b", re.I)
 
 COUNTRY = re.compile(r"(?:UJO|IO|ANDO|IKO|AJO|ARIO|ALO|ILO)\b|ESPERANT|TUTMONDA|JARLIBRO|SOCIET|ADRESARO|REGISTRO|KOMITAT|"
                      r"INSTITUCI|ASOCI|GRUPOJ|SOCIETOJ|AMERIKO|EŬROPO|EUROPO|AZIO|AFRIKO|OCEANIO|MALTA|KANADA|USONO|TRANSVAAL")
@@ -257,6 +277,8 @@ def surname_tokens(name):
     return out
 
 _PROF = {}
+_OWN = {}   # each profile without the joined volume's own tool lines (borne_out), by (label, SELF_KEY)
+SELF_KEY = None   # the locator key of the volume being joined, set by each extractor (borne_out)
 def profile(label):
     if label not in _PROF:
         p = os.path.join(PROFILES, label + ".md")
@@ -272,13 +294,29 @@ def profile(label):
             _PROF[label] = (hp.replace(" $$$ (", " (").replace(" $$$", ""), t, hp)
     return _PROF[label]
 
+TOWNART = {"le", "la", "les", "l", "el", "il", "lo", "los", "las", "de", "du", "des", "den", "der", "het", "s", "san", "santa",
+           "santo", "são", "sao", "saint", "sainte", "st", "ste", "sankt", "bad", "new", "rio", "port", "fort", "mount", "nova", "novo",
+           "nowy", "nowa", "nowe", "stary", "stara", "stare"}
+
 def borne_out(label, name, surname_tok, town):
     """How the profile bears the identification out: «la urbo X», «la inicialoj …», «la persona nomo …», or ''."""
     pr = profile(label)
     if not pr: return ""
-    t = pr[1]
-    if town and len(town) >= 4 and re.search(r"(?<!\w)" + re.escape(town.split()[0]) + r"(?!\w)", t, re.I):
-        return f"la urbo {town.split()[0]}"
+    # NO SELF-CONFIRMATION (2026-11-01, the re-check of the changed lines; the editor chose the re-check of the other volumes only): the
+    # profile is read without the lines a directory tool wrote («⟦identigo: …, laŭ … en la profilo⟧») from the volume
+    # being joined (SELF_KEY, set by the extractor for each volume), so a wrong town written by one run no longer bears
+    # the next run's joins out (PETIT «laŭ la urbo Lebrun», the Tutmonda 1904, «Lebrun» no town); another year's or
+    # another book's lines, and a legilo's of the same volume, still do
+    k = (label, SELF_KEY)
+    if k not in _OWN:
+        _OWN[k] = pr[1] if not SELF_KEY else "\n".join(l for l in pr[1].split("\n") if not ("en la profilo⟧" in l and f"{SELF_KEY}, " in l))
+    t = _OWN[k]
+    # the town's longest word, never its article («Le Havre» bore Drapier out by «Le», found in any profile; Ezri,
+    # 2026-10-30, the sample of the members' run t)
+    # (nor a bracket's region: Sandner «borne out» by «(Hungario)», the Entreprenoj's run g)
+    tw = max((w for w in re.sub(r"\([^()]*\)", " ", town or "").split() if w.lower().strip("'’") not in TOWNART), key=len, default="")
+    if len(tw) >= 4 and re.search(r"(?<!\w)" + re.escape(tw) + r"(?!\w)", t, re.I):
+        return f"la urbo {tw}"
     before = name.split(surname_tok)[0] if surname_tok in name else ""
     if "," in name: before = name.split(",", 1)[1]
     ini = re.findall(r"\b([A-ZÀ-Ž])[a-z]{0,2}\.", before)
@@ -294,7 +332,7 @@ def load_hits(path):
     """{(item, pdf): {normalised word as read: {person}}}, strong tiers only."""
     h = collections.defaultdict(lambda: collections.defaultdict(dict))
     with open(path, encoding="utf-8") as fh:
-        rows = csv.reader((l for l in fh if not l.startswith("#")), delimiter="\t")
+        rows = csv.reader((l for l in fh if not l.startswith("#")), delimiter="\t", quoting=csv.QUOTE_NONE)   # 2026-11-10: the roster bug
         hd = next(rows); ix = {k: i for i, k in enumerate(hd)}
         for r in rows:
             if len(r) < len(hd) or r[ix["tier"]] not in ("exact", "near", "confusion") or not r[ix["page"]].isdigit(): continue
@@ -436,11 +474,13 @@ def main():
     # its identification by the legilo's reason; «alia» and «necerta» stay held. Keyed by year, page, line and the printed
     # name, so a rerun's new order cannot misplace them
     near = {}
-    ni = os.path.join(D, f"near-input-{a.tag}.md")
-    if os.path.exists(ni):
+    # every tag's rulings, a later tag's over an earlier's (2026-10-31: a rerun under its own tag, 2026-10-31m, had lost
+    # the 2026-10-27 rulings, Lladó and Höveler held again as near forms)
+    for ni in sorted(glob.glob(os.path.join(D, "near-input-*.md"))):
+        tg = os.path.basename(ni)[len("near-input-"):-3]
         heads = {int(m.group(1)): (int(m.group(2)), int(m.group(3)), int(m.group(4)), m.group(5))
                  for m in re.finditer(r"^### (\d+)\. (\d{4}), PDF (\d+), l\. (\d+) · .*\n\n- presita nomo: «(.*)»; la resto", open(ni, encoding="utf-8").read(), re.M)}
-        for rp in sorted(glob.glob(os.path.join(D, f"near-return-{a.tag}-*.md"))):
+        for rp in sorted(glob.glob(os.path.join(D, f"near-return-{tg}-*.md"))):
             for m in re.finditer(r"^(\d+) · (sama|alia|necerta) · .*? · (.*)$", open(rp, encoding="utf-8").read(), re.M):
                 # keyed by year, page and printed name, not line: a recupel shifts the lines (the gutter cut, 2026-10-27 14:5x)
                 if int(m.group(1)) in heads:
@@ -529,6 +569,11 @@ def main():
             # first street word or house number; a chunk in lower case without a street word is an occupation, and a
             # chunk with the next group's «E. G.» or «fondita», or under three letters, is no address
             def street(r): return bool(re.match(r"\s*\d+\w?\b", r)) or bool(STREET.search(r))
+            # the person's own address only: cut before a firm's (see FIRM)
+            fk = next((i for i, r in enumerate(rest) if FIRM.search(r)), None)
+            if fk is not None:
+                cut = FIRM.split(rest[fk], 1)[0].rstrip(" .:;|[»(")
+                rest = rest[:fk] + ([cut] if re.sub(r"\W", "", cut) else [])
             first = next((i for i, r in enumerate(rest) if street(r)), None)
             addr = [r for r in (rest if comm else rest[first:] if first is not None else [])
                     if r not in occ and not DEGREE.match(r.strip()) and not FOND.search(r) and not re.search(r"[EG]\.\s?[GE]\.", r)

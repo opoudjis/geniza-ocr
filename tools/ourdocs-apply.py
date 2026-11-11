@@ -29,7 +29,9 @@ def kun_kaj(m):
 def repair(l, notes):
     o = l
     # a list with a qualifier, «LEMAIRE (René, Épernay)», is left alone: its comma is not a separator
-    l = re.sub(r"kun: ([^;}()]*,[^;}()]*)(?=[;}])", kun_kaj, l, count=1) if l.startswith("- $$$") else l
+    # in the kind field only, never a «kun:» the fact or the anchor prints (the trigger audit of 2026-10-28, item 39)
+    km = re.match(r"^(- \$\$\$ .+? \$\$\$[^·{]*· )(\{[^}]*\})", l)
+    if km: l = km.group(1) + re.sub(r"kun: ([^;}()]*,[^;}()]*)(?=[;}])", kun_kaj, km.group(2), count=1) + l[km.end():]
     l = re.sub(r"\{samnomo: [^;}]*; \+", "{", l)
     l = l.replace("&amp;", "&")
     l = re.sub(r"(\d) · (\d)", r"\1, \2", l)

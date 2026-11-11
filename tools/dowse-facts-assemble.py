@@ -20,7 +20,10 @@ The steps, the same for every source:
      [[string, new line]] replaces a reader's line containing the string by a corrected line, given whole;
   2. names: «names» maps a reader's NAME to the profiles' spelling; «rename» maps (NAME, qualifier) to a new NAME and
      qualifier (e.g. JACOB (Hans) → HANS JACOB); «qualifiers» rewrites (NAME, qualifier) after the name map
-     (an empty new qualifier removes it);
+     (an empty new qualifier removes it). A «rename» row with a fifth element «legita» is a fold of the name ungarbler
+     (tools/name-ungarble.py; runbook 10e): the line keeps the form as read, «⟦nomo legita: OLD → NEW⟧» in its last
+     field, for the head and for every name of its kinds or fact so changed, so that a fold found wrong is undone or
+     reassigned by its row (the editor, 2026-10-27 19:4x);
   3. scope: a NAME in «drop» is left out, for reasons other than scope, e.g. a garbled OCR name held for the page
      image (the reasons go in the log; the returns keep the lines). Scope is decided by the scope register alone
      (profiles/SCOPE-REGISTER.tsv; the editor, 2026-10-14 11:3x to the consolidation; the per-source
@@ -44,7 +47,9 @@ Settings (JSON): item, returns [file names], header (text, «facts-format: 2» w
 [[NAME, qual, NEW, newqual]], qualifiers [[NAME, qual, newqual]], drop [], out_of_scope [], quote_fixes [[old, new]], locator_fixes
 [[regex, replacement]], replace_lines [[string, line]], restore [lines].
 (Ezri, 2026-10-11)"""
-import argparse, collections, csv, glob, json, os, re, subprocess, sys, unicodedata
+import argparse, collections, csv, datetime, glob, json, os, re, subprocess, sys, unicodedata
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import factline as FL   # a fact line's fields; triggers kept out of the source's words (2026-10-28)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G = os.path.join(ROOT, "published", "heterophony-resources", "geniza")
@@ -118,6 +123,54 @@ def is_out(name, q, reg):
     if not q and (k, BARE) in reg: return True
     return bool(q) and any(rk == k and rq and (q.startswith(rq) or rq.startswith(q)) for rk, rq in reg)
 
+REL_KINDS = {"renkonto", "konflikto", "interkonsento", "influo", "rilato"}
+RNAME = re.compile(r"[A-ZÀ-ÞĈĜĤĴŜŬ][A-ZÀ-ÞĈĜĤĴŜŬ'’.\- ]*[A-ZÀ-ÞĈĜĤĴŜŬ.](?: \([^()]*\))?")
+
+def names_sorted(lst):
+    """«A, B kaj C» of names only, in alphabetical order (accents and case aside); None if it is not names only."""
+    ppl = [x.strip() for x in re.split(r",\s*(?![^()]*\))(?!\s*JR\b)|\s+kaj\s+", lst.strip()) if x.strip()]
+    if len(ppl) < 2 or not all(RNAME.fullmatch(p) for p in ppl): return None
+    ppl.sort(key=lambda p: unicodedata.normalize("NFKD", p).encode("ascii", "ignore").decode().lower())
+    # joined by «kaj» alone, the form the harvest splits (harvest-facts.py's persons_in and «kun:»: a «A, B kaj C»
+    # read «A, B» as one person, and the first run of 2026-10-28 lost 3,385 copies and 212 profiles)
+    return " kaj ".join(ppl)
+
+def sort_relations(row):
+    """A line with its «kun:» lists and its relations' opening lists of persons sorted (see the pass above); only those
+    lists are rewritten, the rest of the kind as written."""
+    ps = row.split(" · ")
+    if len(ps) < 2 or not ps[1].startswith("{"): return row
+    def kun(m):
+        new = names_sorted(m.group(2))
+        return m.group(1) + new if new else m.group(0)
+    k = re.sub(r"(\bkun: )([^;}]*)", kun, ps[1])
+    def rel(m):
+        items = re.split(r",\s*(?![^()]*\))", m.group(3))
+        lead = []
+        for it in items:   # the leading items that are names only («PRIVAT kaj HODLER», then «vizito» ends it)
+            if all(RNAME.fullmatch(x.strip()) for x in re.split(r"\s+kaj\s+", it) if x.strip()): lead.append(it)
+            else: break
+        new = names_sorted(", ".join(lead)) if lead else None
+        if not new: return m.group(0)
+        rest = items[len(lead):]
+        return m.group(1) + m.group(2) + new + ("".join(", " + r for r in rest) if rest else "")
+    k = re.sub(r"((?:\{|;\s*)\+?)(renkonto: |konflikto: |interkonsento: |influo: |rilato: )([^;}]*)", rel, k)
+    if k == ps[1]: return row
+    ps[1] = k
+    return " · ".join(ps)
+
+def unquoted(s):
+    """A field with its quoted source text and our notes blanked («…», “…”, "…", ⟦…⟧), for reading trigger words only
+    outside them (as harvest-facts.py's unquoted(); the editor, 2026-10-28)."""
+    return re.sub(r"«[^»]*»|“[^”]*”|\"[^\"]*\"|⟦[^⟧]*⟧", " ", s or "")
+
+def legita_note(text, old, new):
+    """The name as read kept in a line's last field (its confidence), beside the line's other notes: «⟦nomo legita: OLD →
+    NEW⟧», a fold of the name ungarbler (2026-10-27; the editor)."""
+    note = f"⟦nomo legita: {old} → {new}⟧"
+    t = text.rstrip()
+    return t[:-1] + f"; {note})" if t.endswith(")") else f"{t} ({note})"
+
 def kun_rotate(name, q, rest, out, names, head_out):
     """The «kun:» list of a line, rid of the people out of scope (out: a test (name, qualifier) -> bool); and, when the
     head is out of scope (head_out), the line passed to the first person left.
@@ -127,7 +180,10 @@ def kun_rotate(name, q, rest, out, names, head_out):
     segs = [x.strip() for x in m.group(2).split(";")]
     ki = next((i for i, x in enumerate(segs) if x.startswith("kun:")), None)
     if ki is None: return name, q, rest, ("all out" if head_out else None)
-    ppl = [x.strip() for x in re.split(r"\s+kaj\s+", segs[ki][4:].strip())]
+    # the list is «A, B kaj C»: split on the commas outside a qualifier's parentheses too, not on «kaj» alone (2026-10-27
+    # 21:5x: «BUISSON, AJAM, … kaj X» rotated to one head of thirty names, a profile name too long to write; the same
+    # fault made The Esperantist's head «PAUL-MEUNIER, BOUHEY-ALLEX, …»); «, JR.» stays with its name
+    ppl = [x.strip() for x in re.split(r",\s*(?![^()]*\))(?!\s*JR\b)|\s+kaj\s+", segs[ki][4:].strip()) if x.strip()]
     inn = [p for p in ppl if not out(names.get(KUNP.match(p).group(1), KUNP.match(p).group(1)), KUNP.match(p).group(2))]
     if head_out:
         if not inn: return name, q, rest, "all out"
@@ -135,7 +191,8 @@ def kun_rotate(name, q, rest, out, names, head_out):
         what = "rotated"
     elif len(inn) == len(ppl): return name, q, rest, None
     else: what = "trimmed"
-    segs = segs[:ki] + ([f"kun: {' kaj '.join(inn)}"] if inn else []) + segs[ki + 1:]
+    joined = " kaj ".join(inn)   # «kaj» alone, the form the harvest splits (see names_sorted)
+    segs = segs[:ki] + ([f"kun: {joined}"] if inn else []) + segs[ki + 1:]
     return name, q, m.group(1) + "; ".join(segs) + m.group(3), what
 
 def themes(fact):
@@ -208,12 +265,13 @@ PRUVO = re.compile(r"\s*\((nur en la (?:ida|esperanta) (?:eldono|versio)[^()]*(?
 def mechanical(fact, conf):
     """The combined pass's mechanical changes (2026-10-11): «(bibliografio)» as a head marker (the editor); a single-copy note moves to «pruvo:» in the confidence field (the editor); «s.d.» in references (the editor)."""
     fact = re.sub(r"^(?:bibliografio|Bibliografio|bibliografia ero|Bibliografia ero)(?: \([^)]*\))?:\s*", "(bibliografio) ", fact)
-    notes = [m.group(1) for m in PRUVO.finditer(fact)]
+    # not a note the source itself prints inside a quotation (the trigger audit of 2026-10-28, item 23)
+    notes = [m.group(1) for m in PRUVO.finditer(FL.unquoted(fact))]
     if notes:
-        fact = PRUVO.sub("", fact).strip()
+        fact = FL.sub_outside(PRUVO, "", fact).strip()
         add = "; ".join(f"pruvo: {n}" for n in notes)
         conf = re.sub(r"\)\s*$", f"; {add})", conf) if conf.rstrip().endswith(")") else f"{conf} ({add})"
-    conf = conf.replace("sen dato en la fonto", "s.d.")
+    conf = FL.sub_outside(r"sen dato en la fonto", "s.d.", conf, notes=False)   # not in a quotation (audit 30)
     return fact, conf
 
 def split_top(s, sep=";"):
@@ -243,7 +301,9 @@ def bracket(conf):
     def show(s):
         while "\x00" in s: s = re.sub(r"\x00(\d+)\x00", lambda mm: held[int(mm.group(1))], s)
         return s
-    h = re.sub(r"«[^«»]*»", hide, re.sub(r"⟦[^⟧]*⟧", hide, conf))
+    # every kind of the source's quotation hidden, “…” and "…" as well as «…» (the trigger audit of 2026-10-28, 24:
+    # «OCR “la teksto korektita”» had been wrapped as our ⟦korektita⟧)
+    h = re.sub(r"«[^«»]*»|“[^”]*”|\"[^\"]*\"", hide, re.sub(r"⟦[^⟧]*⟧", hide, conf))
     SRC_LABEL = re.compile(r"^(?:sendependa|derivita|sen fontindiko|refutas|kopio el|\(refutita)")
     def labels(g):
         out = []
@@ -351,14 +411,15 @@ def expand_lean(D, ret, line):
 
 def published_pages(run, step):
     """THE PUBLISHED SIGLA PAGE after every harvest (2026-10-25; the editor): the items' online
-    locations rebuilt (tools/online-locations.py --again: a new source's items get theirs), then prosopografio/siglaro.md
-    (tools/sigla-propose.py --page). Never a stop: a refusal (a signed siglum with no Esperanto entry in SIGLA-EO.tsv)
+    locations rebuilt (tools/online-locations.py --again: a new source's items get theirs), then published/genizo/pages/
+    siglaro.md (tools/sigla-propose.py --page; in geniza/prosopografio/ until 2026-10-30, the editor: every site page's
+    source in the one place). Never a stop: a refusal (a signed siglum with no Esperanto entry in SIGLA-EO.tsv)
     or a fault is flagged in the summary line and left for the dowser; the dowse goes on."""
     T = os.path.join(ROOT, "tools")
-    page = os.path.join(G, "prosopografio", "siglaro.md")
+    page = os.path.join(ROOT, "published", "genizo", "pages", "siglaro.md")
     before = open(page, encoding="utf-8").read() if os.path.exists(page) else ""
     run(f"{step}, the items' online locations", [os.path.join(T, "online-locations.py"), "--again"], ok=lambda out, code: True)
-    run(f"{step}, the sigla page (prosopografio/siglaro.md)", [os.path.join(T, "sigla-propose.py"), "--page", page],
+    run(f"{step}, the sigla page (published/genizo/pages/siglaro.md)", [os.path.join(T, "sigla-propose.py"), "--page", page],
         ok=lambda out, code: True)
     # THE PUSH IS NOT HERE (2026-10-25; Miles: SITE.tsv row «siglaro», page 113, child of «prosopografio»; every push is
     # the editor's word): the step says whether the page changed, and a changed page is put to the editor for Miles's push
@@ -396,8 +457,9 @@ def scope_off(conf, fact):
     took = []
     def one(mp):
         segs = [x.strip() for x in split_top(mp.group(1))]
-        took.extend(x for x in segs if x and SCOPE_SEG.search(x))
-        keep = [x for x in segs if x and not SCOPE_SEG.search(x)]
+        # the scope words read outside the source's quotations («la nekrologo nomas lin «fervora esperantisto»»: audit 21)
+        took.extend(x for x in segs if x and SCOPE_SEG.search(FL.noquotes(x)))
+        keep = [x for x in segs if x and not SCOPE_SEG.search(FL.noquotes(x))]
         return f"⟦pruvo: {'; '.join(keep)}⟧" if keep else ""
     new = re.sub(r"⟦pruvo:\s*([^⟦⟧]*)⟧", one, conf)
     if not took: return conf, []
@@ -445,13 +507,9 @@ def fold(s):
     """A name for matching: the harvest's alias table applied (WALRISAUN → WALTISBÜHL), diacritics folded."""
     global _ALIASES
     if _ALIASES is None:
-        import importlib.util
-        spec = importlib.util.spec_from_file_location("hf_aliases", os.path.join(ROOT, "tools", "harvest-facts.py"))
-        src = open(spec.origin, encoding="utf-8").read()
-        m = re.search(r"^ALIASES = \{.*?^\}", src, re.M | re.S)
-        _ALIASES = {}
-        if m:
-            ns = {}; exec(m.group(0), ns); _ALIASES = {k.upper(): v for k, v in ns["ALIASES"].items()}
+        # the names register's spellings, the harvest's ALIASES since 2026-10-31 (no longer read from its code)
+        sys.path.insert(0, os.path.join(ROOT, "tools")); import names_register
+        _ALIASES = names_register.aliases()
     s = _ALIASES.get(s.strip().upper(), s.strip())
     return "".join(c for c in unicodedata.normalize("NFD", s.upper()) if unicodedata.category(c) != "Mn")
 
@@ -512,7 +570,7 @@ _PMAP = None
 CITED_PAGE = re.compile(r"\b(?:p\.|pp\.|paĝo|paĝoj|paĝon|paĝe)\s*(\d{1,4})\b")
 INDEX_CUE = re.compile(r"(?i)indeks|tabel|enhav|la listo de|laŭ la tabelo")
 
-def index_issue(loc, fact, anchor, dv, kind=""):
+def index_issue(loc, fact, anchor, dv, kind="", volume=None):
     """For the index rule above: (the new date, the note's words) or None. The page map is ocr/runs/OCR-PAGE-MAP.tsv
     (Miles's: item, PDF page, printed page), read once."""
     global _PMAP
@@ -526,9 +584,13 @@ def index_issue(loc, fact, anchor, dv, kind=""):
     own = re.search(r"\(prese (\d+)\)", loc)
     # an explicit «p. N» or «paĝo N» only: an anchor's last number was read as a page in the second run (2026-10-27
     # 08:4x), a house number («strada Decebal 5») or a price, so the Oficiala Gazeto's addresses took its June issues
-    m = CITED_PAGE.search(fact) or CITED_PAGE.search(anchor or "")
+    # the page cited in our fact, outside its quotations; one only in the anchor (the source's words) counts only where
+    # our fact says the line is an index or table entry («kiel ni diris sur paĝo 3»: the trigger audit, item 25)
+    mf = CITED_PAGE.search(FL.unquoted(fact)); ma = CITED_PAGE.search(anchor or "")
+    cued = INDEX_CUE.search(FL.unquoted(fact))
+    m = mf or (ma if cued else None)
     if not m: return None
-    cue = (not own) or INDEX_CUE.search(fact)
+    cue = (not own) or cued
     p = int(m.group(1))
     if not cue or (own and p >= int(own.group(1))): return None
     if _PMAP is None:
@@ -540,6 +602,11 @@ def index_issue(loc, fact, anchor, dv, kind=""):
     # only a date to the month or day is an index's own (a year index's year is right: Lingvo Internacia's annual
     # index, 1906-0-1, lists that year's articles; the first run of 2026-10-27 weakened them to «dum aŭ antaŭ 1906»)
     if not re.match(r"1[6-9]\d\d-\d\d", dv): return None
+    # A VOLUME SPLIT INTO ONE ITEM AN ISSUE (2026-11-05, the ÖNB *The Esperantist*: the page map stops at the item, so its
+    # December index kept December for all of 1905): the config's «index_volume», index key → [[first printed page, date]]
+    if volume and key in volume:
+        ann = next((d for first, d in reversed(volume[key]) if p >= first), None)
+        return (ann, "laŭ la indekso") if ann and ann < dv[:len(ann)] else None
     item = _HF.key_names().get(key, key)
     pdf2 = _PMAP.get((item, p))
     # only where the page map finds the cited page earlier in the same item, in an earlier issue: no fallback (the
@@ -873,7 +940,8 @@ def assemble(src, S=None):
         REGOUT |= {(k, BARE) for k in bare_cover(REGOUT)}
     DROPK = {fold(x) for x in drop}
     OUT = lambda n, q: fold(n) in DROPK or is_out(n, q, REGOUT)   # who is not in scope, for «kun:» (step 3)
-    rename = {(a, b): (c, d) for a, b, c, d in S.get("rename", [])}
+    rename = {(r[0], r[1]): (r[2], r[3]) for r in S.get("rename", [])}
+    LEGITA = {(r[0], r[1]) for r in S.get("rename", []) if len(r) > 4 and r[4] == "legita"}   # the ungarbler's folds
     quals = {(a, b): c for a, b, c in S.get("qualifiers", [])}
     rows, dropped, bad, used = [], collections.Counter(), [], collections.Counter()
     # «extra_lines»: whole lines written after the readers (e.g. refuted claims, WHO IS REFUTED IS TRACKED, 2026-10-11),
@@ -917,6 +985,11 @@ def assemble(src, S=None):
             m = LINE.match(l)
             if not m: bad.append(l); continue
             name, q, rest = m.group(1), m.group(2) or "", m.group(3)
+            # a head's final punctuation is the reader's, not the name's (the editor, 2026-10-27 20:2x, on final punctuation:
+            # always removed from a candidate name); but the period of a final initial stays («M. G.»)
+            if not re.search(r"(?:^|[\s.\-—])\w\.$", name): name = re.sub(r"\s*[.,;:]+$", "", name)
+            if (name, q) in LEGITA and rename[(name, q)][0] != name:
+                rest = legita_note(rest, name, rename[(name, q)][0])
             name, q = rename.get((name, q), (name, q))
             name = names.get(name, name)
             if name in drop: dropped[name] += 1; notes["dropped"].append((l, f"its name {name} is dropped")); continue
@@ -1065,7 +1138,7 @@ def assemble(src, S=None):
                 reasoned = re.search(r"la dato (?:laŭ|de la diro)|pli frua|kontribuo|la jaro de la fonto", conf)
                 # and only a year the fact itself gives to the matter («… kondukis Zamenhof en 1881 al …»): an essay's
                 # own date in a collection (Waringhien's 1947-03, 1958-06 in Lingvo kaj vivo) is a saying date, kept
-                in_fact = my and re.search(rf"\b{my.group(1)}\b", fact)
+                in_fact = my and re.search(rf"\b{my.group(1)}\b", FL.unquoted(fact))   # our fact's year, not the anchor's (audit 27)
                 if sd and my and sy and int(my.group(1)) < int(sy.group(1)) and not reasoned and in_fact:
                     add = f"⟦pruvo: la afero juĝata: {date.replace('*', '').strip()}; la jaro de la fonto, {sd[2]}⟧"
                     date = f"**{sd[1]}**"; notes.setdefault("saying_moved", collections.Counter())[sd[1]] += 1
@@ -1096,13 +1169,15 @@ def assemble(src, S=None):
             dv = date.replace("*", "").strip()
             # … but not a plan the line says was given up, put off, cancelled, refused or failed («{fondo: Ligo, planita,
             # forlasita}», Zakrzewski 1906: the date is the abandoning's, a real one; 10 such lines on 2026-10-22)
-            ended = re.search(r"\b(?:forlasit|nuligit|rezignit|malakceptit|prokrastit|ĉesigit|rifuzit|ne realigit|malsukces)\w*", kind) \
-                or re.search(r"\bvan[ae]\b", fact)   # «klopodis vane fondi» (the blind sample of 2026-10-22, item 24)
+            # the triggers read only outside quoted source text and our notes (unquoted(): a title «…» in the kind, a
+            # quotation in the fact; the editor, 2026-10-28: trigger words)
+            ended = re.search(r"\b(?:forlasit|nuligit|rezignit|malakceptit|prokrastit|ĉesigit|rifuzit|ne realigit|malsukces)\w*", unquoted(kind)) \
+                or re.search(r"\bvan[ae]\b", unquoted(fact))   # «klopodis vane fondi» (the blind sample of 2026-10-22, item 24)
             # … nor a date that bounds the act from above («antaŭ 1906-09», «ĝis …»): the act («planis», «aliĝis»,
             # «decidis») came before the thing planned, and the date is the act's (the sample, items 8, 26, 40)
             bounded = re.match(r"(?:antaŭ|ĝis|dum aŭ antaŭ)\b", dv)
             # «planitaj», «planitan» too (13 lines, «{propagando: …, planitaj}»; the contents check of 2026-10-22)
-            if re.search(r"\bplanit(?:a|aj|an|ajn)\b", kind) and not ended and not bounded and not dv.startswith("[") and not dv.endswith("☞"):
+            if re.search(r"\bplanit(?:a|aj|an|ajn)\b", unquoted(kind)) and not ended and not bounded and not dv.startswith("[") and not dv.endswith("☞"):
                 dv += "☞"; date = f"**{dv}**"; notes.setdefault("planned", collections.Counter())["☞ by the kind"] += 1
             if dv.endswith("☞") and "⟦anoncita" not in conf:
                 iss = _HF.issue_date(f"- $$$ X $$$ **x** · {{x}} · {loc}", day=True)
@@ -1119,7 +1194,7 @@ def assemble(src, S=None):
                     # … and one dated by the issue's year alone where the issue's month is now known (the reader saw no
                     # month; Ruslanda 1909 no. 4, Bakradze, «1909☞» beside ⟦anoncita inter 1909-05 kaj 1909-07⟧)
                     yr_only = re.fullmatch(r"1[6-9]\d\d", dv[:-1]) and dv[:-1] == str(iss[0]) and iss[1]
-                    if "la dato de la numero" in conf or dv[:-1] == ann or yr_only:
+                    if re.search(r"⟦la dato de la numero", conf) or dv[:-1] == ann or yr_only:   # our note only (audit 20)
                         start = re.match(r"inter (\S+) kaj", ann)
                         dv = f"dum aŭ post {start.group(1) if start else ann}☞"; date = f"**{dv}**"
                         notes["planned"]["dum aŭ post the announcement"] += 1
@@ -1131,7 +1206,7 @@ def assemble(src, S=None):
             # ⟦la dato de la numero, laŭ la indekso⟧; where the map or the masthead does not say, «dum aŭ antaŭ ‹the
             # index's issue›», ⟦…, laŭ la indekso, konkludita⟧. A DECISIONS row still wins (applied after)
             if "⟦la dato de la numero⟧" in conf and not dv.endswith("☞") and not dv.startswith(("dum aŭ", "antaŭ", "inter", "[")):
-                nd = index_issue(loc, *split_anchor(fact), dv, kind)
+                nd = index_issue(loc, *split_anchor(fact), dv, kind, S.get("index_volume"))
                 if nd:
                     dv, why = nd; date = f"**{dv}**"
                     conf = conf.replace("⟦la dato de la numero⟧", f"⟦la dato de la numero, {why}⟧")
@@ -1158,12 +1233,15 @@ def assemble(src, S=None):
                 iss = _HF.issue_date(f"- $$$ X $$$ **x** · {{x}} · {loc}", day=True)
                 # the reader's own date words, before a ruling made them «[sen dato]» («en liaj infanaj jaroj», «baldaŭ»)
                 raw = re.search(r"\*\*([^*]*)\*\*", l.split(" · ")[0]); raw = raw.group(1).strip() if raw else ""
+                # a guard that only leaves a line as it is may read the source's words too (the editor, 2026-10-28:
+                # approved: a false match costs a line left undated, never a wrong date): the childhood words
+                # in the anchor kept STONER's and ZAMENHOF's youth undated
                 keep = re.match(r"\{\s*(?:karaktero|deveno|familio|profesio|nomo|samnomo|civito|sano)\b", kind) \
                     or re.search(r"\b(?:infan|knab|junaĝ|junec|naskiĝ|gimnaziano|liceano|juna studento)", f"{fact} {raw}", re.I) \
                     or re.search(r"\b(?:gimnazi|universitat|student|klaso de)", raw, re.I)   # a school in the fact is a place
                 ahead = re.search(r"^(?:(?:tre|espereble|eble) )*baldaŭ$|venont|proksim|estont|\beble post", raw)
-                plan = re.search(r"\bplanit(?:a|aj|an|ajn)\b", kind) and not re.search(
-                    r"\b(?:forlasit|nuligit|rezignit|malakceptit|prokrastit|ĉesigit|rifuzit|ne realigit|malsukces)\w*", kind)
+                plan = re.search(r"\bplanit(?:a|aj|an|ajn)\b", FL.unquoted(kind)) and not re.search(   # audit 19
+                    r"\b(?:forlasit|nuligit|rezignit|malakceptit|prokrastit|ĉesigit|rifuzit|ne realigit|malsukces)\w*", FL.unquoted(kind))
                 bi = notes.setdefault("by_issue", collections.Counter())
                 if not iss: bi["left: no issue date"] += 1; notes.setdefault("by_issue_nodate", []).append(loc)
                 elif keep: bi["left: character, origin, childhood …"] += 1
@@ -1193,13 +1271,14 @@ def assemble(src, S=None):
             whole = f"- $$$ {name} $$${f' ({q})' if q else ''} {date} · {fact}"   # a key may name the line's head too
             for fx in S.get("label_fixes", []):
                 key, a, b = fx if len(fx) == 3 else ("", fx[0], fx[1])
-                conf = conf.replace("sen dato en la fonto", "s.d.")
+                conf = FL.sub_outside(r"sen dato en la fonto", "s.d.", conf, notes=False)
                 if (key in whole or key in l or key in view3) and a in conf: conf = conf.replace(a, b); used[(key, a)] += 1
-            conf = conf.replace("sen dato en la fonto", "s.d.")
-            # «malamika atestanto» is not for the fact readers (the editor, 2026-10-13
-            #): taken out wherever a return has it
-            conf = re.sub(r"\s*;\s*(?:aserto de )?malamika atestanto(?=\s*[;)])", "", conf)
-            conf = re.sub(r"(?<=\()(?:aserto de )?malamika atestanto\s*(?:;\s*|(?=\)))", "", conf).replace(" ()", "")
+            conf = FL.sub_outside(r"sen dato en la fonto", "s.d.", conf, notes=False)
+            # «malamika atestanto» is not for the fact readers (the editor, 2026-10-13: calling a witness hostile is
+            # premature at fact extraction, and not wanted): taken out wherever a return has it
+            # … the reader's label only, never the words of a quotation (the trigger audit of 2026-10-28, 30)
+            conf = FL.sub_outside(r"\s*;\s*(?:aserto de )?malamika atestanto(?=\s*[;)])", "", conf, notes=False)
+            conf = FL.sub_outside(r"(?<=\()(?:aserto de )?malamika atestanto\s*(?:;\s*|(?=\)))", "", conf, notes=False).replace(" ()", "")
             # a drop key may name the line as an earlier fix reworded it
             dk = next((k for k in S.get("drop_keys", []) if k in fact), None)
             if dk: used[("drop", dk)] += 1; dropped["by key"] += 1; notes["dropped"].append((l, f"drop key «{dk}»")); continue
@@ -1272,18 +1351,32 @@ def assemble(src, S=None):
     # … and the fact text keeps a number the writer signed with (2026-10-23, tools/adresaro-numbers.py: «Esperantisto 4686
     # laŭdas …» had become «Bicknell laŭdas …», and «subskribas nur per «Esperantisto 4686»» a false «per «Bicknell»»):
     # an old NAME with a digit in it is the source's own form, which the fact reports; the head and kinds take the new
-    swaps = [(a, c + (f" ({d})" if d else ""), not d and not re.search(r"\d", a)) for (a, b), (c, d) in rename.items() if a and c and a != c and not b]
+    # a fold of the name ungarbler («legita») changes the kinds and the fact only for a name of four letters or more:
+    # an initial («H.») is everywhere in them (2026-10-27 20:5x: «H.» → «W. H. H.» rewrote 2,264 lines; reverted)
+    swaps = [(a, c + (f" ({d})" if d else ""), not d and not re.search(r"\d", a), (a, b) in LEGITA)
+             for (a, b), (c, d) in rename.items() if a and c and a != c and not b
+             and ((a, b) not in LEGITA or len(re.sub(r"[^\w]", "", a)) >= 4)]
     if swaps:
         renamed = []
         for pg, n, row in rows:
             ps = row.split(" · ")
             if len(ps) >= 7 and ps[1].startswith("{"):
-                for a_, c_, in_fact in swaps:
-                    ps[1] = re.sub(rf"(?<![\w-]){re.escape(a_)}(?![\w-])", c_, ps[1])
-                    if in_fact: ps[2] = re.sub(rf"(?<![\w-]){re.escape(a_.title())}(?![\w-])", c_.title(), ps[2])
+                for a_, c_, in_fact, legita in swaps:
+                    k0, f0 = ps[1], ps[2]
+                    # never inside the source's quotations (the trigger audit of 2026-10-28: the rename had rewritten
+                    # names inside «…» though the source's words are never touched)
+                    ps[1] = FL.sub_outside(rf"(?<![\w-]){re.escape(a_)}(?![\w-])", c_, ps[1], notes=False)
+                    if in_fact: ps[2] = FL.sub_outside(rf"(?<![\w-]){re.escape(a_.title())}(?![\w-])", c_.title(), ps[2], notes=False)
+                    if legita and (ps[1] != k0 or ps[2] != f0) and f"⟦nomo legita: {a_} →" not in ps[-1]:
+                        ps[-1] = legita_note(ps[-1], a_, c_)
                 row = " · ".join(ps)
             renamed.append((pg, n, row))
         rows = renamed
+    # THE PERSONS OF A RELATION IN ALPHABETICAL ORDER (the editor, 2026-10-28: a relation with more than one
+    # object gives them in alphabetical order, to forestall missorts): every «kun:» list, and the list of
+    # persons that opens a relation's object («renkonto: PRIVAT kaj HODLER, vizito»), when it is names only; names
+    # inside a phrase («vortaroj de RHODES, CHRISTALLER kaj GRABOWSKI») keep the source's order
+    rows = [(pg, n, sort_relations(row)) for pg, n, row in rows]
     form_repair("- $$$ X $$$")                                   # loads the harvest module (_HF)
     held = []
     for r in rows:
@@ -1350,8 +1443,19 @@ def after_readers(source, tag, frm="", until=""):
     D = os.path.join(G, "dowse", source)
     T = os.path.join(ROOT, "tools")
     agents = os.path.join(D, f"agents-{tag}.tsv")
-    if not os.path.exists(agents): sys.exit(f"refusing: {os.path.relpath(agents, ROOT)} is missing (D6c step 5 records it)")
-    rets = [os.path.basename(l.split("\t")[1].strip()) for l in open(agents, encoding="utf-8") if l.strip() and not l.startswith("#") and "\t" in l]
+    tool = not os.path.exists(agents)
+    if tool:
+        # A SOURCE READ BY TOOL (2026-11-01; the editor, after the books' chain stopped on the nine directories
+        # and jarlibroj, D4c): no legilo wrote its returns, so no agents table records them; its «returns» in
+        # facts-config.json are taken as they stand, if each is on disk and no agents table of the source names one
+        rets = json.load(open(os.path.join(D, "facts-config.json"), encoding="utf-8")).get("returns", [])
+        named = {os.path.basename(l.split("\t")[1].strip()) for p in glob.glob(os.path.join(D, "agents-*.tsv"))
+                 for l in open(p, encoding="utf-8") if "\t" in l and not l.startswith("#")}
+        if not rets or named & set(rets) or not all(os.path.exists(os.path.join(D, r)) for r in rets):
+            sys.exit(f"refusing: {os.path.relpath(agents, ROOT)} is missing (D6c step 5 records it)"
+                     + (f"; and facts-config.json's returns are not a tool's alone: {sorted(named & set(rets)) or 'some not on disk'}" if rets else ""))
+    else:
+        rets = [os.path.basename(l.split("\t")[1].strip()) for l in open(agents, encoding="utf-8") if l.strip() and not l.startswith("#") and "\t" in l]
     logp = os.path.join(D, f"after-readers-{tag}{'-from-' + frm if frm else ''}.log")
     if os.path.exists(logp): sys.exit(f"refusing: {os.path.relpath(logp, ROOT)} exists (a run of this tag has been made; --from STEP resumes)")
     log = open(logp, "x", encoding="utf-8")
@@ -1393,13 +1497,25 @@ def after_readers(source, tag, frm="", until=""):
             if name.split(",")[0] in ("7a", "8a", "8a2", "8a3", "8", "8b"):
                 reached(name); return ""
             return real_run(name, args, **kw)
+    if tool:
+        # nothing to file, and nothing to restore or re-date: the tool's reading is the correction, so the lines the
+        # committed file had and it has not are shown (8) but not put back (8a–8b)
+        log.write(f"## no legilo: the returns are a tool's (facts-config.json, {len(rets)}), so 6, 7b and 8a–8b are skipped\n\n")
+        print(f"--  no legilo: a tool's {len(rets)} returns; 6, 7b and 8a–8b skipped")
+        tool_run = run
+        def run(name, args, **kw):
+            if name.split(",")[0] in ("6", "8a", "8a2", "8a3", "8b"):
+                reached(name); return ""
+            return tool_run(name, args, **kw)
     run("6, file the returns", [os.path.join(T, "dowse-file-returns.py"), agents],
         ok=lambda out, code: code == 0 and "refused" not in out,
         pick=lambda out: f"{out.count('already filed')} already filed, {out.count(': filed ')} filed now, {out.count(': joined ')} joined from pieces" + ("; REFUSED, see the log" if "refused" in out else ""))
-    run("6b, the format check of the returns", [os.path.join(T, "file-return.py"), "--lines"] + [f"geniza/dowse/{source}/{r}" for r in rets],
+    if not tool and not os.path.exists(os.path.join(D, "facts-config.json")):   # a first dowse (2026-11-11)
+        print(f"ok  {first_config(source, tag, rets)}")
+    run("6b, the format check of the returns", [os.path.join(T, "file-return.py"), "--fixes", "--lines"] + [f"geniza/dowse/{source}/{r}" for r in rets],
         pick=lambda out: "; ".join(l for l in out.strip().split("\n") if "fault" in l)[:220])
     run("7a, interventions from the committed file", [me, source, "--interventions", "HEAD"])
-    if reached("7b, the returns"):
+    if reached("7b, the returns") and not tool:
         cp = os.path.join(D, "facts-config.json"); cfg = json.load(open(cp, encoding="utf-8"))
         old = cfg.get("returns", [])
         if old != rets:
@@ -1427,8 +1543,10 @@ def after_readers(source, tag, frm="", until=""):
         print(f"done up to {until}; every output in {os.path.relpath(logp, ROOT)}. Next, once every source of the batch is "
               f"this far: --after-readers {tag} --from 9a for one of them (the harvest, for all), then --from 9c for the others")
         return 0
-    run("9a, the check", [os.path.join(T, "harvest-facts.py"), "--check", "--quiet"],
-        ok=lambda out, code: code == 0, pick=lambda out: next((l for l in out.split("\n") if l.startswith("scanned")), ""))
+    # 9a, the check, is now the harvest's own scan (2026-11-06; the editor): the harvest scans as
+    # --check does and refuses to write on a format error, so a separate run was the same 10 minutes twice. The step's
+    # name stays, for --from 9a
+    if reached("9a, the check"): print("--  9a, the check: the harvest's own; an error stops it with nothing written")
     run("9b, the harvest", [os.path.join(T, "harvest-facts.py"), "--quiet"],
         pick=lambda out: next((l for l in out.split("\n") if l.startswith("missing-facts report")), (out.strip().split("\n") or [""])[-1]))
     # THE DOWSED LIST after every harvest (2026-10-24; the editor
@@ -1437,8 +1555,10 @@ def after_readers(source, tag, frm="", until=""):
     published_pages(run, "9b3")
     # THE DEDUPE AS THE BATCH'S NEXT PHASE (P1's later phases, 2026-10-18, the dowse fixes): on a first dowse (no
     # alignment, «redowse only») the dedupe brief is written here and the next workflow's arguments with it, so the main
-    # session launches the one dedupe reader and then runs --after-dedupe; a redowse aligns first (step 10)
-    if first:
+    # session launches the one dedupe reader and then runs --after-dedupe; a redowse aligns first (step 10). Also a source
+    # read by tool (no restore, so nothing to align) and one never deduped (no dedupe return: a first dowse committed
+    # before its dedupe, the runbook's «Not built yet» of 2026-10-23, met again by the books' chain 2026-11-01)
+    if first or tool or not glob.glob(os.path.join(D, "dedupe-return-*.md")):
         run("9c, the dedupe brief", [os.path.join(T, "harvest-facts.py"), "--dedupe-brief", source, tag])
         wp = os.path.join(D, f"workflow-dedupe-{tag}.json")
         brief = os.path.join(D, f"dedupe-brief-{tag}.md")
@@ -1496,11 +1616,14 @@ def after_dedupe(source, tag, run_id, more_runs=(), frm=""):
                                   "the dowse runbook, P4: «I do not need to review the sample drops if they are of the quality you have shown me»",
                                   "--source", source])   # this source's rows only: another's of the same tag stay as they are
     asm = run("d5, reassemble", [me, source, "--replace"])
-    hv = run("d6, the harvest", [os.path.join(T, "harvest-facts.py"), "--quiet"])
-    run("d6b, the dowsed list", [os.path.join(T, "dowse-done.py")])   # after every harvest (2026-10-24)
-    published_pages(run, "d6c")
-    # THE UNDATED PASS AS THE BATCH'S NEXT PHASE (2026-10-18, the dowse fixes; the editor, to
-    # the runbook's step 10c): its list and brief here, and the workflow's arguments for its one reader
+    if NO_HARVEST:   # the harvest chain's stage harvests once for all its sources (tools/harvest-chain.py, 2026-10-28)
+        hv = "missing-facts report: left to the chain's harvest"; print("--  d6, the harvest: left to the chain")
+    else:
+        hv = run("d6, the harvest", [os.path.join(T, "harvest-facts.py"), "--quiet"])
+        run("d6b, the dowsed list", [os.path.join(T, "dowse-done.py")])   # after every harvest (2026-10-24)
+        published_pages(run, "d6c")
+    # THE UNDATED PASS AS THE BATCH'S NEXT PHASE (2026-10-18, the dowse fixes; the editor, to «the undated pass as a
+    # batch phase»; the runbook's step 10c): its list and brief here, and the workflow's arguments for its one reader
     # the list a source's own (2026-10-24, L'Espérantiste: the shared UNDATED-2026-10-23.tsv, written the day before for
     # Lingvo Internacia 1906–1914 of the same tag, was not overwritten, and its prep found «nothing to read»)
     ul = os.path.join(G, "profiles", "build", f"UNDATED-{tag}-{source}.tsv")
@@ -1525,7 +1648,7 @@ def after_dedupe(source, tag, run_id, more_runs=(), frm=""):
     held = [l.strip()[len("UNREADABLE: "):] for l in asm.split("\n") if l.strip().startswith("UNREADABLE:")]
     ret = os.path.join(D, f"dedupe-return-{tag}.md")
     unsure = [l.strip() for l in open(ret, encoding="utf-8")] if os.path.exists(ret) else []
-    unsure = [l for l in unsure if re.search(r"\bnecerte\b", l) and not l.startswith(("Fino", "unu fakto"))]
+    unsure = [l for l in unsure if re.search(r"\bnecerte\b", FL.noquotes(l)) and not l.startswith(("Fino", "unu fakto"))]   # audit 31
     fr = open(os.path.join(G, "profiles", "build", "FAULT-RATES-LATEST.md"), encoding="utf-8").read().split("\n")
     head = next((l for l in fr if l.startswith("| type |")), "")
     col = [c.strip() for c in head.split("|")].index(source) if source in head else None
@@ -1540,6 +1663,8 @@ def after_dedupe(source, tag, run_id, more_runs=(), frm=""):
            "## For the editor", "", "### The dedupe's uncertain pairs", ""] + ([f"- {u}" for u in unsure] or ["(none)"]) + [
            "", "## For the record", "", f"### The lines held back or unreadable ({len(held)})", ""] + ([f"- {h}" for h in held] or ["(none)"]) + [
            "", "### The source's fault rates", ""] + ([f"- {t}: {v}" for t, v in rates] or ["(not found)"]) + [
+           "", "### The parts by place in the legilo (`tools/dowse-place-check.py`)", "",
+           subprocess.run([sys.executable, os.path.join(ROOT, "tools", "dowse-place-check.py"), source], capture_output=True, text=True).stdout.strip() or "(not found)"] + [
            "", "### The cost", ""] + [f"- {c}" for c in costs] + [
            "", "(the harness's own count, from the workflow's notification, is added by the main session; output tokens are exact)",
            "", "### The undated pass", "", f"- {undated}",
@@ -1550,6 +1675,7 @@ def after_dedupe(source, tag, run_id, more_runs=(), frm=""):
     return 0
 
 UNDATED_CAP = 80   # lines a reader, as a reader's range (P1, «sized before written»)
+NO_HARVEST = False   # --no-harvest: the harvest chain's stage harvests once (2026-10-28)
 def undated_workflow(source, tag, prep_out, page=False):
     """After `dowse-undated.py prep`: the workflow's arguments for its one reader, dowse/<source>/workflow-undated-<tag>.json
     (create-only), or why there is none. -> a line for the review document."""
@@ -1625,7 +1751,8 @@ def after_undated_written(source, tag):
     fp = os.path.join(G, "profiles", "by-source", f"{source}-dowse.md")
     before = collections.Counter(open(fp, encoding="utf-8").read().split("\n"))
     run("w1, reassemble", [me, source, "--replace"])
-    run("w2, the harvest", [os.path.join(T, "harvest-facts.py"), "--quiet"])
+    if NO_HARVEST: print("--  w2, the harvest: left to the chain")
+    else: run("w2, the harvest", [os.path.join(T, "harvest-facts.py"), "--quiet"])
     changed = sum((collections.Counter(open(fp, encoding="utf-8").read().split("\n")) - before).values())   # lines new or changed
     ul = os.path.join(G, "profiles", "build", f"UNDATED-{tag.rstrip('p')}-{source}.tsv")   # the source's own (d7), else the
     if not os.path.exists(ul): ul = os.path.join(G, "profiles", "build", f"UNDATED-{tag}.tsv")   # shared one of earlier runs
@@ -1645,6 +1772,25 @@ def after_undated_written(source, tag):
         with open(bp, "a", encoding="utf-8") as fh: fh.write(f"- written ({tag}): {check}\n- the page look: {page}\n")
     print(f"done; {check}. The page look: {page}")
     return 0
+
+def first_config(source, tag, rets):
+    """A FIRST DOWSE'S SETTINGS (2026-11-11; the dress runbook's «Not built yet» on step 7b, met by all 36 sources of the
+    chain harvest-2026-11-11a): dowse/<source>/facts-config.json written from its brief-config.json when none exists,
+    create-only: the item, the header (the source's title, «facts-format: 3», which the assembler raises once the lines
+    carry kinds, and the provenance), the returns of agents-<tag>.tsv, the empty lists. Written before 6b, so that a fix
+    for a reader's line can go into its «replace_lines» and be checked there. -> the line for the log."""
+    D = os.path.join(G, "dowse", source); cp = os.path.join(D, "facts-config.json")
+    b = json.load(open(os.path.join(D, "brief-config.json"), encoding="utf-8"))
+    day = re.match(r"\d{4}-\d\d-\d\d", tag).group(0) if re.match(r"\d{4}-\d\d-\d\d", tag) else tag
+    item = b.get("item") or (os.path.basename(b["texts"][0])[:-4] if b.get("texts") else "")
+    head = (f"# {b.get('source', source)}: faktoj el la dowse (la unua dowse, {day})\n\nfacts-format: 3\n\n"
+            f"`[Ezri, {day}, la unua dowse de la fonto, laŭ ocr/method/DOWSE-RUNBOOK-2026-10-13.md (D6c): {len(rets)} redonoj "
+            f"de legiloj (dowse/{source}/agents-{tag}.tsv). Kunmetita per tools/dowse-facts-assemble.py el "
+            f"dowse/{source}/facts-config.json, kiun la ilo skribis el brief-config.json la {datetime.date.today():%Y-%m-%d}.]`")
+    cfg = {"item": item, "header": head, "returns": list(rets), "names": {}, "rename": [], "qualifiers": [], "drop": [],
+           "quote_fixes": [], "replace_lines": [], "locator_fixes": [], "restore": [], "extra_lines": []}
+    with open(cp, "x", encoding="utf-8") as fh: json.dump(cfg, fh, ensure_ascii=False, indent=1)
+    return f"facts-config.json written from brief-config.json (a first dowse): item {item}, {len(rets)} returns"
 
 def main():
     ap = argparse.ArgumentParser()
@@ -1667,6 +1813,7 @@ def main():
     ap.add_argument("--iv-place", action="store_true", help="T1: re-attach each intervention by its anchor's place in the text: an overlapping anchor, else the window's best by words, else the word rule")
     ap.add_argument("--iv-compare", type=int, default=0, metavar="N", help="T1: the sentence rule's choices against the word rule's, counted, and N of each kind of difference; use with --dry-run")
     ap.add_argument("--show-drops", action="store_true", help="print each line dropped as a duplicate or an exact repeat")
+    ap.add_argument("--first-config", metavar="TAG", help="a first dowse: write its facts-config.json from brief-config.json and agents-TAG.tsv (create-only), as --after-readers does before 6b (2026-11-11)")
     ap.add_argument("--key-replace-lines", action="store_true", help="give each «replace_lines» entry that names no return "
                     "the one return whose text holds its key, in the settings; an entry found in none or several is printed, then stop")
     ap.add_argument("--bare-cover", action="store_true", help="a qualified «out» row also covers the bare lines of a surname with no namesake (proposed 2026-10-15)")
@@ -1682,13 +1829,21 @@ def main():
                     "run dowse-undated.py apply as a dry run, for the dowser's check (2026-10-18)")
     ap.add_argument("--after-undated-written", metavar="TAG", help="after dowse-undated.py apply --write: reassemble, harvest, "
                     "the changed lines against the date rows, the page look's brief (TAGp) and its workflow arguments (2026-10-18)")
+    ap.add_argument("--no-harvest", action="store_true", help="with --after-dedupe or --after-undated-written: no harvest, "
+                    "dowsed list or published pages; the harvest chain (tools/harvest-chain.py) harvests once for its stage")
     a = ap.parse_args()
+    global NO_HARVEST; NO_HARVEST = a.no_harvest
     if a.after_undated: return after_undated(a.source, *a.after_undated)
     if a.after_undated_written: return after_undated_written(a.source, a.after_undated_written)
     if a.after_dedupe:
         if len(a.after_dedupe) < 2: sys.exit("refusing: --after-dedupe TAG RUN [RUN …]")
         return after_dedupe(a.source, a.after_dedupe[0], a.after_dedupe[1], a.after_dedupe[2:], a.frm)
     if a.after_readers: return after_readers(a.source, a.after_readers, a.frm, a.until)
+    if a.first_config:   # 2026-11-11: a first dowse's settings ahead of its chain, so its fixes can go in first
+        ag = os.path.join(G, "dowse", a.source, f"agents-{a.first_config}.tsv")
+        rets = [os.path.basename(l.split("\t")[1].strip()) for l in open(ag, encoding="utf-8") if l.strip() and not l.startswith("#") and "\t" in l]
+        if os.path.exists(os.path.join(G, "dowse", a.source, "facts-config.json")): sys.exit("refusing: facts-config.json exists")
+        print(first_config(a.source, a.first_config, rets)); return 0
     global BARE_COVER, IV_IDS, IV_PLACE, IV_COMPARE, IV_NOTE; BARE_COVER = a.bare_cover; IV_IDS = a.iv_ids; IV_PLACE = a.iv_place; IV_COMPARE = a.iv_compare; IV_NOTE = a.iv_note
     if a.key_replace_lines:   # 2026-10-15, the Fable review 1: an entry is applied only to the return it names
         D = os.path.join(G, "dowse", a.source); cp = os.path.join(D, "facts-config.json")

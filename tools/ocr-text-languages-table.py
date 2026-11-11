@@ -159,7 +159,7 @@ _C13_OK = ("decided by the editor, 2026-10-14 (the declarations spelled out per 
 _C13 = lambda seen: f"cupel13, C1 look 2026-10-14 ({seen}); " + _C13_OK
 DECLARED.update({
     "VIjfJaarEsperantoInNederland_1909_kul46590": (("dutch", "esperanto"), _C13("Dutch prose; Dutch 40% of its words, not counting words also Esperanto")),
-    "Krytyka_1912_R14Cz2_": (("polish", "esperanto-cited"), _C13("Polish prose; Polish 43% (the congress pieces Lublin's catalogue names are not in these issues,")),
+    "Krytyka_1912_R14Cz2_": (("polish", "esperanto-cited"), _C13("Polish prose; Polish 43% (the congress pieces Lublin's catalogue names are not in these issues, board 2026-10-14)")),
     "LEsperanto_1914_kul": (("esperanto", "italian"), _C13("Esperanto and Italian glossaries, notes and an Italian article; Italian 7–27%; Portuguese and Latin cited on one page each")),
     "LaEsperantisto_1910_n12_kul44805": (("esperanto", "german"), _C13("Fritz Stephan's monthly: Esperanto, German advertisements; German 9%")),
     "FotoRevuoInternacia_1906_n01_kul47247": (("esperanto", "french"), _C13("Esperanto and French in parallel columns; French 13%")),
@@ -348,6 +348,182 @@ DECLARED.update({
     # outside the batch, put with it: the Coulommiers memorial volume (signed 2026-10-02), «esperanto, french» from the gate before
     "Louis Couturat_1868-1914": (("french", "ido"), "the text French with Ido passages (no «estas», «kaj» in 28,220 words; «esas», «qua»); page languages 2026-10-26 22:2x: French 64, Ido 3 of 67; " + _C18C_OK),
 })
+_C19A_OK = ("confirmed by the editor 2026-10-27 19:5x (the declarations spelled out per title in "
+            "geniza/ocr/runs/CUPEL19A-C5-DECLARATIONS-2026-10-27.md: the languages in order, the main first; the evidence, "
+            "the C1 look of 2026-10-27 and the page languages; the effect)")
+_C19A = lambda seen: f"cupel19a, C1 look 2026-10-27 ({seen}); " + _C19A_OK
+DECLARED.update({
+    # cupel19a: Internacia Bulteno 1914–18, German-Aŭstria Esperantisto 1910–14, Dia Regno 1908–12 (ÖNB/ANNO)
+    "ANNO_e0l_": (("esperanto",), _C19A("Internacia Bulteno 1914–18: pages won Esperanto 1,411 of 1,425; German 6")),
+    "ANNO_e0y_1910": (("german", "esperanto"), _C19A("German-Aŭstria Esperantisto 1910, the German supplement of Informaj Raportoj: pages won German 30, Esperanto 14 of 44 in files 51–60")),
+    "ANNO_e0y_19100061": (("esperanto", "german"), _C19A("German-Aŭstria Esperantisto 1910 file 61: pages won Esperanto 3, German 1")),
+    "ANNO_e0y_19100062": (("esperanto", "german"), _C19A("German-Aŭstria Esperantisto 1910 file 62: pages won Esperanto 7, German 1")),
+    "GermanAustriaEsperantisto_": (("esperanto", "german"), _C19A("German-Aŭstria Esperantisto 1911–14, ÖNB whole works: pages won Esperanto 256, German 149 of 405")),
+    "ANNO_e1q_": (("esperanto",), _C19A("Dia Regno 1908–12: pages won Esperanto 404 of 422; German 12, 11 of them in file 1909/57")),
+    "ANNO_e1q_19090057": (("german", "esperanto"), _C19A("Dia Regno 1909 file 57: pages won German 11, Esperanto 5 of 16")),
+})
+_C19B = lambda seen: (f"cupel19b, C1 look 2026-10-28 ({seen}); confirmed by the editor 2026-10-29 00:3x (the declarations "
+                      "spelled out per title: the languages in order, the main first; the evidence, the C1 look and the page "
+                      "languages, ocr/runs/OCR-PAGE-LANGUAGES-2026-10-29-cupel19b.md; the effect)")
+DECLARED.update({
+    # cupel19b: The Esperanto Monthly 1913–1919, Universo 1909–1912 (ÖNB/ANNO)
+    "ANNO_e0x_": (("esperanto", "english"), _C19B("The Esperanto Monthly, London, British Edition: English and Esperanto, in facing columns by 1917; pages won Esperanto most, English about a third, first on 13 of 85 files")),
+    "ANNO_e4g_": (("esperanto",), _C19B("Universo, Internacia Revuo por la Belo: Esperanto; pages won Esperanto all but two French")),
+})
+DECLARED.update({
+    # before cupel19b's C0 (2026-10-28): the Unua Oficiala Aldono's word list, read by vision (vr9, PDF 4–5), gives each
+    # root in French, English, German, Russian and Polish; the Russian is quoted translations, not running text
+    "oficiala_aldono_1a": (("esperanto", "russian-cited"),
+                           "Unua Oficiala Aldono, vision reading 2026-10-28 (vr9, PDF 4–5: the roots translated into five "
+                           "languages); the editor 2026-10-28 21:5x: Russian cited only, the main language Esperanto"),
+})
+_C19C = lambda seen: (f"cupel19c, C1 look 2026-10-29 ({seen}); the page languages "
+                      "ocr/runs/OCR-PAGE-LANGUAGES-2026-10-29-cupel19c-b.md; the editor 2026-10-29 20:3x (the rulings, "
+                      "OCR-BOARD 20:4x)")
+DECLARED.update({
+    # cupel19c: Progres, the Danish, Hungarian and Croatian organs, La Stelo de l' Feliĉo 1912, the Tutmonda Jarlibro's
+    # title and index leaves (one key each: the volumes, already in, share ANNO_e4d_), five directories
+    "progres": (("occidental",), _C19C("Progres, St Petersburg 1906–08, Idiom Neutral; the editor: Occidental is the default Latin-based auxlang, as Novial before it")),
+    "ANNO_e5g_": (("esperanto", "danish"), _C19C("Dana Esperantisto 1908–12: pages won Esperanto 555, Danish 100")),
+    "ANNO_e5k_": (("esperanto", "danish"), _C19C("Danlando 1912–13: pages won Esperanto 117, Danish 13")),
+    "ANNO_e5i_": (("esperanto", "danish"), _C19C("Esperanto-Bladet 1907: pages won Esperanto 42, Danish 26")),
+    "ANNO_e5j_": (("danish", "esperanto"), _C19C("Esperanto: Raporto de Centra Dana Esperantista Ligo 1913–19: pages won Danish 156, Esperanto 120; the editor: Danish the main language")),
+    "ANNO_e3b_": (("esperanto", "hungarian"), _C19C("Hungara Esperantisto 1909–10: pages won Esperanto 70–95%, the rest Czech or Polish, there being no Hungarian list then")),
+    "ONB_e6e_": (("esperanto", "croatian"), _C19C("Kroata Esperantisto 1909–11: pages won Esperanto 70–95%, the rest Czech or Polish, there being no Croatian list then")),
+    "ANNO_e1x_": (("esperanto",), _C19C("La Stelo de l' Feliĉo 1912: Esperanto")),
+    "13162CBF_iiif": (("esperanto", "italian-cited", "latin-cited"), _C19C("Tutmonda adresaro de katolikaj esperantistoj 1913: Esperanto; Italian won 15 pages on names, streets and hotels only (PDF 99, 106 read 2026-10-29 21:1x); Latin cited, the editor")),
+    "131D09F0_iiif": (("esperanto",), _C19C("Tutmonda amikaro de publikoficistoj 1913: Esperanto")),
+    "100468F5_iiif": (("esperanto",), _C19C("Cenero esperantista 1906: Esperanto")),
+    "10035102_iiif": (("esperanto",), _C19C("the Dresden 1908 congress list: Esperanto")),
+})
+DECLARED.update({k: (("esperanto",), _C19C("the Tutmonda Jarlibro Esperantista's title and index leaves: Esperanto"))
+                 for k in (f"ANNO_e4d_{y}000{n}" for y in range(1904, 1911) for n in (1, 2))
+                 if k not in ("ANNO_e4d_19080002",)})
+DECLARED.update({k: (("ido",), _C19C("Nuva adresaro dokumentizita 1909–10: Ido"))
+                 for k in ("13037E5E_iiif_1-14", "13038337_iiif_1-14", "130387FE_iiif_1-14", "130388DF_iiif_1-14",
+                           "1316679C_iiif_1-14")})
+# cupel20a: Germana Esperantisto 1905–1910 (ÖNB, ANNO e1a), keyed by year so that cupel20b's 1911–1918 are declared from
+# their own look: the volumes, the issues' wrappers, title leaves, indexes and Liberaj Horoj (1907–1909), Esperanto and
+# German in parallel columns
+DECLARED.update({f"ANNO_e1a_{y}": (("esperanto", "german"),
+                 "cupel20a, C1 look 2026-10-31 (German and Esperanto in parallel columns, Antiqua); the page languages "
+                 "ocr/runs/OCR-PAGE-LANGUAGES-2026-10-31-cupel20a.md: the volumes Esperanto 77–168 pages to German "
+                 "39–104, Liberaj Horoj 1907 German 29 to Esperanto 19 on near-even pages; the editor 2026-10-31 16:5x: "
+                 "Miles's default taken, Esperanto first throughout, to be tuned later if need be")
+                 for y in range(1905, 1911)})
+# cupel20b: Germana Esperantisto 1911–1918 (ÖNB, ANNO e1a), the A (Propaganda) and B (Literature) editions from 1912
+DECLARED.update({f"ANNO_e1a_{y}": (("esperanto", "german"),
+                 "cupel20b, C1 look 2026-11-02 (Esperanto with German running text in both editions: the 1911 review in "
+                 "German, German verse in B; Antiqua); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-02-cupel20b.md: "
+                 "Esperanto wins every volume but A 1915–1917 (German 79/62, 74/68, 89/47); the editor 2026-11-02 11:2x: "
+                 "Esperanto first throughout, A 1915–1917 included, to be revisited")
+                 for y in range(1911, 1919)})
+# cupel21: The Esperantist (London, Nov. 1903 – Dec. 1905; ÖNB, ANNO e2a) and Pola Esperantisto 1906–1914 (ÖNB, ANNO
+# e1c: the volumes' text …0004, the issues' wrappers …0001, the contents …0002, the inserts …0008); the six files where
+# Polish wins most pages keyed by their own name (the longest key wins)
+DECLARED.update({"ANNO_e2a_": (("esperanto", "english"),
+                 "cupel21, C1 look 2026-11-03 (English running text, partly set beside the Esperanto; Antiqua); the page "
+                 "languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-03-cupel21-b.md: English wins 46 of 495 pages, 0–5 an "
+                 "issue; the editor 2026-11-03 17:4x: confirmed as proposed"),
+                 "ANNO_e1c_": (("esperanto", "polish"),
+                 "cupel21, C1 look 2026-11-03 (Polish articles, verse and advertisements as running text; Antiqua); the "
+                 "page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-03-cupel21-b.md: Polish wins 1–94 pages of each "
+                 "volume's text (1908 94 of 200); the editor 2026-11-03 17:4x: confirmed as proposed")})
+DECLARED.update({k: (("polish", "esperanto"),
+                 f"cupel21, C1 look 2026-11-03 (Polish advertisements, notices and, in 1911's inserts, a grammar of "
+                 f"Esperanto in Polish); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-03-cupel21-b.md: Polish "
+                 f"wins {n}; the editor 2026-11-03 17:4x: Polish first on the six files where it wins most pages, as proposed")
+                 for k, n in (("ANNO_e1c_19090001", "25 of 37"), ("ANNO_e1c_19100001", "18 of 29"),
+                              ("ANNO_e1c_19110001", "24 of 40"), ("ANNO_e1c_19080008", "26 of 42"),
+                              ("ANNO_e1c_19090008", "13 of 16"), ("ANNO_e1c_19110008", "32 of 34"))})
+# cupel22: UEA's Oficiala Jarlibro 1908–1916 and the congresses' Oficiala Dokumentaro 1910–1914 (ÖNB, ANNO e4c)
+DECLARED.update({"ANNO_e4c_": (("esperanto",),
+                 "cupel22, C1 look 2026-11-04 (Esperanto throughout, the delegates' lists with place and street names in "
+                 "their own languages; Antiqua); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-04-cupel22.md: "
+                 "Esperanto wins every item, any other language 1–4 pages, under 5%; the editor 2026-11-04 14:5x: "
+                 "Esperanto confirmed as the language")})
+DECLARED.update({
+    'ANNO_e7d_': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto throughout); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins all but 2 of 177 pages; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'ANNO_e5c_': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto throughout); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'ANNO_e3j_': (('esperanto', 'ukrainian-cited'),
+        'cupel23, C1 look 2026-11-06 (Esperanto, an apostrophe for each supersign, Cyrillic in headings; declared by hand, C5.1a reading the raw apostrophes); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto 152 of 160; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Esperanto-UEA_1918_n219_nov': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Esperanto-UEA_1921_n245_jan': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Esperanto-UEA_1929_n342_feb': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Esperanto-UEA_1936_n425_jan': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Esperanto-UEA_1937_n442_maj25': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Esperanto-UEA_1938_n462_apr30': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Esperanto-UEA_1940_n486_aug-dec': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Esperanto-UEA_1942_n491_jan-mar': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Esperanto-UEA_1946_n0497': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Esperanto-UEA_1960_n0653': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Esperanto-UEA_1970_n0775': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Esperanto-UEA_1980_n0892': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'HispanaEsperantisto_1919_n025_jan': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'ANNO_e1a_19300004': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'ANNO_e6q_19400059': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'ONB_e2j_19300131': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'esperanto-triumfonta-1923-no-156': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'EsperantoKajLaBlinduloj': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto wins nearly every page; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'ONB_kra_18970224': (('polish',),
+        'cupel23, C1 look 2026-11-06 (Polish daily, the Zamenhof-era item); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Polish wins all 8; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'przeglad-tygodniowy-1897-no09': (('polish',),
+        'cupel23, C1 look 2026-11-06 (Polish weekly); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Polish wins all 12; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'couturat-leau-1908-nouvelles-langues-internationales': (('french', 'esperanto'),
+        'cupel23, C1 look 2026-11-06 (French, specimens of the languages); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: French 107, Esperanto 9 of 118; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Espero.de.Katalunjo': (('catalan', 'esperanto'),
+        'cupel23, C1 look 2026-11-06 (Catalan running text with Esperanto); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Catalan 15, Esperanto 8 of 24; the editor 2026-11-06 16:4x: Catalan first, approved'),
+    'Kataluna.nacio.1909.apr': (('esperanto', 'catalan'),
+        'cupel23, C1 look 2026-11-06 (Catalan and Esperanto, three columns); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto 5, Catalan 4 of 9; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'klubaj.raportoj.vieno': (('esperanto', 'german'),
+        'cupel23, C1 look 2026-11-06 (Esperanto in roman, German in very small Fraktur); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto 463, German 111 of 574; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'Filipina_Esperantisto': (('esperanto', 'english', 'spanish', 'tagalog'),
+        "cupel23, C1 look 2026-11-06 (Esperanto, Spanish, English, Tagalog pages; Tagalog word list built 2026-11-06 from tl-wordlist, modern spelling); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto 345, English 104, Tagalog 25, Spanish 23 of 513 (…-cupel23-filipina.md); the editor 2026-11-06 16:4x"),
+    'dulichenko-1990-mezhdunarodnye-vspomogatelnye-yazyki': (('russian', 'esperanto-cited'),
+        'cupel23, C1 look 2026-11-06 (Russian, Cyrillic, specimens of many languages); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: not measurable: the Latin-model reading of a Cyrillic book; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'stojan-bibliografio-1929': (('esperanto', 'german', 'french'),
+        'cupel23, C1 look 2026-11-06 (Esperanto notes, titles in many languages, French front matter); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto 459, German 40, French 25 of 563; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'ruslanda.adresaro': (('esperanto',),
+        'cupel23, C1 look 2026-11-06 (Esperanto; place and personal names); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto 100 of 112; Polish 7 are Slavic names; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+    'internacia.revuo.medicina': (('esperanto', 'french', 'german'),
+        'cupel23, C1 look 2026-11-06 (parallel texts); the page languages ocr/runs/OCR-PAGE-LANGUAGES-2026-11-06-cupel23.md: Esperanto 115, German 19, French 15 of 149; the editor 2026-11-06 16:4x: the list C5-PROPOSAL.md, approved with the proviso'),
+})
+# EXACT-NAME DECLARATIONS (cupel19c C5.2, 2026-10-29): a key here matches the item of that name only, not as a prefix.
+# «progres» (Progres, Idiom Neutral, 1906–08) as a prefix would also catch progreso1 … progreso25 (Progreso, Ido).
+DECLARED_EXACT = {"progres"}
+
+
+def declared_key(item):
+    """The DECLARED key for an item: an exact-name key if the item is one, else the LONGEST matching prefix, or None."""
+    if item in DECLARED_EXACT and item in DECLARED:
+        return item
+    return max((p for p in DECLARED if p not in DECLARED_EXACT and item.startswith(p)), key=len, default=None)
+
+
+# THE DECLARED MAIN LANGUAGE LEADS BY RULING, over a gate that measured another (cupel19a C5.3, 2026-10-27): the gate, built
+# after cupel18c's C5, read de Beaufront's Ido as Esperanto; scored against the Esperanto list its Ido would lose, with
+# nothing gained for names.
+MAIN_BY_RULING = {"beaufront.couturat.1914": "the editor 2026-10-27 20:0x: Ido and French on facing pages; the gate's «esperanto» is its Ido"}
 RULED = {"StSl2017_XIV": (("arabic-script",), None,
                           "decided by the editor, 2026-10-04: the PDF text layer garbles a transliteration "
                           "font on 98 pages into shifted Latin and Arabic letters and digits — not Arabic"),
@@ -362,10 +538,13 @@ RULED = {"StSl2017_XIV": (("arabic-script",), None,
          "NOVIALISTE.": (("occidental",), "novial", "the gate has no Novial model and reports Occidental (Novial «me/lo/vud/sal» against Occidental «yo/it/quel», 2026-10-10 17:4x); decided by the editor, 2026-10-10, confirmed that the language table say Novial for these three")}
 # cupel17 Before C0 (2026-10-20 21:5x): the rebuilt table added «esperanto» from the gate to four Russian cupel16 items; the editor kept them as confirmed
 RULED.update({
+    "beaufront.couturat.1914": (("esperanto",), None, "the editor 2026-10-27 20:0x: the gate's «esperanto» is the Ido of the facing pages (cupel19a C5.3)"),
+})
+RULED.update({
     "drezen_za_vseobshchim_yazykom_1928": (("esperanto",), None, "editor 2026-10-20 21:5x, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
     "nov_bulgakov_vp": (("esperanto",), None, "editor 2026-10-20 21:5x, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
     "nov_gruzintsev_vp": (("esperanto",), None, "editor 2026-10-20 21:5x, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
-    "nov_anonsy_knig_bika": (("esperanto",), None, "editor 2026-10-20 21:5x, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
+    "nov_anonsy_knig_bika": (("esperanto", "estonian"), None, "editor 2026-10-20 21:5x, on the language table rebuilt from the cupel16-6 gate: these four Russian items, signed 2026-10-20 13:35 on their Russian side, stay Russian only; the gate reads their few Latin-script titles as Esperanto"),
     # cupel17 C7 (2026-10-23): the table rebuilt for the Lingua Internationale re-declaration added «russian» to Rondiranto
     "ANNO_e1v_": (("russian", "russian?"), None, "editor 2026-10-23, on the language table rebuilt after cupel17's chain: Rondiranto's pre-reform Bulgarian, read with the Russian model, gives Russian-list words on 8 of 12 pages (lex); it stays Esperanto and Bulgarian, the Bulgarian-only route"),
 })
@@ -375,6 +554,30 @@ RULED.update({
 RULED.update({
     "Louis Couturat_1868-1914": (("esperanto",), None, "editor 2026-10-26 22:2x («french, ido»): the look's «Esperanto examples» are Ido (no «estas», «kaj» in 28,220 words; «esas», «qua»)"),
 })
+# before cupel19b's C0 (2026-10-28): the Unua Oficiala Aldono's measured «russian» (10 words with Russian letters, from
+# vr9's vision reading of its word list) is the declared cited Russian, not a language of running text
+RULED.update({
+    "oficiala_aldono_1a": (("russian",), "russian-cited", "the editor 2026-10-28 21:5x: Russian cited only (the roots' translations), the main language Esperanto"),
+})
+# before cupel20a's C0 (2026-10-31 13:2x): the table rebuilt from the cupel19c-9 gate changed the languages of 26 rows;
+# the editor 13:2x (to Miles's proposal: Swedish
+# kept for Dana Esperantisto 1909–10, the rest rejected; Estonian also fixed in the gate, tools/ocr-accept.py, failure map
+# R88). The fifth folyo's «French» checked 13:2x: street names in the addresses only («Route du Chene», «Rue Beaurepaire»)
+_WHY_ET = ("the editor 2026-10-31 13:2x, on the table rebuilt before cupel20a: «Estonian» from the gate's Hunspell judging "
+           "(run sheet rule 25), not in the text; detection by the list only since (tools/ocr-accept.py, failure map R88)")
+RULED.update({k: (("estonian",), None, _WHY_ET) for k in (
+    "ANNO_e3b_19090061", "ANNO_e5a_19160107", "ANNO_e7a_19060001", "BultenoTEKS.1911.1", "BultenoTEKS.1912.4",
+    "MezhdunarodnyjJazyk_19260615")})
+RULED.update({
+    "ONB_e6e_": (("czech", "estonian"), None, "the editor 2026-10-31 13:2x: Kroata Esperantisto is Esperanto and Croatian; "
+                 "the gate's «Czech» is Croatian words in the Czech list, its «Estonian» the Hunspell judging (R88)"),
+    "ANNO_e1x_19120062": (("danish", "czech"), None, "the editor 2026-10-31 13:2x: La Stelo de l' Feliĉo is Esperanto; the gate's Danish and Czech are noise"),
+    "1316679C_iiif_1-14": (("french",), None, "the editor 2026-10-31 13:2x: French only in the addresses' street names (PDF 6: «Route du Chene», «Rue Beaurepaire»)"),
+})
+RULED.update({k: (("esperanto",), None, "the editor 2026-10-31 13:2x: Nuva adresaro dokumentizita is Ido; the gate's «Esperanto» is the entrants' «esperanto» among the languages they know, and Ido read as Esperanto")
+              for k in ("13037E5E_iiif_1-14", "13038337_iiif_1-14", "130387FE_iiif_1-14", "130388DF_iiif_1-14")})
+RULED["progres"] = (("esperanto",), None, "the editor 2026-10-31 13:2x: Progres is Idiom Neutral; the gate's «Esperanto» is the Idiom Neutral read as Esperanto")
+RULED_EXACT = {"progres"}   # as DECLARED_EXACT: not progreso1 … progreso25
 NOT_A_LANGUAGE = re.compile(r"-(names|addresses|romanised|lacinka|show-through)$|^(not-stated|not-verifiable|latin-only|"
                             r"latin-unspecified|examples-several-languages|auxlang-.*|ipa|languages_seen)$")
 ALIAS = {"occidental-interlingue": "occidental", "russian-name": None}
@@ -391,7 +594,31 @@ def rows(path):
 MAIN_CONFLICTS = []   # (item, the gate's first language, the declared main): Latin-script disagreements, for the editor
 
 
+def compare(old, new, out):
+    # --compare <old table> <new table> <report> (2026-10-28, run sheet «Before C0» and C5.3 (b): the draft table against
+    # the live one, comment lines left out, as a box-free call in place of `diff <(grep -v '^#' …) <(…)`): every item
+    # added, dropped or changed, with the columns that changed, before and after. Reads the two tables; writes <report>,
+    # created new.
+    if os.path.exists(out):
+        sys.exit(f"exists: {out}")
+    a, b = {r["item"]: r for r in rows(old)}, {r["item"]: r for r in rows(new)}
+    lines = [f"# Language tables compared: {os.path.basename(old)} → {os.path.basename(new)}", ""]
+    gone, added = sorted(set(a) - set(b)), sorted(set(b) - set(a))
+    changed = [k for k in sorted(set(a) & set(b)) if a[k] != b[k]]
+    lines.append(f"{len(a)} → {len(b)} items; {len(added)} added, {len(gone)} dropped, {len(changed)} changed.")
+    lines += ["", "## Added", ""] + [f"- {k}" for k in added]
+    lines += ["", "## Dropped", ""] + [f"- {k}" for k in gone]
+    lines += ["", "## Changed", ""]
+    for k in changed:
+        cols = [c for c in sorted(set(a[k]) | set(b[k])) if a[k].get(c) != b[k].get(c)]
+        lines.append(f"- **{k}**: " + "; ".join(f"{c}: «{a[k].get(c, '')}» → «{b[k].get(c, '')}»" for c in cols))
+    open(out, "x", encoding="utf-8").write("\n".join(lines) + "\n")
+    print(f"{len(added)} added, {len(gone)} dropped, {len(changed)} changed → {out}")
+
+
 def main():
+    if len(sys.argv) == 5 and sys.argv[1] == "--compare":
+        return compare(*sys.argv[2:])
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("evidence"); ap.add_argument("looks", nargs="+", help="look-evidence TSVs (the harvest, then later looks)")
     ap.add_argument("--out", required=True)
@@ -433,10 +660,12 @@ def main():
             add(x, "gate")
         for lang, pages in look[item].items():
             add(lang, f"look:{len(pages)}")
-        for prefix, (langs_, why) in DECLARED.items():
-            if item.startswith(prefix):
-                for x in langs_:
-                    add(x, f"declared:{why}")
+        # the LONGEST matching prefix only, as below (2026-10-27, cupel19a: «ANNO_e0y_1910» and «ANNO_e0y_19100061» both
+        # matched file 61, and adding both in file order put the general key's German first)
+        hit = declared_key(item)
+        if hit:
+            for x in DECLARED[hit][0]:
+                add(x, f"declared:{DECLARED[hit][1]}")
         doubt, notes = [], []
         cyr, lex = n(r, "auth_cyrillic"), n(r, "rus_lex_pages")
         cw, rw, bg, uk = (n(r, k) for k in ("auth_cyr_words", "auth_ru_letter_words", "auth_bg_words", "auth_uk_words"))
@@ -491,7 +720,7 @@ def main():
             else:
                 add("serbian-or-macedonian?", f"auth:{n(r, 'srp_mkd')}"); doubt.append("ђ ј љ њ ћ џ ѓ ќ ѕ on 3+ pages")
         for prefix, (frms, to, why) in RULED.items():
-            if item.startswith(prefix):
+            if item.startswith(prefix) and (prefix not in RULED_EXACT or item == prefix):
                 for frm in frms:
                     if frm in L:
                         if to and to not in L:   # a rename keeps the language's place (2026-10-10: Mondo 1932's
@@ -531,7 +760,7 @@ def main():
                 add(lang, f"auth:{n(r, col)}")
         # the rulings again, for the entries just added (a ruling that DROPS a script, e.g. Studia Slavica's fake Arabic)
         for prefix, (frms, to, why) in RULED.items():
-            if item.startswith(prefix) and to is None:
+            if item.startswith(prefix) and to is None and (prefix not in RULED_EXACT or item == prefix):
                 for frm in frms:
                     if frm in L:
                         L.pop(frm); notes.append(f"{frm} dropped by ruling: {why}")
@@ -591,7 +820,7 @@ def main():
         # item's few Latin bits (Belousov 1975 and 1985, Informilo 1926–27: «esperanto» put ahead of the declared Russian).
         # Where the declared main is a Latin-script language and the gate disagrees (La Belga Sonorilo's Ido years:
         # declared esperanto, the gate ido), the gate MEASURED, so its order stands and the row is listed for the editor.
-        decl = next((d for p, (d, _) in sorted(DECLARED.items(), key=lambda kv: -len(kv[0])) if item.startswith(p)), None)
+        decl = DECLARED[declared_key(item)][0] if declared_key(item) else None
         dmain = next((x for x in decl if not x.endswith("-cited")), None) if decl else None
         # Nor where the gate has no model for the declared main (Lingua Internationale, re-declared 2026-10-23 on the
         # editor's: Latino sine flexione, which the gate cannot report, so it said French).
@@ -602,6 +831,9 @@ def main():
             elif dmain in ("latino-sine-flexione",):
                 L.move_to_end(dmain, last=False)
                 notes.append(f"the declared main language ({dmain}) leads: the gate has no model for it")
+            elif any(item.startswith(p) for p in MAIN_BY_RULING):
+                L.move_to_end(dmain, last=False)
+                notes.append(f"the declared main language ({dmain}) leads by the editor's ruling: {MAIN_BY_RULING[next(p for p in MAIN_BY_RULING if item.startswith(p))]}")
             else:
                 MAIN_CONFLICTS.append((item, next(iter(L)), dmain))
         langs = [x for x in L if x != "cyrillic-unspecified" or len([y for y in L if SCRIPT_OF.get(y.rstrip('?')) == 'cyrillic']) == 1]

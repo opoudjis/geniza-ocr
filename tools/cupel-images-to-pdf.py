@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-r"""cupel-images-to-pdf — cupel step C1: a placed scan's TIFFs → single pages (split at the gutter) → one lossless PDF.
+r"""cupel-images-to-pdf — cupel step C2 (corrected 2026-10-25 from «C1», to match the run sheet of 2026-10-11): a placed scan's TIFFs → single pages (split at the gutter) → one lossless PDF.
 
     tools/cupel-images-to-pdf.py --stem <item> --out <new folder> [--look-all | --look N] <tiff> [<tiff> …]
 

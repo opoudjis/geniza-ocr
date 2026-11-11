@@ -23,10 +23,28 @@ ruling goes into the ledger tool first); else the tool refuses. `tools/ocr-dowse
 latest line is WITHDRAWN.
 """
 import os, re, sys, argparse, datetime
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import apostrophe_supersign as AS
 
 SEARCH = {"ABSENCE-ADMISSIBLE": "search sources/ocr-rendersearch/<item>.txt",
           "SPECIAL HANDLING": "search EVERY reading: sources/ocr-rendersearch-all/<item>.txt",
           "WITH EXCEPTIONS": "search sources/ocr-rendersearch/<item>.txt and, where present, sources/ocr-rendersearch-rus/<item>.txt, on the side and pages the conditions admit"}
+
+# NAME LISTS IN A SCOPED ROW (2026-11-01, the editor on cupel20a's wrappers, whose group-directory pages, read by vision,
+# fell under the G4 bar on their own pages: the name exception used elsewhere applies here too): the rule of
+# tools/ocr-absence-ledger.py's NAMELIST_CHECKED (editor's ruling 2026-10-01: a name list is judged by a name check on the
+# images, not by G4, which counts real words) for the rows of a scope rather than a whole item. Every row of an item here
+# is a name list: its own G4 under the bar is cleared by the name check, and its line says so in the same words. No «;»
+# in a note (the conditions are split on it).
+SCOPED_NAMELIST = {
+    # cupel20a, Germana Esperantisto's wrappers, the directory pages only (ocr/runs/CUPEL-BATCH-20a-SCOPE-2.tsv): a G5 of
+    # those pages on name recall (sources/cupel-batch-20a/g5e/, seed 20261105, the four wrappers with that scope): 40 of the
+    # 62 pages, 0 contradicted, 400/400 names found, every page NOTHING
+    "ANNO_e1a_19050090": "the group directory «Auskünfte über Esperanto» (1905), read by vision, vr22, G5 on name recall 2026-11-01: 400/400 names found over the four wrappers' directories, 70/70 on this volume's 7 pages",
+    "ANNO_e1a_19060090": "the group directory «Adressen von Esperantisten-Gruppen» (1906), read by vision, vr22, G5 on name recall 2026-11-01: 400/400 names found over the four wrappers' directories, 80/80 on this volume's 8 pages",
+    "ANNO_e1a_19080090": "the group directory «Adressen und Zusammenkünfte von Esperantisten-Gruppen» (1908), read by vision, vr22, G5 on name recall 2026-11-01: 400/400 names found over the four wrappers' directories, 140/140 on this volume's 14 pages",
+    "ANNO_e1a_19090090": "the group directory «Adressen und Zusammenkünfte von Esperantisten-Gruppen» (1909), read by vision, vr22, G5 on name recall 2026-11-01: 400/400 names found over the four wrappers' directories, 110/110 on this volume's 11 pages",
+}
 
 
 def main():
@@ -79,8 +97,12 @@ def main():
         if k not in SEARCH: continue
         if want is not None and c not in want: continue
         cond = r[6].strip() or "none"
+        # a ledger row whose conditions say SEARCH EVERY READING (cupel20b, failure map R97: its G5 passed on every
+        # reading, failed on the chosen text) gets the every-reading search field, which is what ocr-dowse.py reads to
+        # pick the text; until 2026-11-03 such a row got its class's field and the dowse searched the chosen text
+        srch = SEARCH["SPECIAL HANDLING"] if "SEARCH EVERY READING" in cond else SEARCH[k]
         if scope is None:
-            out.append(f"{pre} {c} | {pages} pp | {k} · G4 {g4} | {SEARCH[k]} | conditions: {cond} | {led} · {a.g5} | {sig}")
+            out.append(f"{pre} {c} | {pages} pp | {k} · G4 {g4} | {srch} | conditions: {cond} | {led} · {a.g5} | {sig}")
             n[k] = n.get(k, 0) + 1
             continue
         for s in [s for s in scope if s[0] == c]:
@@ -93,16 +115,23 @@ def main():
             lo, hi = map(int, rng.split("-"))
             if c not in gate: sys.exit(f"{c} is not in the gate {a.gate}")
             v, sg4, npp, bar = SG.scoped_g4(a.root, gate[c], lo, hi)
-            if v == "UNDER":
+            nl = SCOPED_NAMELIST.get(c)
+            if v == "UNDER" and not nl:
                 under.append(f"{c} pp. {lo}–{hi}: G4 {sg4:.1f} on its own pages ({npp} scored), bar {bar} (item {g4})")
                 continue
-            g4f = (f"G4 {sg4:.1f} on pp. {lo}–{hi} ({npp} pp scored; item {g4})" if v in ("PASS", "UNDER-AS-ITEM")
+            g4f = (f"G4 {sg4:.1f} on pp. {lo}–{hi} ({npp} pp scored; item {g4})" if v in ("PASS", "UNDER-AS-ITEM", "UNDER")
                    else f"G4 {g4} (item; pp. {lo}–{hi} {'too short to score' if v == 'TOO SHORT' else 'unscoreable'})")
+            if v == "UNDER":
+                g4f += f", under the bar {bar}, cleared by the NAME CHECK"
             sc = f"SCOPE: absence admissible on pages {lo}–{hi} only ({hi - lo + 1} pp)" + (f" — {lab}" if lab else "") + f"; {kind}"
+            if nl:
+                sc += f"; NAME LIST checked on NAME RECALL, by the images ({nl}) (editor's ruling 2026-10-01)"
             if kind == "SECONDARY":
                 sc += " LITERATURE — absence here shows only that this work does not mention X; it is not evidence about the event"
-            # an «Esperanto side» row of a bi-script item admitted on its other side only (failure map R64; approved by the editor
-            # 2026-10-24 21:4x, `ocr-biscript-scope.py`): the row's own pages pass on the Esperanto side, so the
+            if AS.applies(c):   # the note the normalisation owes its reader (the editor 2026-11-06 14:1x; tools/apostrophe_supersign.py)
+                sc += "; APOSTROPHES: printed with an apostrophe for each supersign, normalised to the letters in the search and preferred texts, the readings on disk as printed"
+            # an «Esperanto side» row of a bi-script item admitted on its other side only (failure map R64; the editor
+            # 2026-10-24 21:4x approved, `ocr-biscript-scope.py`): the row's own pages pass on the Esperanto side, so the
             # item's «… side only» clause would contradict the row; the row says which side it admits
             rcond = cond
             if lab.startswith("Esperanto side") and v == "PASS":
@@ -110,7 +139,7 @@ def main():
                                lambda m: f"SPECIAL HANDLING (bi-script): item {m[1]}; on pp. {lo}–{hi} the Esperanto side "
                                          f"passes alone (G4 {sg4:.1f}, bar {bar}) — absence admissible on the ESPERANTO "
                                          f"side of pp. {lo}–{hi}; the {m[2]} side as the item's own line", cond)
-            out.append(f"{pre} {c} | pp. {lo}–{hi} of {pages} | {k} · {g4f} | {SEARCH[k]} | conditions: {sc}; {rcond} | {led} · {a.g5} | {sig}")
+            out.append(f"{pre} {c} | pp. {lo}–{hi} of {pages} | {k} · {g4f} | {srch} | conditions: {sc}; {rcond} | {led} · {a.g5} | {sig}")
             n[kind] = n.get(kind, 0) + 1
     if under:
         print("NO LINE, SCOPE UNDER THE BAR on its own pages (for the editor):\n  " + "\n  ".join(under))

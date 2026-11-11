@@ -51,7 +51,7 @@ JUDGEMENTS (--judgements FILE), one line per person, fields separated by « | »
 its item present whatever its tier. The record prints each person's judgement, and their silences follow their cutoff;
 the silent counts at the exact-only and up-to-confusion cutoffs are given beside it.
 """
-import argparse, collections, datetime, fnmatch, glob, importlib.util, os, random, re, resource, sys, unicodedata
+import argparse, collections, datetime, fnmatch, glob, importlib.util, os, random, re, resource, subprocess, sys, unicodedata
 from multiprocessing import Pool
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -63,6 +63,7 @@ _s = importlib.util.spec_from_file_location("ns", os.path.join(HERE, "ocr-name-s
 NS = importlib.util.module_from_spec(_s); _s.loader.exec_module(NS)
 sys.path.insert(0, HERE)
 import ocr_index as IX  # noqa: E402
+import factline as FL  # noqa: E402  (a line's own fields, the source's words left out; 2026-10-28)
 import born_digital_lines as BDL  # noqa: E402  (the born-digital lists and texts, 2026-10-10)
 import corpus_locks as CL  # noqa: E402  (the dowse's lock against Miles's chain, 2026-10-26: geniza/ocr/locks/)
 _BDSEC = {}   # born-digital item → {¶: section}, filled in main(); its hits cite «¶ N», not a PDF page
@@ -103,9 +104,11 @@ def birth_year(label):
         sur = re.split(r"[\s(]", name.strip())[0].strip(",") if name else ""
         for l in t.splitlines():
             if not l.startswith("- $$$"): continue
-            ys += [int(y) for y in _B1.findall(l)] + [int(y) for y in _B2.findall(l)]
+            # the birth in our words, not in the anchor's («lia patro naskiĝis en 1821»: the trigger audit, 43)
+            own = FL.ours(l)
+            ys += [int(y) for y in _B1.findall(l)] + [int(y) for y in _B2.findall(own)]
             if sur and len(sur) > 2:
-                ys += [int(y) for y in re.findall(re.escape(sur) + r"[^()]{0,30}?\((1[5-9]\d\d|20[0-2]\d)\s*[–-]", l, re.I)]
+                ys += [int(y) for y in re.findall(re.escape(sur) + r"[^()]{0,30}?\((1[5-9]\d\d|20[0-2]\d)\s*[–-]", own, re.I)]
     _BIRTH[label] = min(ys) if ys else None
     return _BIRTH[label]
 
@@ -879,6 +882,8 @@ def tier(how, form, targets, stem):
         return "stem"
     if not how.startswith("word"):
         return "join"
+    if STRICT_MARK in how:                        # --translit-strict: a transliterated hit within the ordinary allowance
+        return "near"
     if "measured OCR confusion" in how:
         return "confusion"
     if form in targets:
@@ -936,10 +941,78 @@ _STRONG = False
 # they are gathered or written, so the readers' roster is the same.
 STRONG_TIERS = {"exact", "near", "confusion"}
 
+# THE STRICT TRANSLITERATION TIER (2026-11-09; Miles, on Espero of St Petersburg, 430 of its 478 pages in Russian: the
+# strong search drops «translit», so a Latin roster form barely finds a Russian page; the editor). The «translit»
+# tier compares a Cyrillic word, transliterated, with a Latin name at the ordinary allowance + 1 (tools/ocr-name-search.py
+# close()), the noise of La Ondo's 25.3M hits. --translit-strict keeps, in the strong search, the «translit» hits where
+# (1) the name has 5 letters or more, (2) the word as printed is CAPITALISED, and (3) the word, transliterated, whole or
+# with its Russian case ending stripped, EQUALS the name once both go through one Russian transcription table (TRANSCR:
+# ch, sh, zh, shch → c, s, z, s, as the Esperanto forms fold; kh → h; h → g, the Russian rendering of a foreign h,
+# «Заменгофъ»; w → v; ph → f; x → ks; j, y → i). MEASURED 2026-11-09 on Espero Kleriga 1908-1 and 1908-12, the whole
+# roster (22,780 names): the ordinary allowance (1 edit to 6 letters, 2 above) kept 75,899 hits for 4,433 names, nearly all
+# words («только» for Stolk, «будетъ» for Baudet); one edit at every length 46,318; this rule 480 hits for 52 names: the
+# Russian-side people (Ivanov, Bitner, Tihomirov, Mal'cev, Men'šikov, Zverev), place names that are also roster names
+# (Rossi «Россія», German «Германіи», Kovno, Berlin) and «Эсперанто» itself. They are marked in «how» (STRICT_MARK) and
+# labelled «near», which the readers' roster takes. Off by default: every other search is unchanged. Read in each worker
+# from the environment (the pools spawn), set by main() from the flag.
+STRICT_MARK = " · transliterated, by the Russian transcription table (--translit-strict)"
+_TRANSLIT_STRICT = os.environ.get("OCR_DOWSE_TRANSLIT_STRICT") == "1"
+TRANSCR = (("shch", "s"), ("ch", "c"), ("sh", "s"), ("zh", "z"), ("kh", "h"), ("ph", "f"), ("x", "ks"), ("w", "v"), ("h", "g"),
+           ("y", "i"), ("j", "i"))
+
+
+def _transcr(w):
+    for a_, b_ in TRANSCR:
+        w = w.replace(a_, b_)
+    return w
+
+
+def strict_translit(form, targets, as_read):
+    first = re.search(r"[^\W\d_]", as_read)
+    if not first or not first.group(0).isupper():
+        return False
+    for tg in targets:
+        if NS.is_cyr(form) == NS.is_cyr(tg):
+            continue
+        c, l = (form, tg) if NS.is_cyr(form) else (tg, form)
+        if len(l) < 5:
+            continue
+        if any(_transcr(NS.translit(x)) == _transcr(l) for x in (c, NS.stem(c))):
+            return True
+    return False
+
 
 def strong_hits(hs, forms):
     tg = {NS.fold(max(re.findall(r"[^\W\d_]+", f), key=len)) for f in forms}
-    return [h for h in hs if tier(h[-2], NS.fold(re.sub(r"\s*…\s*", "", h[-1]).replace(" ", "")), tg, False) in STRONG_TIERS]
+    out = []
+    for h in hs:
+        fm = NS.fold(re.sub(r"\s*…\s*", "", h[-1]).replace(" ", ""))
+        t = tier(h[-2], fm, tg, False)
+        # A RUSSIAN SOURCE'S CYRILLIC HITS (2026-11-09, with the Russian roster, tools/roster-cyrillic.py): measured on two
+        # Espero Kleriga issues, the 29 people's Cyrillic forms hit 512 words, all of them noise («бей» for Бейн, «вать»
+        # for Валь, «поступковъ» for Постниковъ); a Russian word in lower case is not a name, so with --translit-strict a
+        # Cyrillic hit must be capitalised (129 left), and a Cyrillic form of 4 letters or fewer (Бейн, Кабе, Валь) must
+        # be matched exactly («Бей», «Кате», «Аль» out)
+        if _TRANSLIT_STRICT and t in STRONG_TIERS and NS.is_cyr(fm):
+            first = re.search(r"[^\W\d_]", h[-1])
+            if not first or not first.group(0).isupper():
+                continue
+            if t != "exact" and all(len(x) <= 4 for x in tg if NS.is_cyr(x)) and any(NS.is_cyr(x) for x in tg):
+                continue
+        if t in STRONG_TIERS:
+            out.append(h)
+        elif t == "translit" and _TRANSLIT_STRICT and strict_translit(fm, tg, h[-1]):
+            out.append(h[:-2] + (h[-2] + STRICT_MARK, h[-1]))
+    return out
+
+
+# ONLY THE NOTICE PAGES (2026-11-07; the editor, on a search of 18,328 pages for 1,803 notice pages): --pages
+# FILE, «item TAB page» a line, written by redowse-pages.py search: each text is cut to those pages before it is indexed.
+_PAGES = None
+
+
+def only_pages(text, keep):
+    return "".join(f"=== page {p} ===\n{t}" for p, t in IX.pages(text) if p in keep)
 
 
 def build_union(ujobs):
@@ -948,6 +1021,7 @@ def build_union(ujobs):
     for item, files, strong in ujobs:
         for f in files:
             text = read_text(f)
+            if _PAGES is not None: text = only_pages(text, _PAGES.get(item, ()))
             rel = os.path.relpath(f, S)
             idx = IX.build(text, words_only=strong)
             for form, lst in idx.words.items():
@@ -961,8 +1035,9 @@ def build_union(ujobs):
     return U.bucket()
 
 
-def _union_init(ujobs):
-    global _UNION, _STRONG
+def _union_init(ujobs, pages=None):
+    global _UNION, _STRONG, _PAGES
+    _PAGES = pages                                # passed in: a macOS worker starts afresh and sees no global of main's
     _UNION = build_union(ujobs)
     _STRONG = any(strong for _it, _f, strong in ujobs)
 
@@ -1127,6 +1202,12 @@ def sort_hit(toks, i, group, firsts, titles=None):
     return ("unlisted", " ".join(run))
 
 
+def progress(done, of, what, t0):
+    """A line a finished share, flushed, with the time so far and a straight-line estimate of what is left: a search of the
+    full roster ran 45 minutes with no sign of where it stood (2026-11-07; the editor). The biggest items and any record-writing are not in the estimate."""
+    secs = (datetime.datetime.now() - t0).seconds
+    print(f"  {done}/{of} {what}, {secs // 60} min so far, about {round(secs * (of - done) / done / 60)} min left", flush=True)
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("forms", nargs="*", help="the forms of ONE name (the one-name way)")
@@ -1146,6 +1227,7 @@ def main():
     ap.add_argument("--where-max", type=int, default=None,
                     help="list the places of a form with at most this many hits (default: all with --items, else 10)")
     ap.add_argument("--jobs", type=int, default=8)
+    ap.add_argument("--pages", default=None, help="a file of «item TAB page» lines: search only those pages (the union search only)")
     ap.add_argument("--mode", choices=("solo", "shared"), default=None,
                     help="the worker count by the editor's two modes (2026-10-14: 40%% of cores when running alongside "
                          "a parallelised cupel, 80%% of cores when running solo), from tools/cupel_workers.py; overrides --jobs")
@@ -1160,7 +1242,24 @@ def main():
     ap.add_argument("--born-digital", choices=("signed", "proposed", "none"), default="signed",
                     help="the born-digital lists searched beside the ledger: SIGNED only (default), PROPOSED too (a "
                          "test: their silences are labelled «proposed, not signed»), or none")
+    ap.add_argument("--stored", nargs="?", const=os.path.join(S, "ocr-work", "index-store.noindex"), default=None, metavar="STORE",
+                    help="with --strong-only: the people tools/ocr-index-store.py has cached by look-up, the rest by the ordinary "
+                         "search; the same hits (2026-11-07; the editor)")
+    ap.add_argument("--translit-strict", action="store_true",
+                    help="with --strong-only, for a source in Russian: also keep the transliteration hits that equal the name by "
+                         "the Russian transcription table, capitalised, names of 5+ letters (labelled near, marked in «how»; 2026-11-09)")
     a = ap.parse_args()
+    if a.stored and not a.strong_only:
+        sys.exit("--stored answers the strong tiers only: give --strong-only")
+    if a.translit_strict:
+        if not a.strong_only: sys.exit("--translit-strict refines the strong search: give --strong-only")
+        if a.stored: sys.exit("--translit-strict: the store caches the strong tiers' look-ups only; search without --stored")
+        os.environ["OCR_DOWSE_TRANSLIT_STRICT"] = "1"; globals()["_TRANSLIT_STRICT"] = True
+    if a.pages:
+        wanted = collections.defaultdict(set)
+        for l in open(a.pages, encoding="utf-8"):
+            if l.strip(): wanted[l.split("\t")[0]].add(int(l.split("\t")[1]))
+        globals()["_PAGES"] = dict(wanted)
     if a.mode:                                   # the same count the cupel uses (cupel_workers.total)
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from cupel_workers import total as _workers
@@ -1260,16 +1359,34 @@ def main():
             pr.disable()
             pstats.Stats(pr).sort_stats("tottime").print_stats(20)
             sys.exit(0)
-        if len(jobs) > 1 and not a.stem and not a.per_item:
+        if (len(jobs) > 1 or a.stored) and not a.stem and not a.per_item:
             ujobs = [(it, files, strong) for it, files, _, _, strong in jobs]
-            n = max(1, min(len(people), a.jobs * 8))  # shares of the roster, small enough to keep every worker busy
-            chunks = [people[i::n] for i in range(n)]
             res = {it: {label: [] for label, _ in people} for it, *_ in jobs}   # roster order, as search_item keys them
-            with Pool(a.jobs, initializer=_union_init, initargs=(ujobs,)) as pool:
-                for part in pool.imap_unordered(search_people_slotted, chunks):
-                    for label, hs in part.items():
-                        for (it, rel, p), how, r in hs:
+            rest = people
+            if a.stored:                          # the texts of this search indexed, the new word forms folded; then the look-ups
+                tools = os.path.dirname(os.path.abspath(__file__))
+                lst = re.sub(r"\.md$", "", a.write) + ".stored-texts.tmp"
+                with open(lst, "w", encoding="utf-8") as fh:
+                    fh.write("".join(f + "\n" for _, files, _ in ujobs for f in files))
+                subprocess.run([sys.executable, os.path.join(tools, "ocr-index-store.py"), "fold", "--store", a.stored, "--texts", lst, "--jobs", str(a.jobs)], check=True, stdout=sys.stderr)
+                os.remove(lst)
+                spec = importlib.util.spec_from_file_location("ocr_index_store", os.path.join(tools, "ocr-index-store.py"))
+                ST = importlib.util.module_from_spec(spec); spec.loader.exec_module(ST)
+                found, rest, note = ST.stored_search(a.stored, people, [(it, files) for it, files, _ in ujobs], _PAGES)
+                print(note, file=sys.stderr)
+                for label, forms in people:
+                    if label in found:
+                        for (it, rel, p), how, r in strong_hits(found[label], forms):
                             res[it][label].append((rel, p, how, r))
+            n = max(1, min(len(rest), a.jobs * 8))  # shares of the roster, small enough to keep every worker busy
+            chunks = [rest[i::n] for i in range(n)]
+            if rest:
+                with Pool(a.jobs, initializer=_union_init, initargs=(ujobs, _PAGES)) as pool:
+                    for k, part in enumerate(pool.imap_unordered(search_people_slotted, chunks), 1):
+                        for label, hs in part.items():
+                            for (it, rel, p), how, r in hs:
+                                res[it][label].append((rel, p, how, r))
+                        progress(k, len(chunks), "shares of the roster", t0)
             for it, files, *_ in jobs:            # the record's size line, as search_item counts it
                 size = [0, 0]
                 for f in files:
@@ -1280,8 +1397,11 @@ def main():
                     res[it][label].sort(key=lambda h: order[h[0]])
                 res[it]["\0size"] = size
         else:
+            res = {}
             with Pool(a.jobs) as pool:
-                res = dict(pool.imap_unordered(search_item_slotted, jobs, chunksize=1))
+                for k, (it, r) in enumerate(pool.imap_unordered(search_item_slotted, jobs, chunksize=1), 1):
+                    res[it] = r
+                    progress(k, len(jobs), "items", t0)
     secs = (datetime.datetime.now() - t0).seconds
     cpu = resource.getrusage(resource.RUSAGE_CHILDREN).ru_utime + resource.getrusage(resource.RUSAGE_SELF).ru_utime
     sizes = [v.pop("\0size") for v in res.values() if "\0size" in v]
@@ -1468,7 +1588,9 @@ def main():
          f"Searched {len(rows)} items, uncapped. Every hit: `{os.path.basename(a.from_hits or hits_tsv)}`. Every hit is a "
          f"CANDIDATE until confirmed on the page image. Do not hand-edit — re-run it."
          + (" STRONG TIERS ONLY (--strong-only): single words, no joins, for the readers' roster; NOT a presence record, "
-            "its silences say nothing." if getattr(a, "strong_only", False) else "") + "]`", "",
+            "its silences say nothing." if getattr(a, "strong_only", False) else "")
+         + (" With --translit-strict: transliterated hits equal by the Russian transcription table kept as «near», marked in «how»."
+            if getattr(a, "translit_strict", False) else "") + "]`", "",
          (f"**Size and time:** {len(rows):,} items, {n_pages:,} pages, {n_words:,} words searched (each text counted once, "
           f"the texts in other alphabets included), {len(people):,} people; {secs:,} s wall-clock, {cpu:,.0f} s CPU, "
           f"{a.jobs} processes, on the machine described in METHOD.md." if not a.from_hits else

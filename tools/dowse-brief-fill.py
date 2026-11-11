@@ -18,7 +18,7 @@ header says it is SUPERSEDED is refused). The settings, dowse/<source>/brief-con
 The «out» list comes from dowse/<source>/out-list-<date>.md (tools/dowse-reader-roster.py --out-list), the roster from
 dowse/<source>/roster-reader-<date>.txt if it exists, else roster.txt; the namesakes from dowse/<source>/candidates-<date>.md
 or candidates.md (tools/dowse-candidates.py; required from 2026-10-15). Refuses to overwrite. Ezri, 2026-10-14."""
-import argparse, glob, json, os, re, sys
+import argparse, csv, glob, json, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import corpus_locks as CL  # noqa: E402  (the dowse's lock against Miles's chain, 2026-10-26: geniza/ocr/locks/)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -105,9 +105,18 @@ SCOPE = {}    # the source's scope.tsv, for propose_ranges
 # FILE gives the «readers» for this run only (the recupelled pages, written by tools/redowse-pages.py), so the source's
 # own brief-config.json keeps its whole-source ranges; its «reader_starts», numbered by those ranges, is not used
 READERS_OVERRIDE = []
+# A DATED CONFIG (2026-11-10, the roster-cut redowse of Esperanto (UEA): its 1905–1910 issues are the texts of
+# brief-config-2026-10-30u.json, not of brief-config.json, and a --readers-file reader whose item is not among the
+# config's texts gets no brief, silently): --config FILE (a name in dowse/<source>/, or a path) read in place of
+# brief-config.json, for this run only; the file itself is not written
+CONFIG_FILE = []
+
+def config_name():
+    return os.path.basename(CONFIG_FILE[0]) if CONFIG_FILE else "brief-config.json"
 
 def load_config(D):
-    c = json.load(open(os.path.join(D, "brief-config.json"), encoding="utf-8"))
+    p = CONFIG_FILE[0] if CONFIG_FILE else "brief-config.json"
+    c = json.load(open(p if os.path.isabs(p) else os.path.join(D, p), encoding="utf-8"))
     if READERS_OVERRIDE: c["readers"], c["reader_starts"] = READERS_OVERRIDE[0], {}
     return c
 
@@ -203,6 +212,93 @@ def article_cuts(lines_by_page, ps, rubric=None):
             out[p] = ("mid", h[0][1][:60])
     return out
 
+# THE CONTEXT OF A REDOWSE READER (2026-10-30; the editor 16:0x: a re-cupelled page is not read in isolation, since a dowse
+# needs the pages beside it to make sense, but eight pages are too many; the bounds proposed approved, up to a page or
+# the first heading): with --context (redowse-pages.py prep), a reader's page file
+# holds, besides its own pages, the page before from its last heading (the whole page if it has none; nothing if the
+# reader's first page opens with an article), the page after up to its first heading (the whole page if none; nothing if
+# it opens with one), and the issue's masthead lines when the issue began on an earlier page, each marked CTX_MARK
+CONTEXT = []   # [the source's brief-config], set by --context
+CTX_MARK = "=== kunteksto, nur por kompreno; prenu neniun fakton el ĝi: PDF {p}, {what} ==="
+
+# THE PAGE'S OTHER READINGS IN THE BRIEF (2026-11-03, the bi-script redowse; the editor; the runbook's «Not
+# built yet: the search's form given in the R4 brief»): item -> {PDF page: [the forms the name search read there]},
+# from a search table (redowse-pages.py search --write, the «persons gained» column, «person «form»»), set by
+# --other-readings. Each such page in a reader's pages file is followed by the lines of its every-reading text
+# (sources/ocr-rendersearch-all/<item>.txt) round each form, the first reading that holds it, marked; the legilo reads
+# them as the page's own, and the harvest finds a quotation from them on the page (harvest-facts.py item_pages)
+OTHER = {}
+OTHER_ONLY = []   # --other-readings-only: the extracts without the page they belong to (pages_files)
+# (the words «kiujn la ĉefa legaĵo de la paĝo ne montras», 2026-11-03: «la supra teksto» named a text that, with
+# --other-readings-only, does not stand above them)
+OTHER_MARK = ("=== aliaj legaĵoj de la paĝo {p}: la nomserĉo legis ĉi tie {forms}, kiujn la ĉefa legaĵo de la paĝo ne montras; "
+              "la samaj linioj de la paĝo, legitaj alimaniere; faktoj el ili citas la paĝon {p} kiel kutime ===")
+OTHER_END = "=== fino de la aliaj legaĵoj de la paĝo {p} ==="
+_ALL = {}
+
+def other_readings(item, p):
+    """-> the marked block of page p's other readings round its forms, or '' (OTHER, above): at most 12 lines each side
+    of a form's first line in each reading, windows that meet joined, 60 lines a page at most."""
+    forms = OTHER.get(item, {}).get(p)
+    if not forms: return ""
+    ap = os.path.join(G, "sources", "ocr-rendersearch-all", item + ".txt")
+    if ap not in _ALL:
+        t = open(ap, encoding="utf-8").read() if os.path.exists(ap) else ""
+        pc = re.split(r"^=== page (\d+) ===[ \t]*$", t, flags=re.M)
+        _ALL[ap] = {int(pc[i]): pc[i + 1] for i in range(1, len(pc) - 1, 2)}
+    readings = re.split(r"^--- (\S+) ---$", _ALL[ap].get(p, ""), flags=re.M)
+    readings = [(readings[i], readings[i + 1].split("\n")) for i in range(1, len(readings) - 1, 2)]
+    wins = {}
+    for f in forms:
+        f = f.strip(".,;:!?»«“”„\"'()[]|-…")
+        for name, ls in readings:
+            at = next((i for i, l in enumerate(ls) if f and f in l), None)
+            if at is not None:
+                wins.setdefault(name, []).append((max(0, at - 12), min(len(ls), at + 13))); break
+    out = []
+    for name, ls in readings:
+        for lo, hi in sorted(wins.get(name, [])):
+            if out and out[-1][0] == name and lo <= out[-1][2]: out[-1][2] = max(out[-1][2], hi)
+            else: out.append([name, lo, hi])
+    body = [l for name, lo, hi in out for l in dict(readings)[name][lo:hi] if l.strip()][:60]
+    if not body: return ""
+    return ("\n" + OTHER_MARK.format(p=p, forms=", ".join(f"«{f}»" for f in forms)) + "\n" + "\n".join(body)
+            + "\n" + OTHER_END.format(p=p) + "\n")
+
+def context_blocks(t, lo, hi, c):
+    """-> (before, after): the marked context of the reader's pages lo–hi of the text t (see CONTEXT)."""
+    lbp = page_lines(t)
+    ps = sorted(lbp)
+    j = c.get("journal") or {}
+    rub = j.get("rubric")
+    cuts = article_cuts(lbp, ps, rub)
+    before, after = [], []
+    if lo - 1 in lbp and cuts.get(lo, ("",))[0] != "top":
+        ls = lbp[lo - 1]
+        h = headings(ls, rub)
+        k = h[-1][0] if h else 0
+        part = "\n".join(ls[k:]).strip("\n")
+        if part.strip():
+            before.append(CTX_MARK.format(p=lo - 1, what=f"de la titolo «{h[-1][1][:50]}»" if h else "la tuta paĝo") + "\n" + part + "\n")
+    # the masthead: the issue's first lines, where the issue began before the context
+    starts = sorted(issue_starts(lbp, j.get("issue_start"), j.get("issue_window", 30)))
+    first = max((p for p in starts if p <= lo), default=None)
+    if first is not None and first < lo - (1 if before else 0):
+        body = [l for l in lbp[first] if l.strip()]
+        rx = re.compile(j["issue_start"]) if j.get("issue_start") else None
+        upto = next((i for i, l in enumerate(body[:30]) if rx and rx.search(l)), None)
+        mast = body[:(upto + 1 if upto is not None else 0) + 4][:8]
+        if mast: before.insert(0, CTX_MARK.format(p=first, what="la kapo de la numero") + "\n" + "\n".join(mast) + "\n")
+    if hi + 1 in lbp:
+        nh = hi + 1
+        if cuts.get(nh, ("",))[0] != "top":
+            ls = lbp[nh]
+            h = headings(ls, rub)
+            part = "\n".join(ls[:h[0][0]] if h else ls).strip("\n")
+            if part.strip():
+                after.append(CTX_MARK.format(p=nh, what=f"ĝis la titolo «{h[0][1][:50]}»" if h else "la tuta paĝo") + "\n" + part + "\n")
+    return "".join(before), "".join(after)
+
 def pages_files(texts, date):
     """EACH READER'S PAGES CUT OUT FOR IT (2026-10-17; the editor; the runbook review, lever 2): a reader of
     2026-10-15 searched the whole text for its pages (a Neves reader read lines 1–700, then 3700–3950 and 4200–4600) and
@@ -221,9 +317,24 @@ def pages_files(texts, date):
             # the next unit only for pages, where a paragraph runs on; a paragraph («¶ N») ends in itself, and its
             # neighbour in the file would invite lines from the next reader's first paragraph (found 2026-10-17, Jossinet)
             nxt = 0 if re.search(r"^=== ¶ \d+ ===", t, re.M) else 1
-            keep = [units[n] for n in range(lo, min(hi + nxt, last) + 1) if n in units]
+            if CONTEXT and not nxt: sys.exit("refusing: --context is for paged texts")
+            stem = os.path.basename(path)[:-4]
+            if OTHER and OTHER_ONLY:
+                # THE EXTRACTS ONLY (2026-11-03, the bi-script redowse): the page's preferred text was dowsed already, so
+                # the reader is given its page marker and the other readings' lines alone (67 pages: 18,000 words of
+                # extracts against 48,000 of pages, and their neighbours as context besides)
+                keep = [f"=== page {n} ===\n" + other_readings(stem, n).lstrip("\n") for n in range(lo, hi + 1) if other_readings(stem, n)]
+                head = f"=== teksto: {stem} ===\n" if len(bypath) > 1 else ""
+                chunks.append(head + "".join(keep).strip("\n") + "\n")
+                continue
+            keep = [units[n].rstrip("\n") + "\n" + other_readings(stem, n) if n <= hi and other_readings(stem, n) else units[n]
+                    for n in range(lo, (hi if CONTEXT else min(hi + nxt, last)) + 1) if n in units]
             head = f"=== teksto: {os.path.basename(path)[:-4]} ===\n" if len(bypath) > 1 else ""
-            chunks.append(head + "".join(keep).strip("\n") + "\n")
+            if CONTEXT:
+                bef, aft = context_blocks(t, lo, hi, CONTEXT[0])
+                chunks.append(head + bef + "".join(keep).strip("\n") + "\n" + aft)
+            else:
+                chunks.append(head + "".join(keep).strip("\n") + "\n")
         out[f"facts-pages-{date}-{r}.txt"] = "\n".join(chunks)
     return out
 
@@ -240,9 +351,11 @@ def coverage(readers, texts, partial, scope=None):
     RANGES.clear()
     scope = scope or {}
     if len(texts) == 1:
-        got = [(int(m.group(2)), int(m.group(3) or m.group(2)), m.group(1))
-               # the text's name before the range is optional: --write-readers names it, a range written by hand need not
-               for m in re.finditer(r"(\d+): (?:`[^`]+` )?(?:PDF|¶) (\d+)(?:\s*[–-]\s*(\d+))?", readers)]
+        # the text's name before the range is optional: --write-readers names it, a range written by hand need not; a reader
+        # may hold several ranges, «1: PDF 2–3 + PDF 5» (2026-11-06: only the first was read, and the page file and roster lost the rest)
+        got = [(int(m.group(1)), int(m.group(2) or m.group(1)), e.group(1))
+               for e in re.finditer(r"(\d+): (.*?)(?=\s+·\s+\d+:|\s*$)", readers, re.S)
+               for m in re.finditer(r"(?:PDF|¶) (\d+)(?:\s*[–-]\s*(\d+))?", e.group(2))]
         faults = gaps(got, lastof(joined), unit, expect=scope.get(os.path.basename(texts[0][0])[:-4]))
         for lo, hi, r in got: RANGES.setdefault(r, []).append((texts[0][0], lo, hi))
     else:
@@ -288,8 +401,13 @@ def fill(s, date, stage, side, partial="", pdir=None):
          f"{c['source']}. {marker}"),
         ("{absoluta vojo al sources/ocr-preferred/<ero>.txt aŭ sources/born-digital-text/<ero>.txt}", "\n".join(os.path.join(G, x) for x in c["texts"])
          + f"\n**Viaj paĝoj, eltranĉitaj por vi** (la runbook-revizio de 2026-10-17): `{os.path.join(pdir, f'facts-pages-{date}-')}N.txt`, kie N estas via numero; "
-           "ĝi enhavas viajn paĝojn kun iliaj markoj, kaj la sekvan paĝon, por alineo, kiu daŭras. Legu tiun dosieron; la tutan tekston supre "
-           "nur por noto, kiun viaj paĝoj citas, aŭ por kunteksto."),
+           + ("ĝi enhavas viajn paĝojn kun iliaj markoj, kaj antaŭ kaj post ili kuntekston el la najbaraj paĝoj (la komencon de "
+              "artikolo, kiu daŭras sur viaj paĝoj, ĝian daŭrigon, la kapon de la numero), markitan «=== kunteksto, nur por kompreno; "
+              "prenu neniun fakton el ĝi … ===». **El la kunteksto prenu neniun fakton:** ĝi estas jam legita; ĝi nur helpas kompreni "
+              "viajn paĝojn (kiu parolas, pri kio, kie, kiam). Legu tiun dosieron; la tutan tekston supre nur por noto, kiun viaj "
+              "paĝoj citas." if CONTEXT else
+              "ĝi enhavas viajn paĝojn kun iliaj markoj, kaj la sekvan paĝon, por alineo, kiu daŭras. Legu tiun dosieron; la tutan tekston supre "
+              "nur por noto, kiun viaj paĝoj citas, aŭ por kunteksto.")),
         ("{Kiel rilatas presitaj kaj PDF-paĝoj, ekz. «la presita paĝo estas kutime la PDF-paĝo minus unu; kontrolu ĝin sur ĉiu paĝo, kie ĝi videblas».}", c["pages"]),
         ("**Viaj paĝoj:** PDF {de} ĝis {ĝis}. Legu ilin tute.\n", ""),
         ("{Se la fonto estas sub kopirajto:} ", "" if c["copyright"] else "\x00"),
@@ -313,7 +431,7 @@ def fill(s, date, stage, side, partial="", pdir=None):
     body = re.sub(r"## La legiloj\n\n\{Por ĉiu legilo:.*\}", (extra + "\n\n" if extra else "") + "## La legiloj\n\n" + c["readers"], body, flags=re.S)
     cover = (f" Partial on purpose ({partial}): " + "; ".join(faults) + "." if faults else "")
     head = (f"# {s}: la fakto-legado{' de ' + stage if stage else ''} ({date})\n\n"
-            f"`[Ezri, {date}, per tools/dowse-brief-fill.py el la ŝablono {os.path.basename(TPL)} kaj dowse/{s}/brief-config.json; "
+            f"`[Ezri, {date}, per tools/dowse-brief-fill.py el la ŝablono {os.path.basename(TPL)} kaj dowse/{s}/{config_name()}; "
             f"the side files of {side}; «The list in force» lines {la}–{lb}.{cover}]`\n\n"
             "## La briefo, kiel donita al ĉiu legilo (la paĝoj malsamas)")
     return head + body
@@ -496,6 +614,9 @@ def propose_ranges(s, target, write=False):
         # sections packed into a reader up to a quarter over the target; only a section too big for one reader is
         # split, in parts of about the target, each such cut marked «mid-section: choose the paragraph»
         ps = sorted(units[x]); cap = target * 1.25
+        # the cap of twenty a reader is in PAGES (D6 point 7); a numbered text's ¶ are cut by its lines alone (2026-11-04:
+        # OV's 2,326 ¶ were proposed as 122 readers of about 30 lines, every cut at 20 ¶)
+        mx = 10 ** 6 if re.search(r"^=== ¶ \d+ ===", t, re.M) else 20
         # THE SCOPE (scope.tsv, tools/dowse-page-scope.py, 2026-10-20): only the pages in scope; each run of them a
         # section of its own, and no reader's range across a page out of scope
         sc = SCOPE.get(stems[x], None) if stems[x] in SCOPE else None
@@ -513,9 +634,9 @@ def propose_ranges(s, target, write=False):
             if cur: out.append((ps[cur[0]], ps[cur[1] - 1], sum(lines_on(p) for p in ps[cur[0]:cur[1]]), ""))
         for a_, b_ in secs:
             n_ = sum(lines_on(p) for p in ps[a_:b_])
-            if n_ > cap or b_ - a_ > 20:
+            if n_ > cap or b_ - a_ > mx:
                 flush(); cur = None
-                parts = max(2, -(-int(n_) // target), -(-(b_ - a_) // 20))
+                parts = max(2, -(-int(n_) // target), -(-(b_ - a_) // mx))
                 acc_, start, done = 0.0, a_, 0
                 for q in range(a_, b_):
                     acc_ += lines_on(ps[q])
@@ -524,7 +645,7 @@ def propose_ranges(s, target, write=False):
                         out.append((ps[start], ps[q], sum(lines_on(p) for p in ps[start:q + 1]), "mid-section: choose the paragraph"))
                         start, done = q + 1, done + 1
                 out.append((ps[start], ps[b_ - 1], sum(lines_on(p) for p in ps[start:b_]), "mid-section: choose the paragraph"))
-            elif cur and sum(lines_on(p) for p in ps[cur[0]:b_]) <= cap and b_ - cur[0] <= 20 and whole(cur[0], b_):
+            elif cur and sum(lines_on(p) for p in ps[cur[0]:b_]) <= cap and b_ - cur[0] <= mx and whole(cur[0], b_):
                 cur = (cur[0], b_)
             else:
                 flush(); cur = (a_, b_)
@@ -534,7 +655,7 @@ def propose_ranges(s, target, write=False):
         while k < len(out):
             a, b, acc, note = out[k]
             if acc < target / 3 and len(out) > 1:
-                nb = [m for m in (k - 1, k + 1) if 0 <= m < len(out) and out[m][2] + acc <= cap and (max(b, out[m][1]) - min(a, out[m][0]) + 1) <= 20
+                nb = [m for m in (k - 1, k + 1) if 0 <= m < len(out) and out[m][2] + acc <= cap and (max(b, out[m][1]) - min(a, out[m][0]) + 1) <= mx
                       and all(p in ps for p in range(min(a, out[m][0]), max(b, out[m][1]) + 1))]
                 if nb:
                     m = min(nb, key=lambda m: out[m][2]); a2, b2, acc2, note2 = out[m]
@@ -585,12 +706,31 @@ def workflow_args(s, date):
     return 0
 
 def main():
+    if "--config" in sys.argv:   # a dated config in place of brief-config.json (CONFIG_FILE, above)
+        i = sys.argv.index("--config")
+        CONFIG_FILE.append(sys.argv[i + 1]); del sys.argv[i:i + 2]
+        if "--config-from" in sys.argv or "--propose-ranges" in sys.argv:
+            sys.exit("refusing: --config is for filling briefs, not for writing a config")
     if "--readers-file" in sys.argv:
         i = sys.argv.index("--readers-file")
         READERS_OVERRIDE.append(open(sys.argv[i + 1], encoding="utf-8").read().strip())
         del sys.argv[i:i + 2]
         if "--workflow-args" not in sys.argv and "--partial" not in sys.argv:
             sys.exit("refusing: --readers-file needs --partial «why» (the pages are part of the text)")
+    if "--context" in sys.argv:   # a redowse reader's neighbouring pages, marked (CONTEXT, above)
+        if not READERS_OVERRIDE: sys.exit("refusing: --context is for a redowse's --readers-file")
+        sys.argv.remove("--context"); CONTEXT.append(True)
+    if "--other-readings" in sys.argv:   # a search table's gained forms: the page's other readings round them (OTHER)
+        i = sys.argv.index("--other-readings")
+        if not READERS_OVERRIDE: sys.exit("refusing: --other-readings is for a redowse's --readers-file")
+        src = sys.argv[1]
+        for r in csv.DictReader(open(sys.argv[i + 1], encoding="utf-8"), delimiter="\t", quoting=csv.QUOTE_NONE):   # as above
+            if r["source"] == src and r["action"] == "R4 re-read":
+                OTHER.setdefault(r["item"], {})[int(r["PDF page"])] = list(dict.fromkeys(re.findall(r"«([^»]+)»", r["persons gained"])))
+        del sys.argv[i:i + 2]
+    if "--other-readings-only" in sys.argv:
+        if not OTHER or CONTEXT: sys.exit("refusing: --other-readings-only needs --other-readings, and no --context")
+        sys.argv.remove("--other-readings-only"); OTHER_ONLY.append(True)
     if "--workflow-args" in sys.argv:
         i = sys.argv.index("--workflow-args")
         return workflow_args(sys.argv[i + 1], sys.argv[i + 2])
@@ -637,6 +777,7 @@ def main():
     partial = a.partial or (f"a probe of readers {a.only}" if only else "")
     text = fill(a.source, a.date, a.stage, a.side_date or a.date, partial, pdir)
     c = load_config(D)
+    if CONTEXT: CONTEXT[0] = c   # the source's journal rules (issue_start, rubric) for the context's bounds
     pf = pages_files([(x, open(os.path.join(G, x), encoding="utf-8").read()) for x in c["texts"]], a.date)
     if only: pf = {n: b for n, b in pf.items() if int(n.rsplit("-", 1)[1][:-4]) in only}
     briefs = per_reader(a.source, a.date, a.side_date or a.date, c, text, only, pdir) if a.per_reader else {out: text}
@@ -664,7 +805,8 @@ def per_reader(s, date, side, c, text, only, pdir):
     _csv.field_size_limit(sys.maxsize)
     onpage = {}
     with open(hp[0], encoding="utf-8") as fh:
-        for r in _csv.DictReader((l for l in fh if not l.startswith("#")), delimiter="\t"):
+        # QUOTE_NONE (2026-11-09, Miles's find: a «"» in an OCR reading swallowed the rows after it)
+        for r in _csv.DictReader((l for l in fh if not l.startswith("#")), delimiter="\t", quoting=_csv.QUOTE_NONE):
             if r["tier"] in ("exact", "near", "confusion") and r["page"].isdigit():
                 onpage.setdefault((r["item"], int(r["page"])), set()).add(r["person"])
     rl = [l.rstrip("\n") for l in open(os.path.join(D, f"roster-reader-{side}.txt"), encoding="utf-8")]
@@ -695,7 +837,12 @@ def per_reader(s, date, side, c, text, only, pdir):
         mo = [l for l in outs if hit(l)]
         b = text.replace(joined, "\n".join(os.path.join(G, p) for p, _lo, _hi in ranges))
         b = b.replace(full_roster, rp).replace(out_block, "\n".join(mo) if mo else "   (neniu el la registro troviĝis sur viaj paĝoj)")
-        b = b.replace("## La legiloj\n\n" + c["readers"], "## La legiloj\n\n" + f"{n}: {parts.get(n, '')}.")
+        # a field written without the text's name («1: PDF 1–8», which the parser takes for a source of one text) is
+        # rebuilt from the parsed ranges (2026-11-04, the Briefwechsel: its briefs read «1: .», and readers 1–3 wrote nothing)
+        um = re.search(rf"(?:^|·\s*){n}: [^·]*?(PDF|¶) \d", c["readers"])
+        mine_r = parts.get(n) or " + ".join(f"`{os.path.basename(p)[:-4]}` {um.group(1) if um else 'PDF'} {lo}–{hi}" for p, lo, hi in ranges)
+        if not mine_r.strip(): sys.exit(f"refusing: reader {n} has no range for its brief's «La legiloj»")
+        b = b.replace("## La legiloj\n\n" + c["readers"], "## La legiloj\n\n" + f"{n}: {mine_r}.")
         own = os.path.basename(ranges[0][0])[:-4]   # the line's example locator names the reader's own item
         b = b.replace(f"{c['item']}, PDF N (prese M)", f"{own}, PDF N (prese M)").replace(f"{c['item']}, ¶ N", f"{own}, ¶ N")
         briefs[f"facts-brief-{date}-{n}.md"] = b
@@ -780,7 +927,10 @@ def writer_briefs(briefs, s, date, group, pdir):
         k = len(chunk)
         new_end = (
             f"**Viaj partoj kaj la raportoj:** vi legas {'unu parton' if k == 1 else f'{k} partojn, unu post la alia, en la ordo de la sekcio «La legiloj»'}. "
-            f"Por ĉiu parto: legu ĝian paĝ-dosieron (`facts-pages-{date}-N.txt`, N la numero de la parto) tute; skribu ĝian raporton "
+            # N spelt out as the number the section «La legiloj» gives (2026-10-30, launch u1: the reader of g130-132 read N
+            # as 1, 2, 3, its parts' order, and read readers 1–3's pages)
+            f"Por ĉiu parto: legu ĝian paĝ-dosieron (`facts-pages-{date}-N.txt`, N la numero de la parto, kiel la sekcio «La legiloj» sube "
+            f"ĝin donas, ekzemple `facts-pages-{date}-{chunk[0]}.txt` por la parto {chunk[0]}; neniam 1, 2, 3 laŭ la ordo de viaj partoj) tute; skribu ĝian raporton "
             f"per la ilo Write **en pecoj**, al `{rpath}` (N la numero de la parto; K = 1, 2, 3 … la numero de la peco): "
             f"ĉiu peco havas ne pli ol {PIECE} liniojn de faktoj, la linioj de nur tiu parto, en la ordo de la paĝoj; skribu ĉiun pecon, "
             "tuj kiam ĝiaj linioj estas pretaj, kaj daŭrigu la legadon poste: neniam la tutan raporton de densa parto en unu skribo "

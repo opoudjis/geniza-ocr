@@ -3,7 +3,13 @@ r"""ocr-second-model — read a page again with a SECOND language model, through
 its chosen reading, and merge the two word by word.
 
     tools/ocr-second-model.py --gate OCR-GATE-<tag>.md.json --verdicts OCR-PSM-VERDICTS-<tag>.json \
-        --pdfs <list> --root <ocr root> --lang fra [--corpus SUBSTR] [--page-gate N] [--files 6]
+        --pdfs <list> --root <ocr root> --lang fra [--corpus SUBSTR] [--page-gate N] [--files 6] [--pages <tsv>]
+
+--pages (2026-11-03, run sheet C5.2; the editor approved a «-cited» language's own reading on a title's name-list pages
+only, `geniza/ocr/runs/CITED-LANGUAGE-NAME-PAGES-PROPOSAL-2026-11-03.md`): a TSV of item and PDF page (a header line
+and other columns ignored). Only those items are read, whether or not the gate found the language in them (the list is
+the ruling), and only those pages; the merge is the ordinary second-language merge on the item's declared language.
+`SECOND-MODEL.json` still counts merged pages out of all the item's pages, so G2 sees the pass as partial.
 
 WHY A WRAPPER AND NOT `ocr-arbitrate.py` DIRECTLY (2026-09-26, approved by the editor for French).
 `ocr-arbitrate.py` renders every page itself at a fixed 300 dpi, greyscale, one segmentation mode
@@ -58,10 +64,12 @@ ARB = _mod("arb", "ocr-arbitrate.py")
 MR = _mod("mr", "ocr-mask-reread.py")
 TESS = {"fra": "fr", "deu": "de", "ces": "cs", "pol": "pl", "cat": "ca", "nld": "nl",
         "spa": "es", "swe": "sv", "ita": "it", "dan": "da",
-        "est": "et",   # 2026-09-28: the editor asked for the Estonian OCR model, as an attempt at ä, õ, ö, ü, with W read as V
-        "eng": "en",   # 2026-10-02, approved by the editor (failure map row 5d)
-        "por": "pt",   # 2026-10-14, the editor ruled that the language goes by declaration (cupel11, Brazila Esperantisto)
-        "slk": "sk"}   # 2026-10-12, Slovak added to the gate at the editor's request (cupel9, Gašparíková & Pollák 1987)
+        "est": "et",   # 2026-09-28, editor
+        "eng": "en",   # 2026-10-02, editor (failure map row 5d)
+        "por": "pt",   # 2026-10-14, editor (cupel11, Brazila Esperantisto)
+        "slk": "sk",   # 2026-10-12, editor (cupel9, Gašparíková & Pollák 1987)
+        "hun": "hu",   # 2026-10-31, cupel19c, Hungara Esperantisto's Hungarian (the editor; Hunspell behind the stems)
+        "fil": "tl"}   # 2026-11-06, cupel23, Filipina Esperantisto's Tagalog pages (the editor); Tesseract's model is «fil»
 SUF = {"psm6": ".txt", "psm4": ".psm4.txt", "hr6": ".hr.txt", "hr4": ".hr.psm4.txt", "tl": ".tl.txt"}
 
 
@@ -121,6 +129,23 @@ def lexicons(primary, lang):
         F, base2 = {OO.fold_portuguese(x) for x in p2}, is2
         is2 = lambda w, b=base2: b(w) or (len(re.sub(r"[^\w]", "", w)) >= 4
                                           and OO.fold_portuguese(re.sub(r"[^\w]", "", w)) in F)
+    if lang in ("deu", "swe"):
+        # GERMAN BEFORE 1901 AND 1996, SWEDISH BEFORE 1906 (2026-10-31, the editor): as Portuguese above,
+        # an old spelling counts as a word if a variant is one (tools/old_orthography.py); the page's spelling stays.
+        import old_orthography as OO
+        _var, base2b = (OO.german_variants if lang == "deu" else OO.swedish_variants), is2
+        is2 = lambda w, b=base2b, var=_var: b(w) or any(v != w and b(v) for v in var(re.sub(r"[^\w]", "", w))
+                                                        if len(re.sub(r"[^\w]", "", w)) >= 4 or "ß" in w)
+    import hunspell_words as HW
+    lname = HW.CODE_NAMES.get(code2)
+    if lname in HW.JUDGED:
+        # AN AGGLUTINATIVE LANGUAGE: its stems with Hunspell behind them, verdicts cached, exactly as the gate judges it
+        # (tools/hunspell_words.py; never a pre-generated list). 2026-10-31, cupel19c, the editor: the approach preferred
+        # for agglutinative languages, rather than pre-generated dictionaries; Estonian closed the same way; the precedent
+        # to be set firmly. With the stems alone the merge took almost no inflected Hungarian word for a word and kept
+        # the Esperanto model's misreading («tekintetĉben», «szabadsagot»; failure map R86).
+        HL, base2 = HW.words_for(lname, p2), is2
+        is2 = lambda w, b=base2: b(w) or (len(re.sub(r"[^\w]", "", w)) >= 2 and re.sub(r"[^\w]", "", w).lower() in HL)
     if lang == "est":
         # OLD ORTHOGRAPHY: Estonian of c. 1908 prints «w» where the modern list has «v» (*wõib*, *weel*,
         # *rahwus*). The Estonian reading keeps the page's «w» — the text stays as printed — but it counts
@@ -231,6 +256,7 @@ def best_merge(base, w):
 
 def do_corpus(job):
     (corpus, pdf, root, primary, lang, verdicts, gate, jobs) = job[:8]
+    only = job[9] if len(job) > 9 else None             # --pages: these PDF pages only
     d = os.path.join(root, corpus)
     if not os.path.isdir(d):
         return corpus, collections.Counter()
@@ -241,6 +267,8 @@ def do_corpus(job):
             pages[int(m.group(1))] = f
     todo, skipped_tl = [], 0
     for n, f in sorted(pages.items()):
+        if only is not None and n not in only:
+            continue
         w = verdicts.get(f"{corpus}/page-{n:04d}.txt", "psm6")
         if w == "tl":
             skipped_tl += 1
@@ -419,15 +447,32 @@ def main():
                     help="the named items' MAIN language is --lang: select them by exact name, merge against Esperanto")
     ap.add_argument("--progress", help="rule 0: rewrite this PROGRESS.txt every minute, one tick per item done "
                     "(the pass skips pages already merged, so the same command again resumes)")
+    ap.add_argument("--pages", help="a TSV of item and PDF page: only these items and pages (a «-cited» language's "
+                    "name-list pages, run sheet C5.2)")
     a = ap.parse_args()
     if a.main and not (a.corpus and a.corpus.startswith("=")):
         sys.exit("--main needs --corpus =<exact name>[,<name>…]")
+    only = None
+    if a.pages:
+        if a.remerge:
+            sys.exit("--pages reads pages; --remerge reads none: give one or the other")
+        only = collections.defaultdict(set)
+        for l in open(a.pages, encoding="utf-8"):
+            x = l.rstrip("\n").split("\t")
+            if len(x) >= 2 and x[1].strip().isdigit():
+                only[x[0].strip()].add(int(x[1]))
+        if not only:
+            sys.exit(f"--pages: no item⇥page rows in {a.pages}")
 
     full = {"fra": "french", "deu": "german", "ces": "czech", "pol": "polish", "cat": "catalan",
             "nld": "dutch", "spa": "spanish", "swe": "swedish", "ita": "italian", "dan": "danish",
-            "est": "estonian", "eng": "english", "slk": "slovak", "por": "portuguese"}[a.lang]
+            "est": "estonian", "eng": "english", "slk": "slovak", "por": "portuguese", "hun": "hungarian", "fil": "tagalog"}[a.lang]
     gate = json.load(open(a.gate, encoding="utf-8"))
-    rows = [r for r in gate if a.main or any(x["lang"] == full for x in r["all_seconds"])]
+    # a DECLARED second language counts as a detected one (2026-10-31, cupel19c: Hungarian is not among the gate's
+    # corpus-wide candidates, so Hungara Esperantisto's declared Hungarian was never in «all_seconds»; failure map R86)
+    import ocr_text_languages as TL
+    rows = [r for r in gate if a.main or any(x["lang"] == full for x in r["all_seconds"])
+            or full in (TL.languages(r["corpus"]) or ())] if only is None else [r for r in gate if r["corpus"] in only]
     if a.corpus:
         rows = ([r for r in rows if r["corpus"] in set(a.corpus[1:].split(","))] if a.corpus.startswith("=")   # «=a,b,c»: exact names
                 else [r for r in rows if a.corpus.lower() in r["corpus"].lower()])
@@ -453,7 +498,12 @@ def main():
         return dcl if dcl not in ("MISS", None) else r["primary"]
     jobs = [(r["corpus"], pdfs[r["corpus"]], a.root, prim(r), a.lang,
              {k: v for k, v in verdicts.items() if k.startswith(r["corpus"] + "/")},
-             a.page_gate, a.jobs, a.suffix) for r in rows if r["corpus"] in pdfs]
+             a.page_gate, a.jobs, a.suffix, only[r["corpus"]] if only is not None else None)
+            for r in rows if r["corpus"] in pdfs]
+    if only is not None and not a.corpus:
+        missing = sorted(set(only) - {j[0] for j in jobs})
+        if missing:
+            sys.exit(f"--pages: items not in the gate or the PDF list: {', '.join(missing)}")
     print(f"{len(jobs)} corpora flagged for {full} · page gate {a.page_gate}", file=sys.stderr, flush=True)
     total = collections.Counter()
     P = CP.Progress(a.progress, f"second model {a.lang}", len(jobs), chunk=10) if a.progress else None

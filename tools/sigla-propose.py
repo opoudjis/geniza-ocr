@@ -47,12 +47,12 @@ def codes_in_use():
 STOP = {"la", "le", "les", "de", "des", "du", "di", "da", "the", "of", "and", "kaj", "pri", "en", "el", "al", "por", "un", "une",
         "banq", "pub", "dokumen", "reu", "bhs", "pg", "kul", "anno", "part", "vol"}
 def rule(key):
-    """The rule's siglum for a work no row has (books: «Author + year», Joss98): the key's first word, capitalised, four
-    letters at most, and the two-digit year of the first year in the key; a work with no year, the first word alone."""
+    """The rule's siglum for a work no row has (books: «Author + year», Joss1998): the key's first word, capitalised, four
+    letters at most, and the four-digit year (2026-11-10, the editor) of the first year in the key; a work with no year, the first word alone."""
     ws = [w for w in key.split("-") if w and w not in STOP and not w.isdigit()]
     yr = re.search(r"(?<!\d)(1[5-9]\d\d|20\d\d)(?!\d)", key)
     head = (ws[0][:4].capitalize() if ws else key[:4].capitalize())
-    return head + (yr.group(1)[2:] if yr else "")
+    return head + (yr.group(1) if yr else "")
 
 def page(S, path):
     """THE PUBLISHED SIGLA PAGE (2026-10-25; the editor, on prosopografio/README.md): every signed siglum with its work in Esperanto (profiles/SIGLA-EO.tsv),
@@ -71,11 +71,11 @@ def page(S, path):
          "La siglo restas por ĉiam; la litero validas por unu legado de la fonto. La partoj de etikedo:", "",
          "- **AmEsp 1910.3:14a**: la siglo (AmEsp, *Amerika Esperantisto*), la jaro kaj la numero (1910.3), post la dupunkto "
          "la presita paĝo (14), kiel la paĝo mem ĝin presas, kaj la litero de la fakto sur tiu paĝo (a).",
-         "- **Korĵ05:120m**: ĉe libro la siglo jam portas la jaron de la verko; Korĵenkov 2005, paĝo 120.",
-         "- **∴15**: paĝo, kies numero ne legeblas en la skanaĵo; la numero eltirita el la paĝigo de la numero aŭ de la volumo.",
+         "- **Korĵ2005:120m**: ĉe libro la siglo jam portas la jaron de la verko; Korĵenkov 2005, paĝo 120.",
+         "- **≈15**: paĝo, kies numero ne legeblas en la skanaĵo; la numero eltirita el la paĝigo de la numero aŭ de la volumo.",
          "- **[15]**: paĝo de verko, kiu presas neniujn numerojn, nombrita.",
          "- **[kovrilo]**, **[interna kovrilo]**: la kovriloj.",
-         "- **[PDF 14]**: la 14-a paĝo de la skanaĵo, nur kie neniu el la supraj eblas.",
+         "- **{14}**: la 14-a paĝo de la skanaĵo, nur kie neniu el la supraj eblas.",
          "- **¶12**: la 12-a alineo de tajpita teksto.",
          "- **l.40**: la 40-a linio de konservita retpaĝo.",
          "- **Rete**: kie la verko legeblas rete (la paĝo de la titolo ĉe ANNO, la dosierujo ĉe BitArkivo, la serĉo ĉe "
@@ -88,14 +88,16 @@ def page(S, path):
         w = SG.work_online(re.compile(s["match"]), s["siglum"])
         if not w: nowhere.append(s["siglum"])
         L.append(f"| **{s['siglum']}** | {eo[s['siglum']]} | " + (" · ".join(f"[{h}]({SG.href(u)})" for h, u, _ in w) or "—") + " |")
-    open(path, "w", encoding="utf-8").write("\n".join(L) + "\n")
-    print(f"wrote {os.path.relpath(path, ROOT)}: {len(signed)} sigla; no online location in the item table for {len(nowhere)}: " + ", ".join(nowhere))
+    import page_date   # «_Aktualigita: …_», the day the page last changed (2026-10-31)
+    old = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
+    open(path, "w", encoding="utf-8").write(page_date.stamp(old, "\n".join(L) + "\n"))
+    print(f"wrote {os.path.relpath(path, ROOT)}:{len(signed)} sigla; no online location in the item table for {len(nowhere)}: " + ", ".join(nowhere))
 
 def main():
     a = sys.argv[1:]
     if "--page" in a:
         return page(sigla(), a[a.index("--page") + 1] if len(a) > a.index("--page") + 1 and not a[a.index("--page") + 1].startswith("--")
-                    else os.path.join(G, "prosopografio", "siglaro.md"))
+                    else os.path.join(ROOT, "published", "genizo", "pages", "siglaro.md"))   # the site's pages, 2026-10-30
     want = set((a[a.index("--tiers") + 1] if "--tiers" in a else "0,1,2,3").split(","))
     out = a[a.index("--write") + 1] if "--write" in a else None
     S, I, (T, tname), C = sigla(), items(), tiers(), codes_in_use()

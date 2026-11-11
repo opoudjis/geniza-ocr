@@ -223,7 +223,7 @@ def load_hits(path):
     (1.5 GB, 2026-10-29), most of them the Jarlibroj's."""
     h = collections.defaultdict(lambda: collections.defaultdict(dict))
     with open(path, encoding="utf-8") as fh:
-        rows = csv.reader((l for l in fh if "\tadresaro-" in l[:120] or l.startswith("person\t")), delimiter="\t")
+        rows = csv.reader((l for l in fh if "\tadresaro-" in l[:120] or l.startswith("person\t")), delimiter="\t", quoting=csv.QUOTE_NONE)   # 2026-11-10: the roster bug
         hd = next(rows); ix = {k: i for i, k in enumerate(hd)}
         for r in rows:
             if len(r) < len(hd) or r[ix["tier"]] not in ("exact", "near", "confusion") or not r[ix["page"]].isdigit(): continue

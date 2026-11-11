@@ -227,8 +227,12 @@ DECLARED = {
     "/volapükan.melopik.": "volapuk", "/nunal.nulik.": "volapuk", "/Volapukabled_talik_1889_n19": "volapuk",
     "/volapükabled.": "volapuk", "/levolapuk.": "volapuk",
     "/einstein-weltsprachliche-zeit-und-streitfragen-1889.": "german",
-    # cupel16, 2026-10-18 (confirmed by the editor 23:0x): main languages outside the planned three; also DECLARED in
-    # ocr-text-languages-table.py (an internal record, 2026-10-18, not published)
+    # cupel21, 2026-11-03 (the editor 17:4x, the declarations spelled out): Polish main on the six Pola Esperantisto
+    # files where Polish wins most pages (wrappers 1909–1911, inserts 1908, 1909, 1911); also DECLARED in ocr-text-languages-table.py
+    "/ANNO_e1c_19090001.": "polish", "/ANNO_e1c_19100001.": "polish", "/ANNO_e1c_19110001.": "polish",
+    "/ANNO_e1c_19080008.": "polish", "/ANNO_e1c_19090008.": "polish", "/ANNO_e1c_19110008.": "polish",
+    # cupel16, 2026-10-18 (the editor 23:0x): main languages outside the planned three; also DECLARED in
+    # ocr-text-languages-table.py (geniza/ocr/runs/CUPEL16-C5-DECLARATIONS-PROPOSAL-2026-10-18.md)
     "/bukalised_literata_1889.": "german",
     "/cogabled_": "volapuk",
     "/couturat_leau_histoire_": "french",
@@ -291,13 +295,25 @@ DECLARED = {
     # cupel17, 2026-10-21 (accepted by the editor 00:3x): main languages outside the planned three; also DECLARED in
     # tools/ocr-text-languages-table.py (an internal record, 2026-10-21, not published)
     "/ANNO_e0d_": "german",    # Rund um die Welt 1909–14: German beside Esperanto
+    # cupel19a (confirmed by the editor 2026-10-27 19:5x; ocr/runs/CUPEL19A-C5-DECLARATIONS-2026-10-27.md): German main
+    "/ANNO_e0y_19100051.": "german", "/ANNO_e0y_19100052.": "german", "/ANNO_e0y_19100053.": "german",
+    "/ANNO_e0y_19100054.": "german", "/ANNO_e0y_19100055.": "german", "/ANNO_e0y_19100056.": "german",
+    "/ANNO_e0y_19100057.": "german", "/ANNO_e0y_19100059.": "german", "/ANNO_e0y_19100060.": "german",
+    "/ANNO_e1q_19090057.": "german",    # Dia Regno 1909 file 57: German wins 11 of 16 pages
     "/ANNO_e6g_": "latino-sine-flexione",    # Lingua Internationale 1911–12: mostly Latino sine flexione, with French (re-declared 2026-10-23)
     # cupel18a, 2026-10-23 (the editor 16:2x; geniza/ocr/runs/CUPEL18A-C5-DECLARATIONS-PROPOSAL-2026-10-23.md)
     "/couturat_pour_la_langue_internationale_1906.": "french",   # Couturat 1906, 4th ed.: French
     # cupel18c, 2026-10-26 (the editor 22:2x; geniza/ocr/runs/CUPEL18C-C5-DECLARATIONS-PROPOSAL-2026-10-26.md)
     "/ONB_e3k_": "italian",     # Itala Esperanto-Revuo 1913–14: Italian wins 210 of 354 pages, Esperanto 138
     "/ANNO_e7s_": "italian",    # Itala Esperantisto 1911–14: Italian wins 244 of 344 pages, Esperanto 99
+    # cupel19c, 2026-10-29 (the editor 20:3x: Danish the main language; geniza/ocr/runs/OCR-PAGE-LANGUAGES-2026-10-29-cupel19c-b.md)
+    "/ANNO_e5j_": "danish",     # Esperanto: Raporto de Centra Dana Esperantista Ligo 1913–19: Danish wins 156 of 276 pages, Esperanto 120
     "/Louis Couturat_1868-1914.": "french",   # the Coulommiers memorial volume (1915): French with Ido passages
+    # 2026-11-06, cupel23 (the editor; sources/cupel-batch-23/C5-PROPOSAL.md): main language not Esperanto
+    "/ONB_kra_18970224.": "polish", "/przeglad-tygodniowy-1897-no09.": "polish",
+    "/couturat-leau-1908-nouvelles-langues-internationales.": "french",
+    "/Espero.de.Katalunjo.": "catalan",
+    "/dulichenko-1990-mezhdunarodnye-vspomogatelnye-yazyki.": "russian",
 }
 
 
@@ -327,6 +343,10 @@ def lexicon(lang):
                 _LEX[lang] = {w.strip() for w in fh if w.strip()}
         except OSError:
             _LEX[lang] = None
+        # HUNGARIAN, ESTONIAN: the stems with Hunspell behind them, as in tools/ocr-accept.py lex() (2026-10-29)
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import hunspell_words
+        _LEX[lang] = hunspell_words.words_for(lang, _LEX[lang])
     return _LEX[lang]
 
 

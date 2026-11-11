@@ -37,10 +37,15 @@ def leads(seq):
             a, b = int(m.group(4)), int(m.group(5))
             pages = list(range(a, b + 1)) if b - a <= 5 else [a, a + 1, b - 1, b]
             out.append((f"G{len(out)+1:03d}", [(c, p) for p in pages], "GAP", f"{m.group(1)} missing between printed {m.group(2)} and {m.group(3)}"))
-        for m in re.finditer(r"JOIN printed (\d+)–(\d+) missing before (\S.*?)(?: · |$)", ev):
+        # since 2026-11-03 the JOIN names the files between its two issues that the scan could not number (failure map R56):
+        # their first two pages go into the look too, as the run sheet asks («a file between them goes into the look»)
+        for m in re.finditer(r"JOIN printed (\d+)–(\d+) missing before (\S+?)(?: \(a file between, not numbered: ([^)]*)\))?(?: · |$)", ev):
             nxt = m.group(3).strip()
             last = int(f[2])
-            pages = [(c, last - 1), (c, last), (nxt, 1), (nxt, 2)]
+            pages = [(c, last - 1), (c, last)]
+            for w in (m.group(4) or "").split(", "):
+                if w: pages += [(w, 1), (w, 2)]
+            pages += [(nxt, 1), (nxt, 2)]
             out.append((f"J{len(out)+1:03d}", pages, "JOIN", f"printed {m.group(1)}–{m.group(2)} missing before {nxt}"))
     return out
 
@@ -61,7 +66,7 @@ def build(a):
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import ocr_page_images as OPI
     pdfs = {os.path.splitext(os.path.basename(l.strip()))[0]: l.strip() for l in open(a.pdfs) if l.strip()}
-    per = 24
+    per = 15   # the image readers' cap (was 24 for leads: cupel19b's 16 strips came in one batch, split by hand, 2026-10-29)
     if a.what == "pages":
         # --what pages --items <file> (2026-10-27, cupel18c C6.4.1, the editor: Internacia Scienca Revuo 1904, no
         # printed number read on any of its 449 pages): every page of each item named, in batches of 15 strips (the
@@ -81,6 +86,9 @@ def build(a):
                 L[-1][1].append((c, int(p)))
     else:
         L = leads(a.seq)
+        if a.items:   # --items with leads (2026-10-29, box-free C6.4.1): only the leads of the batch's items, in place of
+            keep = {l.strip() for l in open(a.items, encoding="utf-8") if l.strip()}   # the «head; grep -F -f» filter
+            L = [x for x in L if any(c in keep for c, _ in x[1])]
     os.makedirs(a.out, exist_ok=True)
     key, n, work = [], 0, tempfile.mkdtemp()
     try:
@@ -162,5 +170,9 @@ if __name__ == "__main__":
     # --strip (2026-10-27, cupel18c): ÖNB scans carry a dark border and ÖNB's own footer line, so 14% of the image stops
     # short of a page number set at the foot of the text (Internacia Scienca Revuo 1904: «— 188 —» at about 87% down)
     ap.add_argument("--strip", type=float, default=0.14, help="the depth of each strip, a share of the page's height (default 0.14)")
+    ap.add_argument("--report", help="judge: write the table to this new file, not the console (2026-10-29: in place of `>`)")
     a = ap.parse_args()
+    if a.report:
+        if os.path.exists(a.report): sys.exit(f"exists: {a.report}")
+        sys.stdout = open(a.report, "x", encoding="utf-8")
     build(a) if a.mode == "build" else judge(a)

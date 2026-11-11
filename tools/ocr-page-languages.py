@@ -20,6 +20,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location("ocr_scope_g4", os.path.join(HERE, "ocr-scope-g4.py"))
 S = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(S)   # the gate, with its folds (failure map R54)
 A = S.A
+sys.path.insert(0, HERE)
+import hunspell_words as HW
 G = os.path.join(HERE, "..", "published", "heterophony-resources", "geniza")
 DEFAULT = ["esperanto", "ido", "occidental", "latino-sine-flexione", "french", "german", "spanish", "portuguese",
            "italian", "english"]
@@ -63,7 +65,9 @@ def main():
             words = [w.lower() for w in WORD.findall(text)]
             if len(words) < a.min_words:
                 continue
-            own = {l: sum(1 for w in words if w in L and not any(w in M for m, M in lists.items() if m != l))
+            # «in no other list» asks a judged list's stems only (hunspell_words.listed, 2026-10-29): Hunspell's
+            # verdicts add words, never take one another list holds
+            own = {l: sum(1 for w in words if w in L and not any(HW.listed(M, w) for m, M in lists.items() if m != l))
                    for l, L in lists.items()}
             best = max(own, key=lambda l: own[l])
             if not own[best]:

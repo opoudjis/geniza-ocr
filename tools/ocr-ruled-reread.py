@@ -49,12 +49,27 @@ def recognised(text, lex):
     return sum(1 for m in WORD.finditer(text) if m.group(0).lower() in lex)
 
 
+# WORDS OF 5+ LETTERS, printed and recorded beside the count above (2026-11-03; failure map R82): since the word lists grew
+# (Croatian, Hungarian, 2026-10-29) almost any two- or three-letter scrap of a misread page is a word somewhere, so the
+# «was» of a page read as junk looked nearly as good as a real reading. The choice of reading still uses the count above.
+WORD5 = re.compile(r"[^\W\d_]{5,}", re.UNICODE)
+
+
+def recognised5(text, lex):
+    return sum(1 for m in WORD5.finditer(text) if m.group(0).lower() in lex)
+
+
 def image(pdf, page, work, rotate, crop):
     base = os.path.join(work, f"p{page:05d}")
     subprocess.run(["pdftoppm", "-r", str(PPI), "-png", "-f", str(page), "-l", str(page), pdf, base],
                    capture_output=True, check=True)
     src = glob.glob(base + "*.png")[0]
+    # a very large page (2026-10-28: *Weltsprache und Wissenschaft* PDF 88, a fold-out, 311 megapixels at 400 ppi) tripped
+    # Pillow's size guard; the guard lifted, and the long side capped at 8,000 px, which Tesseract reads without trouble
+    Image.MAX_IMAGE_PIXELS = None
     im = Image.open(src).convert("L")
+    if max(im.size) > 8000:
+        im.thumbnail((8000, 8000))
     if crop:
         # crop FIRST: the box is measured on the page as scanned, before any rotation
         w, h = im.size
@@ -94,17 +109,21 @@ def main():
                                    capture_output=True, text=True, errors="replace")
                 cands[psm] = r.stdout
         score = {p: recognised(t, lex) for p, t in cands.items()}
+        score5 = {p: recognised5(t, lex) for p, t in cands.items()}
         best = max(PSMS, key=lambda p: (score[p], p == "6"))
         d = os.path.join(a.root, corpus)
         old = os.path.join(d, f"page-{page:04d}.txt")
-        was = recognised(open(old, encoding="utf-8", errors="ignore").read(), lex) if os.path.exists(old) else None
-        print(f"{corpus} p.{page}: psm6 was {was} · " +
-              " · ".join(f"psm{p} {score[p]}" for p in PSMS) + f"  → psm {best}")
+        oldt = open(old, encoding="utf-8", errors="ignore").read() if os.path.exists(old) else None
+        was = recognised(oldt, lex) if oldt is not None else None
+        was5 = recognised5(oldt, lex) if oldt is not None else None
+        print(f"{corpus} p.{page}: psm6 was {was} ({was5} of 5+ letters) · " +
+              " · ".join(f"psm{p} {score[p]} ({score5[p]})" for p in PSMS) + f"  → psm {best}")
         if not a.dry_run:
             open(os.path.join(d, f"page-{page:04d}.ruled.txt"), "w", encoding="utf-8").write(cands[best])
             json.dump({"pdf": pdf, "page": page, "lang": lang, "ppi": PPI, "rotate": rotate,
                        "crop": crop, "chosen_psm": best, "recognised": score,
-                       "recognised_before": was}, open(os.path.join(d, f"page-{page:04d}.ruled.json"),
+                       "recognised_before": was, "recognised_5plus": score5,
+                       "recognised_before_5plus": was5}, open(os.path.join(d, f"page-{page:04d}.ruled.json"),
                                                        "w", encoding="utf-8"), indent=1)
 
 

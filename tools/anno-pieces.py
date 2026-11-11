@@ -2,11 +2,15 @@
 r"""anno-pieces — the ÖNB/ANNO download pieces of one volume: renamed, then joined per volume.
 
     tools/anno-pieces.py rename <folder>                  # «X (n).pdf» → «X_part<n+1>.pdf»; writes <folder>/RENAMES-<date>.tsv
-    tools/anno-pieces.py join <folder> --out <dir>        # X.pdf + X_part2.pdf … → <dir>/X.pdf (qpdf), one per volume
+    tools/anno-pieces.py join <folder> --out <dir> [--match <regex>]   # X.pdf + X_part2.pdf … → <dir>/X.pdf (qpdf), one per volume
 
 WHY (cupel17 C0, 2026-10-20, the editor; cupel18b C0, 2026-10-24 20:5x, approved): ANNO
 serves a long volume in 50-page parts, and a browser saves them as «X.pdf», «X (1).pdf», «X (2).pdf» …: «X (n).pdf» is
 the (n+1)th part, the unsuffixed X.pdf part 1. Names with spaces break the shell steps, and the volume is one item.
+THE DOT FORM (cupel20a C0, 2026-10-31): the editor's *Germana Esperantisto* downloads of 2026-10-15 are saved as
+«ANNO_<aid>_<date>.<k>.pdf», «.<k>» the (k+1)th part (as cupel12 joined Espero Katolika's by hand); they need no rename,
+so `join` reads them as parts too, for ANNO names only (a run's own «X.1907.5.pdf» is an issue, not a part).
+`--match` joins only the volumes whose name the regex finds (a folder holding two batches' years).
 CHECKS: rename refuses a target that exists; join refuses an output that exists, a gap in the part numbers, and a
 part other than the last that is not 50 pages (the order would then be in doubt).
 WRITE-SET: rename: the renamed files (mv in place) and <folder>/RENAMES-<date>.tsv (create-only); join: <dir>/X.pdf
@@ -18,6 +22,7 @@ QPDF = "/opt/homebrew/bin/qpdf"
 PDFINFO = "/opt/homebrew/bin/pdfinfo"
 BROWSER = re.compile(r"^(?P<x>.+) \((?P<n>\d+)\)\.pdf$")
 PART = re.compile(r"^(?P<x>.+)_part(?P<n>\d+)\.pdf$")
+DOT = re.compile(r"^(?P<x>ANNO_[a-z0-9]+_\d{8})\.(?P<k>\d+)\.pdf$")
 
 
 def pages(f):
@@ -45,17 +50,20 @@ def rename(folder):
     print(f"{len(todo)} pieces renamed → {log}")
 
 
-def join(folder, out):
+def join(folder, out, match=None):
     vols = {}
     for f in os.listdir(folder):
         m = PART.match(f)
-        if m: vols.setdefault(m["x"], []).append(int(m["n"]))
-    if not vols: sys.exit("no «X_part<n>.pdf» pieces in " + folder)
+        if m: vols.setdefault(m["x"], {})[int(m["n"])] = f
+        m = DOT.match(f)
+        if m: vols.setdefault(m["x"], {})[int(m["k"]) + 1] = f
+    if match: vols = {x: v for x, v in vols.items() if re.search(match, x)}
+    if not vols: sys.exit("no «X_part<n>.pdf» or «ANNO_….<k>.pdf» pieces in " + folder)
     os.makedirs(out, exist_ok=True)
     for x in sorted(vols):
         ns = sorted(vols[x])
         if ns != list(range(2, ns[-1] + 1)): sys.exit(f"refusing: {x}: parts {ns}, a gap")
-        files = [os.path.join(folder, x + ".pdf")] + [os.path.join(folder, f"{x}_part{n}.pdf") for n in ns]
+        files = [os.path.join(folder, x + ".pdf")] + [os.path.join(folder, vols[x][n]) for n in ns]
         if not os.path.exists(files[0]): sys.exit(f"refusing: {x}.pdf (part 1) missing")
         pp = [pages(f) for f in files]
         if any(p != 50 for p in pp[:-1]): sys.exit(f"refusing: {x}: parts' pages {pp}; all but the last should be 50")
@@ -70,8 +78,9 @@ def join(folder, out):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["rename", "join"]); ap.add_argument("folder"); ap.add_argument("--out")
+    ap.add_argument("--match")
     a = ap.parse_args()
     if a.cmd == "rename": rename(a.folder)
     else:
         if not a.out: sys.exit("join needs --out")
-        join(a.folder, a.out)
+        join(a.folder, a.out, a.match)

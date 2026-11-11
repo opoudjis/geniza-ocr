@@ -73,8 +73,10 @@ ENDINGS = re.compile(r"(ojn|ajn|oj|aj|on|an|en|oj|j|n|o|a|e|i|is|as|os|us|u)$")
 BUILT = {"eo": "esperanto", "fr": "french", "de": "german", "it": "italian", "es": "spanish",
          "cs": "czech", "sv": "swedish", "nl": "dutch", "pl": "polish", "da": "danish",
          "ca": "catalan", "ru": "russian_post1918", "et": "estonian", "en": "english",
-         "sk": "slovak",   # 2026-10-12, added to the gate at the editor's request (cupel9)
-         "pt": "portuguese"}   # 2026-10-14, by declaration, on the editor's decision (cupel11)
+         "sk": "slovak",   # 2026-10-12, editor (cupel9)
+         "pt": "portuguese",   # 2026-10-14, editor (cupel11)
+         "hu": "hungarian",   # 2026-10-31, cupel19c, Hungara Esperantisto (stems; ocr-second-model puts Hunspell behind them)
+         "tl": "tagalog"}   # 2026-11-06, cupel23, Filipina Esperantisto's Tagalog pages (the editor)
 
 
 def load(code):

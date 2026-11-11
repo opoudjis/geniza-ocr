@@ -4,7 +4,7 @@
 Reads the 106 portrait captions (sources/ocr/schuckAlbumo.captions.txt), maps each to a profile stem, and PROPOSES the
 card's tags from the profile's fact lines — every tag carrying the year and locator of the line that earned it:
 
-  † <year> death, on every timeline where known; the timeline ENDS there.   🟪 died before the end of 1908 (never faced the choice)
+  † <year> death, on every timeline where known; the timeline ENDS there.   ‡ died before the end of 1908 (never faced the choice)
   🟨 voted for reform in the 1894 ballot (anything but point I)
   Ⓚ  Lingva Komitato          Ⓐ  Akademio
   🟦 Ido adherent ([B] with an Ido marker)      💙 Ido sympathiser ([X]-only with an Ido marker)
@@ -14,14 +14,14 @@ card's tags from the profile's fact lines — every tag carrying the year and lo
   ⭘ RESIGNED (the man's own «eksiĝis» — 2026-09-19, hand-only, black hollow circle; NOT a strike)
   HEARTS = SYMPATHY (editor 2026-09-19 23:30): 💛 for reform before the Aug 1894 vote · 💚 for the language as it was, before the vote · 💙 Ido sympathiser · 🧡 other-auxlang sympathiser (all hand-confirm; the squares are ACTS, the hearts are LEANINGS)
   ◐ DOUBLE MEMBERSHIP (2026-09-19): an LK/Akademio seat, vote or session held after a camp square, until the strike — a tag, span-dated
-  ⬛ RENOUNCED (widened 2026-09-20): publicly rejected Esperanto without adhering elsewhere — the man's act (Kabe 1931, Moch 1933); ⬜ stays the lapse
-  ⬜ («got too busy», the man) HAND-ONLY; 💙/🧡 HAND-ONLY (bylines in a rival organ prove nothing); 🟢 HAND-ONLY; ⬛ proposed only from an EdE-type «rejected the idea» line
+  ⬛ RENOUNCED (widened 2026-09-20): publicly renounced world languages (the editor, 2026-11-06), adhering nowhere else — the man's act (Kabe 1931, Moch 1933); ⬜ stays the lapse
+  ⬜ (a lapse: the man got too busy) HAND-ONLY; 💙/🧡 HAND-ONLY (bylines in a rival organ prove nothing); 🟢 HAND-ONLY; ⬛ proposed only from an EdE-type «rejected the idea» line
 
-Outputs, in the geniza root: bingo-card-v<ver>.csv, bingo-card-v<ver>.md, and P-SRC / P-GAP v<ver> (sources cited by the
+Outputs, in geniza/bingo-card/ (moved there 2026-10-31, the editor): bingo-card-v<ver>.csv, bingo-card-v<ver>.md, and P-SRC / P-GAP v<ver> (sources cited by the
 evidence lines; cells with no evidence / ❓ / HAND-PASS). No colour without a fact line behind it: a proposal with no line is
 written as «?» and flagged. The script reads; the human reads the diff.
 """
-import csv, importlib.util, os, re, sys, unicodedata
+import collections, csv, importlib.util, os, re, sys, unicodedata
 from collections import OrderedDict, defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -126,7 +126,12 @@ CARD_BUCKET = {
     "kuhnl":     [(r"Ed\.|Eduard", r"Eduard Kühnl")],
     "simon":     [(r"Otto", r"Otto Simon")],
     "trompeter": [(r"W\. ?H\.", r"W\. H\. Trompeter")],
-    "atanasov":  [(r"St\.|Plovdiv", r"St\. Atanasoff of the 1906")],
+    # the card's man whatever the caption, each now a profile of his own, the shared one only an index (2026-11-06: read as
+    # that index they had no lines at all; see NAMESAKE). The album's «St.» is Georgi by its prose, and every witness to the editing
+    "atanasov":  [(r"", r"Georgi Atanasov")],
+    "postnikov": [(r"", r"Fjodor A\. Postnikov")],
+    "lojko":     [(r"", r"Ivan Markoviĉ Lojko")],
+    "morin":     [(r"", r"Anselmo Morin")],
 }
 SHARED_SECTION = re.compile(r"^\(|both|undetermined|other / unidentified|other \w+s \(", re.I)
 def lines_of(stem, caption=""):
@@ -168,7 +173,7 @@ def lines_of(stem, caption=""):
         # ≤ 1958 laŭ la paĝoj …]»), whose year is no act's date (Asnes and Gernet lost their ⬜ to a 1931 «guess»)
         ym = None if "sen dato" in m.group("year") else re.search(r"(1[89]\d\d|20\d\d)", m.group("year"))
         out.append(dict(year=int(ym.group(1)) if ym else None, ystr=m.group("year"), tags=tags, text=rest, loc=loc,
-                        kind=kind, obj=obj))
+                        kind=kind, obj=obj, who=m.group("who")))
     return out
 
 IDO = re.compile(r"\b(Ido|Idist|idist|Uniono|Progreso|adjuvid|Ilo\b|Delegit)", re.I)
@@ -231,8 +236,8 @@ HAND_RULINGS = {
     "krumpholc":  [RESIGNED_1913],
     "gauntlett":  [RESIGNED_1913],
     "bagnulo":    [("⬜", 1911, "EsperantoUEA.1911.104.txt l.2866 — UEA «Eksigoj (pro nericevo de respondo je 2-a cito)»", "RULED 2026-09-19: confirmed lapse (default); the institution is UEA, not the LK")],
-    # 2026-09-20 00:50 ruled by the editor — ⬛ widened to RENOUNCED (publicly rejected Esperanto without adhering elsewhere); Kabe ⬛ 1931 on the Literatura Mondo interview supersedes the ⬜
-    "bein":       [RESIGNED_1912, ("⬛", 1931, "literatura-mondo-1931-7-kabe.txt L2553–2725 — the interview of 24 Jun 1931 (bein.md l.201–214)", "RULED 2026-09-20: RENOUNCED — demanded that his no longer being an Esperantist be printed; «ideas entirely unfavourable»; «batalu por via afero»; «eĉ kontraŭulo via»; his Esperanto period «1903–1910»; but «a new genius would create the true solution» — the language rejected, not the idea")],
+    # 2026-09-20 00:50 ruled by the editor — ⬛ widened to RENOUNCED (publicly renounced world languages (the editor, 2026-11-06), adhering nowhere else); Kabe ⬛ 1931 on the Literatura Mondo interview supersedes the ⬜
+    "bein":       [RESIGNED_1912, ("🟢", 1956, "the editor, 2026-11-06", "RULED 2026-11-06, the editor; no line on the profile yet"), ("⬛", 1931, "literatura-mondo-1931-7-kabe.txt L2553–2725 — the interview of 24 Jun 1931 (bein.md l.201–214)", "RULED 2026-09-20: RENOUNCED — demanded that his no longer being an Esperantist be printed; «ideas entirely unfavourable»; «batalu por via afero»; «eĉ kontraŭulo via»; his Esperanto period «1903–1910»; but «a new genius would create the true solution» — the language rejected, not the idea")],
     # 2026-09-19 22:40 approved — Avilov: the blue dates from his own letter to Progreso, Jul 1908; the 1910 Ido lectures (Brussels, Stockholm) while a sitting LK member are the evidence behind the 🔴 of Jan 1911
     "avilov":     [("🟦", 1908, "Progreso I, Jul 1908, «Letro di S. Avilov» (avilov.md l.49)", "RULED 2026-09-19: Ido ADHERENT from his own letter printed in Progreso, Jul 1908 — «Mi estas tre konvinkita, ke la propono…»; then on the 1909 roll, voting in the LK Jul 1909, Ido lectures in Brussels and Stockholm 1910, the Washington LK session Oct 1910, struck Jan 1911")],
     # 2026-09-19 22:53 approved — Talmey: the blue dates from his April 1908 resignation-for-reform and the Nov 1908 «New York Ilo Society» motion; the orange is Arulo 1924
@@ -294,6 +299,10 @@ HAND_RETURN_DISMISSED = {"zamenhof", "de-beaufront", "mudie", "schneeberger", "a
 # Jan 1909, would otherwise have read as ruled)
 HAND_CONFIRMED_HEARTS = {"krikortz": {("💛", 1893), ("🟨", 1894)}, "grabowski": {("💛", 1893)}, "de-beaufront": {("💚", 1893)},
                          "meier": {("💚", 1893), ("🟨", 1894)}, "zamenhof": {("💚", 1894), ("💛", 1894)}}
+# The initial 🟩 the default rule does not give (it gives 🟩 only to a profile with no camp line): the editor 2026-10-31
+# 12:3x, on v0.3: Privat and Schneeberger to have an initial green square. Read by propose() and by --resequence.
+INITIAL_GREEN = {"privat": "RULED 2026-10-31: an Esperantist first (initial 🟩)",
+                 "schneeberger": "RULED 2026-10-31: an Esperantist first (initial 🟩), before his 🟦 1908"}
 HAND_CONFIRMED_CAMP = {"lemaire", "michaux", "deligny", "zabilon-d-her", "beauchemin", "meazzini", "kofman", "privat"}   # kofman 23:30 approved: 🟦 1909 · 🟦 1922 (riadheris; Esther 1925; Mondo 1928) · 🟧 1929 (Cosmoglotta primary; Künzli's «1922» undocumented)   # beauchemin 23:27 approved: 🟦 1909 (the signed Alegorio) and the second 🟦 1925 (Ido Zürich bylines; Uniono Idista Reprezentero 1928) stand as dated   # michaux 23:07 approved: ◈ 1907 → 💙 1908 → 🟧 1909 stands as ruled 14 and 18 Sep
 HAND_RESOLVED_STRIKE = {"o-connor", "lambert", "lemaire", "meier", "ahlberg", "cejka", "seynaeve", "rhodes", "moscheles", "cape", "ebner",
                         "bicknell", "junck", "bagnulo", "bein", "hanauer", "gallois", "asnes", "gernet", "talmey", "beauchemin", "kofman",
@@ -423,7 +432,7 @@ def propose(stem, caption=""):
             deaths.append((ln["year"], ln, "death line [E2]"))
     if "†" in caption and not deaths:
         tags.append(("†", 1906, "the album's own † (dead by 1906)", "album caption — year unknown, ≤ 1906"))
-        tags.append(("🟪", 1906, "the album's own †", "died before the end of 1908 — never faced the choice")); death_year = 1906
+        tags.append(("‡", 1906, "the album's own †", "died before the end of 1908 — never faced the choice")); death_year = 1906
     death_year = None
     # the «morto» lines of this person decide alone where there are any: the patterns below them were written for the
     # older English heads and, reading the facts themselves, catch other people's deaths (Boirac: EdE on Miletz,
@@ -435,7 +444,7 @@ def propose(stem, caption=""):
         dy, ln, why = sorted(arc or deaths, key=lambda x: x[0])[0]
         death_year = dy
         tags.append(("†", dy, ln["loc"][:90], f"{why} — † {dy}"))
-        if dy <= 1908: tags.append(("🟪", dy, ln["loc"][:90], "died before the end of 1908 — never faced the choice"))
+        if dy <= 1908: tags.append(("‡", dy, ln["loc"][:90], "died before the end of 1908 — never faced the choice"))
     # Ⓚ / Ⓐ
     if re.search(r"\bL\. ?K\.", caption):
         tags.append(("Ⓚ", 1906, "the album's own «L. K.» mark (printed key p. 14)", "album caption"))
@@ -503,7 +512,7 @@ def propose(stem, caption=""):
     # (1) no camp after death
     if death_year:
         tags[:] = [t for t in tags if not (t[1] and t[1] > death_year and t[0] != "†")]
-    if any(t[0] == "🟪" for t in tags):
+    if any(t[0] == "‡" for t in tags):
         tags[:] = [t for t in tags if t[0] not in "🟦💙🟧🧡"]
     if stem == "de-saussure":   # Progreso scores Antido's author ADHERENT — he never joined Ido (hand, 2026-09-18)
         tags[:] = [t for t in tags if t[0] != "🟦"]
@@ -530,7 +539,7 @@ def propose(stem, caption=""):
         else:
             n_later = sum(1 for ln in L if ln["year"] and ln["year"] > first and GREEN.search(ln["text"].split(" · ")[0]) and not IDO.search(ln["text"].split(" · ")[0]) and not OTHER.search(ln["text"].split(" · ")[0]))
             if n_later: tags.append(("·", first, "", f"{n_later} Esperanto-marked lines after the first camp line, no explicit return word — hand-pass for 🟢"))
-    if not any(t[0] in "🟦💙🟧🧡🟪" for t in tags):
+    if not any(t[0] in "🟦💙🟧🧡‡" for t in tags):
         tags.append(("🟩", None, "", "default — no camp line on the profile" + ("" if L else "; NO FACT LINES")))
     # 🟨 = voted FOR reform in the 1894 ballot — anything but point I («kontraŭ reformoj»): PRIMARY = the August 1894 result page
     # (La Esperantisto No. 8, pp. 13–15; `Esperanto 1894.3.txt` l.761–795, points 2/3/4 as printed; the November additions are point I bar Runstedt),
@@ -655,9 +664,13 @@ def propose(stem, caption=""):
             tags.append(("⬜", sy, strikes[0][2], "confirmed lapse — struck for silence and no dated act of his own follows on the profile (the default outcome of ⭕; check the profile is not just thin)"))
     if death_year:
         tags[:] = [t for t in tags if not (t[1] and t[1] > death_year and t[0] != "†")]
+    if stem in INITIAL_GREEN and not any(t[0] == "🟩" for t in tags):
+        tags.insert(0, ("🟩", None, "", INITIAL_GREEN[stem]))
     # within a year: the institution's act (🔴 ⭕ ⭘) before its outcome (⬜ 🟢) — 2026-09-19
     SEQ = {"🔴": 1, "⭕": 1, "⭘": 1, "⬜": 2, "🟢": 2}
     tags.sort(key=lambda t: (t[1] or 0, SEQ.get(t[0], 1)))
+    j = join_of(L)   # the initial 🟩's date, set after the sort (a «≤ 1903» is text, and the square stays first)
+    if j: tags[:] = [(g, j[0], loc, f"{why}; {j[2]}") if g == "🟩" and y is None else (g, y, loc, why) for g, y, loc, why in tags]
     return L, tags
 
 # --- the SUPPLEMENT: a principled shortlist of canon — (1) the names Schuck's own prose calls pioneers but does not picture
@@ -680,10 +693,10 @@ SUPP_COUNTRY = {"de-wahl": "Russia (Estonia)", "zinoviev": "Russia (Ukraine)", "
                 "evrot": "France", "lallemant": "France", "saquet": "France", "sentis": "France", "holub": "Austria-Hungary", "kraus": "Austria-Hungary",
                 "krumpholc": "Austria-Hungary", "nalli": "Italy", "runeberg": "Finland", "twombley": "USA"}
 
-ORDER = ["🟩", "🟢", "💛", "💚", "🟨", "🟦", "💙", "🟧", "🧡", "⬜", "⬛", "🔴", "⭕", "⭘", "🟪", "†", "Ⓚ", "Ⓐ", "◈", "◐"]
-LEGEND = {"🟩": "stayed", "🟢": "returned", "🟨": "voted for reform 1894", "🟦": "Ido adherent", "💙": "Ido sympathiser", "🟧": "other-auxlang adherent",
-          "🧡": "other-auxlang sympathiser", "⬜": "confirmed lapse", "⬛": "renounced — publicly rejected Esperanto without adhering elsewhere (the man's act; ⬜ is the lapse the committee inferred)", "🔴": "struck for disloyalty",
-          "⭕": "struck, no disloyalty formula", "⭘": "resigned (the man's own eksiĝo)", "💛": "yellow heart — sympathy for reform before the 1894 vote", "💚": "green heart — sympathy for the language as it was, before the 1894 vote", "🟪": "died before end-1908", "†": "death year known", "Ⓚ": "Lingva Komitato", "Ⓐ": "Akademio", "◈": "unifier (proposed a union / reconciliation of the camps)", "◐": "double membership (kept an Esperanto-institution seat after a camp square — the purge lag per man)"}
+ORDER = ["🟩", "🟢", "💛", "💚", "🟨", "🟦", "💙", "🟧", "🧡", "⬜", "⬛", "🔴", "⭕", "⭘", "🟪", "🟠", "‡", "†", "Ⓚ", "Ⓐ", "◈", "◐"]
+LEGEND = {"🟩": "joined Esperanto, dated; stayed unless a later square says otherwise", "🟢": "returned", "🟨": "voted for reform 1894", "🟦": "Ido adherent", "💙": "Ido sympathiser", "🟧": "other-auxlang adherent",
+          "🧡": "other-auxlang sympathiser", "⬜": "confirmed lapse", "⬛": "renounced — publicly renounced world languages (the editor, 2026-11-06), adhering nowhere else (the man's act; ⬜ is the lapse the committee inferred)", "🔴": "struck for disloyalty",
+          "⭕": "struck, no disloyalty formula", "⭘": "resigned (the man's own eksiĝo)", "💛": "yellow heart — sympathy for reform before the 1894 vote", "💚": "green heart — sympathy for the language as it was, before the 1894 vote", "🟪": "Volapük adherent, dated", "🟠": "invented an auxlang of their own, dated", "‡": "died before end-1908", "†": "death year known, after 1908", "Ⓚ": "Lingva Komitato", "Ⓐ": "Akademio", "◈": "unifier (proposed a union / reconciliation of the camps)", "◐": "double membership (kept an Esperanto-institution seat after a camp square — the purge lag per man)"}
 def tag_table(taglists):
     counts = {g: sum(1 for t in taglists if any(x[0] == g for x in t)) for g in ORDER}
     out = "| tag | meaning | people |\n|---|---|---|\n"
@@ -693,12 +706,12 @@ def tag_table(taglists):
     out += f"| 🟦💙🟧🧡 | **any camp — Ido or other auxlang, adherent or sympathiser** | **{anyc}** |\n"
     return out
 def country_table(items):
-    """items: (country, tags) — rows: country · portraits · 🟦 · 🟧 · any square · 🔴/⭕ · 🟪"""
+    """items: (country, tags) — rows: country · portraits · 🟦 · 🟧 · any square · 🔴/⭕ · ‡"""
     bc = {}
     for c, t in items:
         c = re.sub(r"\s*\(.*\)$", "", c); d = bc.setdefault(c, [0, 0, 0, 0, 0, 0])
-        g = "".join(x[0] for x in t); d[0] += 1; d[1] += ("🟦" in g or "💙" in g); d[2] += ("🟧" in g or "🧡" in g); d[3] += any(c in g for c in "🟦💙🟧🧡"); d[4] += ("🔴" in g or "⭕" in g); d[5] += "🟪" in g
-    out = "| country (1906 borders) | people | Ido 🟦+💙 | other 🟧+🧡 | any camp | struck 🔴/⭕ | 🟪 |\n|---|---|---|---|---|---|---|\n"
+        g = "".join(x[0] for x in t); d[0] += 1; d[1] += ("🟦" in g or "💙" in g); d[2] += ("🟧" in g or "🧡" in g); d[3] += any(c in g for c in "🟦💙🟧🧡"); d[4] += ("🔴" in g or "⭕" in g); d[5] += "‡" in g
+    out = "| country (1906 borders) | people | Ido 🟦+💙 | other 🟧+🧡 | any camp | struck 🔴/⭕ | ‡ |\n|---|---|---|---|---|---|---|\n"
     for c, v in sorted(bc.items(), key=lambda x: (-x[1][0], x[0])): out += f"| {c} | {v[0]} | {v[1]} | {v[2]} | {v[3]} | {v[4]} | {v[5]} |\n"
     tot = [sum(v[i] for v in bc.values()) for i in range(6)]
     out += f"| **total** | **{tot[0]}** | **{tot[1]}** | **{tot[2]}** | **{tot[3]}** | **{tot[4]}** | **{tot[5]}** |\n"
@@ -715,7 +728,7 @@ LK_HAND = {"de saussure": "de-saussure", "saussure": "de-saussure", "bein": "bei
            "ostrovski": "ostrovskij", "ostrowski": "ostrovskij", "de menil": "de-menil", "menil": "de-menil", "de beaufront": "de-beaufront", "beaufront": "de-beaufront",
            "ĉejka": "cejka", "cejka": "cejka", "schafer": "schafer", "ŝefer": "schafer", "fiŝer": "fiser", "fischer": "fischer", "costa e almeida": "costa-e-almeida",
            "sepulveda cuadra": "sepulveda", "sepúlveda cuadra": "sepulveda", "capé": "cape", "cape": "cape", "zabilon d'her": "zabilon-d-her", "van melckebeke": "van-melckebeke",
-           "de ladevèze": "de-ladeveze", "ladevèze": "de-ladeveze", "de wahl": "de-wahl", "wahl": "de-wahl", "kanaloŝŝi-lefler": "kanalossi-lefler", "kanaloŝŝy-lefler": "kanalossi-lefler", "benoist": "benoit", "mackenzie": "mac-kensie", "blumenthal": "blumenthal", "belmont": "blumenthal", "busutil": "busuttil", "dragumis": "dragoumis", "uitterdyk": "uitterdijk", "thornsteinsson": "thorsteinsson", "seynaeve": "seynaeve", "runeberg": "runeberg", "capé-montrosier": "cape", "cape-montrosier": "cape", "blanc": "blanc", "coutinho": "coutinho"}
+           "de ladevèze": "de-ladeveze", "ladevèze": "de-ladeveze", "de wahl": "de-wahl", "wahl": "de-wahl", "kanaloŝŝi-lefler": "kanalossi-lefler", "kanaloŝŝy-lefler": "kanalossi-lefler", "benoist": "benoit", "mackenzie": "mac-kenzie", "blumenthal": "blumenthal", "belmont": "blumenthal", "busutil": "busuttil", "dragumis": "dragoumis", "uitterdyk": "uitterdijk", "thornsteinsson": "thorsteinsson", "seynaeve": "seynaeve", "runeberg": "runeberg", "capé-montrosier": "cape", "cape-montrosier": "cape", "blanc": "blanc", "coutinho": "coutinho"}
 LK_1907 = {"asada": "Japan", "evstifejev": "Russia", "mann": "Britain", "de-saussure": "Switzerland"}
 def lk_roll1(allstems):
     """[(stem or None, printed name, country, line)] from ROLL 1 of the BK-IV transcription."""
@@ -759,13 +772,870 @@ def lk_roll1(allstems):
         out.append((stem, m.group(2).strip(), country, m.group(4)))
     return out
 
+# (v0.3.5: the death before end-1908 is «‡», 🟪 now being Volapük; «🟪 †» is the old cards' way of writing it)
+DEATH_TOK = re.compile(r"^(🟪 †|‡|†)(?: (.+))?$")
+
+def seq_text(s):
+    """A sequence with the death last, † and 🟪 written together (2026-10-31; the editor, on v0.3's «† 1906 → 🟪 1906 →
+    Ⓚ 1906»). The year is †'s; a sequence already written so is unchanged."""
+    toks = s.split(" → ")
+    dead = [DEATH_TOK.match(t) for t in toks if DEATH_TOK.match(t)]
+    if not dead: return s
+    out = [t for t in toks if not DEATH_TOK.match(t)]
+    y = next((m.group(2) for m in dead if m.group(2)), None)
+    g = "‡" if any(m.group(1) != "†" for m in dead) else "†"
+    return " → ".join(out + [f"{g} {y}" if y else g])
+
+def seq_of(tags):
+    return seq_text(" → ".join(f"{g}{'' if y is None else ' ' + str(y)}" for g, y, _, _ in tags))
+
+# THE DATE OF THE INITIAL 🟩 (2026-10-31; the editor: the card to give the date of joining Esperanto as the date of the
+# initial green square; Miles's proposal approved): in order of weight (1) the series year of the person's
+# first entry in Zamenhof's Adresaro (the «{aperoj: Adresaro de Zamenhof, n-ro N}» lines, tools/adresaro-extract.py);
+# (2) a line stating the joining («aliĝis al Esperanto», «eklernis», «fariĝis esperantisto» …), on its own exact date;
+# (3) else the earliest exactly dated Esperanto act on the profile, written as a bound, «🟩 ≤ 1903» (a bound is not a
+# year, as the editor ruled of Zinoviev's death, 2026-09-19). An act earlier than (1) or (2) makes the date that bound.
+JOINED = re.compile(r"(aliĝis al (la )?(Esperant|esperant|movado)|ekesperantistiĝis|esperantistiĝis|eklernis|fariĝis "
+                    r"esperantist|lernis (la )?Esperant|komencis lerni|varbita al Esperant|(ek)?konis Esperant|konatiĝis kun "
+                    r"Esperant|learned Esperanto|took up Esperanto|became an Esperantist)")
+# The Adresaro's entries are not yet harvested into the profiles (Ezri's dowse of 2026-10-29): read from its facts file,
+# by the line's head, as the dowse identified each entry with a profile
+ADRESARO_FACTS = os.path.join(PROFILES, "by-source", "zamenhof-adresaro-dowse.md")
+_ADR = None
+def adresaro_years():
+    global _ADR
+    if _ADR is None:
+        _ADR = defaultdict(list)
+        if os.path.exists(ADRESARO_FACTS):
+            for ln in open(ADRESARO_FACTS, encoding="utf-8"):
+                m = LINE.match(ln.rstrip("\n"))
+                if m and "{aperoj: Adresaro de Zamenhof" in m.group("rest") and EXACT.match(m.group("year")):
+                    loc = next((f for f in m.group("rest").split(" · ") if re.match(r"adresaro-\d{4}-serio", f)), "Adresaro")
+                    _ADR[m.group("who")].append((int(EXACT.match(m.group("year")).group(1)), loc))
+    return _ADR
+ESP_MARK = re.compile(r"Esperant|esperant|Lingvo Internacia|Fundament|Unua Libro")
+ACT_KINDS = {"aliĝo", "aperoj", "ofico", "verko", "prelego", "propagando", "fondo", "kongreso"}
+EXACT = re.compile(r"\s*\**(1[89]\d\d)(-\d\d){0,2}\**\s*$")
+
+def join_of(L):
+    """(the date as written, «» or «≤», the evidence) for the initial 🟩, or None"""
+    def best(pred):   # nothing before 1887, the Unua Libro (a misread year, «1803», is no act of the language)
+        c = [(int(m.group(1)), ln) for ln in L if pred(ln) for m in [EXACT.match(ln["ystr"])] if m and int(m.group(1)) >= 1887]
+        return min(c, key=lambda x: x[0]) if c else None
+    adr = best(lambda ln: ln["kind"] == "aperoj" and ln["obj"].startswith("Adresaro de Zamenhof"))
+    fromfile = [(y, {"loc": loc}) for who in {ln["who"] for ln in L} for y, loc in adresaro_years().get(who, [])]
+    if fromfile:
+        f = min(fromfile, key=lambda x: x[0])
+        adr = f if not adr or f[0] < adr[0] else adr
+    said = best(lambda ln: JOINED.search(ln["text"].split(" · ")[0]))
+    act = best(lambda ln: ln["kind"] in ACT_KINDS and ESP_MARK.search(ln["obj"] + " " + ln["text"].split(" · ")[0]))
+    exact = min((x for x in (adr, said) if x), key=lambda x: x[0], default=None)
+    if exact and not (act and act[0] < exact[0]):
+        how = "the Adresaro's series year" if exact is adr else "a line stating the joining"
+        return str(exact[0]), "", f"joined: {how} [{exact[1]['loc'][:90]}]"
+    if act:
+        return f"≤ {act[0]}", "≤", f"joined by: the earliest dated Esperanto act on the profile [{act[1]['loc'][:90]}]"
+    return None
+
+def with_join(stem, caption, s):
+    """the sequence's initial 🟩 given its date (join_of); (sequence, evidence or None)"""
+    if not s.startswith("🟩") or re.match(r"^🟩 [^→]", s) or not stem: return s, None
+    j = join_of(lines_of(stem, caption))
+    return (s.replace("🟩", f"🟩 {j[0]}", 1), f"🟩: {j[2]}") if j else (s, None)
+
+def green(stem, s):
+    """the ruled initial 🟩 (INITIAL_GREEN) put first where a sequence lacks it"""
+    return s if stem not in INITIAL_GREEN or s.startswith("🟩") else "🟩 → " + s
+
+# THE LK CHECK'S CORRECTIONS (2026-10-31; the editor 13:2x, on the eight proposed in
+# geniza/BINGO-LK-CHECK-2026-10-31.md from the notices, sources/oge-rolls/LK-DEPARTURES-2026-10-31.md; and the OGE rolls ranked above the
+# Bohemian Esperantist as an authority, on Holub: OGE vol. 3, PDF p. 337 (printed 237), «Eksiĝoj» of the February 1911
+# number, names him among those «konsiderataj kiel eksiĝintaj, pro nerespondo»). stem → [(op, glyph, year, new glyph,
+# new year, why)]: «add» a mark (year None: undated, put before the death); «change» a mark; «remove» a mark (v0.3.4).
+_OGE = "Oficiala Gazeto Esperantista"
+CORRECTIONS = {
+    "meray": [("add", "⭘", 1910, None, None, f"resigned from the LK, «ĉar lia aĝo ne ebligas lian efektivan partoprenon» ({_OGE}, Nov 1910, `sources/oge-rolls/3-0219…`)")],
+    "miletz": [("add", "⭕", 1908, None, None, f"struck for answering no circular (LK Cirkulero 10, voted 41 to 5; {_OGE}, Aug 1908, `sources/oge-rolls/1-0140…`)")],
+    "cederblad": [("add", "⭕", 1908, None, None, f"struck for answering no circular (LK Cirkulero 10; {_OGE}, Aug 1908)")],
+    "guilbeau": [("add", "⭕", 1908, None, None, f"struck for answering no circular (LK Cirkulero 10; {_OGE}, Aug 1908)")],
+    "mac-kenzie": [("add", "⭕", 1908, None, None, f"struck for answering no circular (LK Cirkulero 10; {_OGE}, Aug 1908)")],
+    "saint-martin": [("add", "⭕", 1908, None, None, f"struck for answering no circular (LK Cirkulero 10; {_OGE}, Aug 1908)")],
+    "guillaume": [("add", "⭘", 1910, None, None, f"resigned, his professional work too heavy ({_OGE}, Nov 1910, `sources/oge-rolls/3-0219…`)")],
+    "zinoviev": [("change", "⭘", "1914", "⭘", "1913", f"«sendis sian eksiĝon de la Lingva Komitato» ({_OGE}, Dec 1913, `sources/oge-rolls/6-0205…`)")],
+    "hodler": [("add", "⭘", None, None, None, f"had resigned from the LK, the year not given (his obituary, {_OGE}, May 1920, `sources/oge-rolls/7-0219…`)")],
+    "lallemant": [("add", "⭘", 1920, None, None, f"resigned from the LK for his health ({_OGE}, May 1920, `sources/oge-rolls/7-0219…`); his seat's date to find")],
+    "holub": [("change", "🔴", "1911", "⭕", "1911", f"«konsiderataj kiel eksiĝintaj, pro nerespondo» ({_OGE} vol. 3, PDF p. 337, printed 237, Feb 1911); not for anti-Esperanto activity")],
+    # v0.3.4 (the editor 18:2x, on the marks the notices did not hold; approved to the changes): the
+    # congress reports and the rolls' corrections, BINGO-LK-CHECK-2026-10-31.md § «The marks not in the notices»
+    "talmey": [("change", "⭕", "1911", "⭕", "1912", f"«la Akademio devis konsideri kiel eksiĝintaj S-rojn Gaston Moch kaj Max Talmey», no reason given (Boirac's report to the Eighth Congress, {_OGE} vol. 5, PDF 78, Aug 1912)")],
+    "bagnulo": [("add", "⭕", 1914, None, None, f"struck from the LK's list, «de tre longa tempo, ne donis signon de vivo» (Boirac's report to the Tenth Congress, {_OGE} vol. 7, PDF 43, Jul 1914); the ⭕ 1911 is UEA's")],
+    "beauchemin": [],
+    "asada": [("change", "⭕", "1909", "⭘", "1911", f"on the lists of 1910 and Feb 1911; then «petas, ke oni ne konsideru lin kiel anon de tiu Komitato», too busy for its duties (the July 1911 election's «Korektoj», {_OGE} vol. 4)")],
+    "de-saussure": [("remove", "⭕", "1912", None, None, f"not struck: at the Kraków sitting the Academy «decidis ne konsideri lin, kiel eksiĝintan» ({_OGE} vol. 5, PDF 172, 1912); on the LK roll of 1 Jan 1920 ({_OGE} vol. 7, PDF 199)")],
+    "michaux": [("add", "⭕", 1914, None, None, f"left off the 1914 re-election: «La Akademio konservis ĉiujn nomojn de malnovaj anoj, kun escepto de la nomo de S-ro Michaux» (Boirac's report to the Tenth Congress, {_OGE} vol. 7, PDF 43, Jul 1914); not on the roll of 1 Jan 1920")],
+}
+CORRECTIONS = {k: v for k, v in CORRECTIONS.items() if v}
+SPAN_FIX = {"michaux": ("DOUBLE MEMBERSHIP 1909–1911", "DOUBLE MEMBERSHIP 1909–1914",
+                        "to 1914: an LK voter in July 1909 and July 1911, at the Antwerp session of 1911 and on the Bern report of July 1913; left off the re-election of 1914"),
+            "de-saussure": ("DOUBLE MEMBERSHIP 1910–1912", "DOUBLE MEMBERSHIP 1910–1920",
+                            "to 1920 at least: not struck in 1912 (the Academy's decision at Kraków), on the LK roll of 1 Jan 1920; its end to be found")}
+
+def correct(stem, seq, ev):
+    """the CORRECTIONS and SPAN_FIX of a stem applied to its sequence and evidence"""
+    toks = [t for t in seq.split(" → ") if t]
+    for op, g, y, g2, y2, why in CORRECTIONS.get(stem, []):
+        if op == "change":
+            toks = [f"{g2} {y2}" if t == f"{g} {y}" else t for t in toks]
+        elif op == "remove":
+            toks = [t for t in toks if t != f"{g} {y}"]
+        else:
+            tok = g if y is None else f"{g} {y}"
+            if tok in toks: continue
+            dead = next((i for i, t in enumerate(toks) if DEATH_TOK.match(t)), len(toks))
+            at = dead if y is None else next((i for i, t in enumerate(toks[:dead]) if not t.startswith("🟩")
+                                              and re.search(r"(\d{4})", t) and int(re.search(r"(\d{4})", t).group(1)) > y), dead)
+            toks.insert(at, tok)
+        ev = f"{g2 or g}: RULED 2026-10-31: {why} [LK check]" + (" ‖ " + ev if ev else "")
+    if stem in SPAN_FIX:
+        a, b, why = SPAN_FIX[stem]
+        ev = ev.replace(a, b) + f" ‖ ◐: RULED 2026-10-31: span {why} [LK check]"
+    return " → ".join(toks), ev
+
+def resequence(old, new):
+    """--resequence OLD NEW (2026-10-31): the card of version OLD with its sequences rewritten by seq_text() and the
+    ruled initial 🟩 (INITIAL_GREEN) put first, and nothing else, as version NEW (the card is hand-edited: a re-cut from today's profiles would change more than the order).
+    Writes bingo-card-v<NEW>.csv, -supplement.csv, -lk1905.csv and .md; refuses if any exists."""
+    out_dir = os.environ.get("BINGO_OUT", os.path.join(GEN, "bingo-card"))
+    P = lambda v, suf: os.path.join(out_dir, f"bingo-card-v{v}{suf}")
+    sufs = [".csv", "-supplement.csv", "-lk1905.csv", ".md"]
+    there = [P(new, s) for s in sufs if os.path.exists(P(new, s))]
+    if there: sys.exit("refusing, nothing written: exists: " + ", ".join(os.path.basename(p) for p in there))
+    n, MAP = 0, {}   # (stem, the old sequence) → the new, from the CSVs, for the .md's rows
+    for s in sufs[:3]:
+        R = list(csv.DictReader(open(P(old, s), encoding="utf-8")))
+        with open(P(new, s), "w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(R[0].keys())); w.writeheader()
+            for r in R:
+                orig = r["tags_in_sequence"]
+                t = green(r["stem"], seq_text(orig))
+                if t.startswith("🟩 → ") and r["stem"] in INITIAL_GREEN and "🟩:" not in r["evidence"]:
+                    r["evidence"] = f"🟩: {INITIAL_GREEN[r['stem']]} [] ‖ " + r["evidence"]
+                t, ev = with_join(r["stem"], r.get("caption", ""), t)
+                if ev: r["evidence"] = ev + " ‖ " + r["evidence"]
+                t, r["evidence"] = correct(r["stem"], t, r["evidence"])
+                MAP[(r["stem"], orig)] = t
+                n += t != orig; r["tags_in_sequence"] = t
+                w.writerow(r)
+    L, col, table = [], None, None
+    delta = collections.defaultdict(collections.Counter)   # table → glyph → people gained (lost: negative), for the totals
+    # table → country → [Ido, other, any camp, struck, ‡] gained, for the «| country (1906 borders) |» tables
+    cdelta = collections.defaultdict(lambda: collections.defaultdict(lambda: [0] * 5))
+    person_cols = lambda g: [bool(g & {"🟦", "💙"}), bool(g & {"🟧", "🧡"}), bool(g & {"🟦", "💙", "🟧", "🧡"}),
+                             bool(g & {"🔴", "⭕"}), "‡" in g]
+    ccol = None
+    has = lambda q: {w for t in q.split(" → ") for w in t.split(" ") if w and not re.match(r"^(\d{4}|≤)$", w)}   # «‡ † 1906»: both
+    for line in open(P(old, ".md"), encoding="utf-8"):
+        if line.startswith("|"):
+            cells = line.rstrip("\n").split(" | ")
+            hd = [c.strip().strip("|").strip() for c in cells]   # a header's last cell carries the closing «|»
+            if "tags in sequence" in hd:
+                col = hd.index("tags in sequence")
+                ccol = hd.index("country") if "country" in hd else None
+                table = {"| plate": "album", "| stem": "supplement"}.get(cells[0].strip(), "supplement")
+                if "as the roll prints him" in hd: table = "table3"
+            elif col is not None and len(cells) > col and cells[col].strip() and not cells[col].startswith("-"):
+                st = next((m.group(1) for c in cells for m in [re.fullmatch(r"`([^`]+)`", c.strip().strip("|").strip())] if m), "")
+                # the last cell of a row carries the closing « |» (the supplement's and table 3's sequence is their last)
+                tail = " |" if cells[col].rstrip().endswith(" |") else ""
+                orig = cells[col].rstrip()[:-2].strip() if tail else cells[col].strip(); was = seq_text(orig)
+                cells[col] = (MAP.get((st, orig)) or correct(st, with_join(st, "", green(st, was))[0], "")[0]) + tail
+                nw = cells[col][:-2] if tail else cells[col]
+                for g_ in has(orig) | has(nw):
+                    delta[table][g_] += (g_ in has(nw)) - (g_ in has(orig))
+                if ccol is not None:   # the country tables' columns, per person (v0.3.4: they had not followed)
+                    cty = cells[ccol].strip().strip("|").strip()
+                    for k, v in enumerate(person_cols(has(nw))):
+                        cdelta[table][cty][k] += v - person_cols(has(orig))[k]
+                line = " | ".join(cells) + "\n"
+        else:
+            col = None if line.strip() else col
+        if line.startswith("# The Schuck-album bingo card — v" + old):
+            line = line.replace("— v" + old, "— v" + new, 1).rstrip("\n") + (f" · re-sequenced 2026-10-31 from v{old}: the death "
+                   "last, «‡ †» written together; the ruled initial 🟩 (Privat, Schneeberger); the initial 🟩 dated by the "
+                   "joining (the Adresaro's series year, a line stating it, else «≤» the earliest Esperanto act); the LK check's "
+                   "corrections (geniza/BINGO-LK-CHECK-2026-10-31.md)\n")
+        L.append(line)
+    # the totals follow the marks put in or taken out (each «### Totals — …» table's «| <mark> | <label> | N |» rows)
+    adds = {"the album's": ["album"], "the supplement's": ["supplement"], "both tables together": ["album", "supplement"],
+            "table 3's": ["table3"], "all three tables": ["album", "supplement", "table3"]}
+    head = None
+    for i, line in enumerate(L):
+        if line.startswith("### Totals"): head = next((k for k in adds if k in line), None)
+        m = re.match(r"^\| (\S+) \| ([^|]+) \| (\d+) \|$", line.rstrip("\n"))
+        if m and head and m.group(1) in ORDER:
+            L[i] = f"| {m.group(1)} | {m.group(2)} | {int(m.group(3)) + sum(delta[t][m.group(1)] for t in adds[head])} |\n"
+        c = re.match(r"^\| ([^|*]+?) \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (\d+) \| (\d+) \|$", line.rstrip("\n"))
+        if c and head:
+            v = [int(x) + sum(cdelta[t][c.group(1)][k] for t in adds[head]) for k, x in enumerate(c.groups()[2:])]
+            L[i] = f"| {c.group(1)} | {c.group(2)} | " + " | ".join(map(str, v)) + " |\n"
+    open(P(new, ".md"), "w", encoding="utf-8").write("".join(L))
+    print(f"v{old} → v{new}: {n} sequences rewritten in the three CSVs; → {', '.join(os.path.basename(P(new, s)) for s in sufs)}")
+    return 0
+
+# v0.3.5 (2026-11-05; the editor 18:4x: the date of adherence to Volapük added where it applies, as a purple
+# square, the old purple square (out of scope, dead before Ido) becoming a double
+# dagger; an orange circle for those who invented auxiliary languages of their own; De Beaufront's joining in 1887
+# as the case for using the Adresaro more, beside the Enciklopedio de Esperanto). Read from bingo-card/BINGO-EVIDENCE-2026-11-05.md
+# (tools/bingo-evidence.py). A key is the stem, or (stem, country) where a stem is shared. An initial 🟩 for everyone, dated:
+# the first own entry in the Adresaro's series, or the Enciklopedio's stated year, whichever is earlier.
+_ADR_S = lambda y, s, n: f"Adresaro {y}, serio {s}, n-ro {n}"
+JOIN_RULED = {
+    "nylen": ("1892", "EdE, «E-isto de aŭg. 1892»"),
+    "zamenhof": ("1887", "the editor 2026-11-06"),
+    "de-beaufront": ("1888", "EdE, «aliĝis al E jam en 1888» (l. 2170; also l. 8031), and the album; Adresaro 1889, serio 1, n-ro 46, pins only «by 1889»"),   # was 1887 to 2026-11-08 (the editor)
+    "rhodes": ("1900", _ADR_S(1900, 21, 5260)), "motteau": ("1901", "EdE, «E-istiĝis en 1901»; " + _ADR_S(1901, 22, 6266)),
+    "schafer": ("1903", _ADR_S(1903, 24, 7778)), "talmey": ("1904", _ADR_S(1904, 25, 9777)),
+    "beauchemin": ("1901", "the profile, April 1901; " + _ADR_S(1901, 22, 6358)), "kuhnl": ("1900", "EdE, «E-isto de 1900»"),
+    "jamin": ("1898", _ADR_S(1898, 19, 4375)), ("lemaire", "Belgium"): ("1897", _ADR_S(1897, 18, 4020)),
+    ("lemaire", "France"): ("1892", _ADR_S(1892, 11, 2026)), "coox": ("1903", _ADR_S(1903, 24, 7836)),
+    "van-melckebeke": ("1902", _ADR_S(1902, 23, 7125)), "peltier": ("≤ 1895", "sending names to the Adresaro, 1895, serio 17, n-ro 3659"),
+    "michaux": ("1901", _ADR_S(1901, 22, 6305)), "moch": ("1889", "EdE, «aliĝis al E en 1889»; his own account, Lingvo Internacia 1897"),
+    "javal": ("1903", "EdE, «li praktikis ĝin nur de 1903»"), "lambert": ("1899", _ADR_S(1899, 20, 4731)),
+    "zabilon-d-her": ("1895", _ADR_S(1895, 17, 3749)), "einstein": ("1888", "EdE, the Unua Libro received in 1888, «li tuj konvertiĝis»; " + _ADR_S(1889, 1, 205)),
+    "trompeter": ("1889", _ADR_S(1889, 1, 918)), "meier": ("1889", "EdE, «jam en 1889 konatiĝis kun E»"), "wallon": ("1889", "EdE, «E-isto de 1889»"),
+    "villanueva": ("1902", "EdE, «E-isto de 1902»"), "bicknell": ("1897", "EdE, «E-isto de 1897»"), "marich": ("1901", "EdE, «E-isto de 1901»"),
+    "wasniewski": ("1893", _ADR_S(1893, 13, 2572)), "dambrauskas": ("1889", _ADR_S(1889, 1, 186)), "kofman": ("1892", "the profile, «E-iĝis: 1892» (Szerdahelyi 1979)"),
+    "avilov": ("1889", _ADR_S(1889, 1, 30)), "dragoumis": ("1903", _ADR_S(1903, 24, 8800)), "krikortz": ("1893", _ADR_S(1893, 13, 2465)),
+    "ahlberg": ("1892", _ADR_S(1892, 11, 1990)), "uitterdijk": ("1898", "EdE, «E-isto de 1898»"), "de-wahl": ("1888", "the profile, «aliĝi al Esperanto en 1888»; " + _ADR_S(1889, 1, 932)),
+    "sentis": ("1898", "EdE, «E-isto de 1898»"), "kraus": ("1895", "EdE, «E-isto de 1895»"), "runeberg": ("1901", "EdE, «E-istiĝis en 1901»"),
+    "bricard": ("1901", _ADR_S(1901, 22, 6489)), "saquet": ("1902", _ADR_S(1902, 23, 7566)), "krumpholc": ("1902", _ADR_S(1902, 23, 7025)),
+    "huet": ("1901", _ADR_S(1901, 22, 6486)), "asada": ("1906", _ADR_S(1906, 27, 14522)),
+    "zinoviev": ("1887", "his own word, «malnuva esperantisto» of 1887 (Progreso, 2-a yaro, PDF 570)"),
+    "boulet": ("1902", "EdE, «E-iĝis en 1902»; born 2 Jan 1884, so the 1895 of the earlier cards, an Adresaro entry, is another Boulet"),
+    "postnikov": ("1893", _ADR_S(1893, 14, 2817) + ", «F. A. Postnikov»"), "lojko": ("1889", _ADR_S(1889, 1, 569) + ", «Lojko, I.»"),
+    "atanasov": ("1900", _ADR_S(1900, 21, 5204) + ", «Georgij Atanasov (lernanto de gimnazio)», Varna"), "morin": ("1903", "the Adresaro's series year, «Anselmo Morin», Santa Rosa, Veracruz"),
+}
+# 🟪: a date from a report is only a date by which he had adhered (the editor 19:0x, on Beauchemin's 1901: a date of
+# reporting, not of joining, any joining of Volapük after 1890 suspect, so taken as a terminus ante quem)
+VOLAPUK = {
+    "wallon": ("≤ 1890", "Volapükabled zenodik 1890, no. 1251, «Wallon Paul in Gleiwitz» (volapukabled-1890-anno-0053, PDF 2, l. 120); Paul Polykarp Wallon the card's Karp Wallon (the editor 2026-11-08 02:2x)"),
+    "einstein": ("1883", "began to study it, by his own count (Volapükabled talik 1888, PDF 7)"), "grabowski": ("1886", "the profile: about a year before Esperanto"),
+    "de-wahl": ("≤ 1888", "teacher's diploma, May 1888"), "deligny": ("≤ 1887", "leading Volapük courses at Saint-Omer, end of 1887"),
+    "lauren": ("≤ 1888", "Allmänna Svenska Volapükföreningen, 1887–1888"), "gustafsson": ("≤ 1888", "Allmänna Svenska Volapükföreningen, 1887–1888"),
+    "marignoni": ("≤ 1889", "EdE, «Eksvolapükisto»"), "meier": ("≤ 1889", "EdE, «Volapükisto»"), "devjatnin": ("≤ 1891", "EdE, «Antaŭe li estis Volapükisto»"),
+    "bicknell": ("≤ 1897", "EdE, «Eksvolapükisto»"), "bulthuis": ("≤ 1899", "EdE; diploma, 12 May 1899"), "midthus": ("≤ 1900", "EdE, «Studis Volapükon antaŭ 1900»"),
+    "motteau": ("≤ 1901", "EdE, «Antaŭe Volapükisto»"), "beauchemin": ("≤ 1901", "«jam studietis Volapükon», reported late 1901; RULED a terminus ante quem"),
+    "evstifejev": ("≤ 1904", "«konas kaj skribas Volapükon», reported 1904; a terminus ante quem, as Beauchemin"),
+}
+# from the Volapük directories and press themselves (the editor 2026-11-06, asking that the Volapük directories
+# and press be searched for a terminus ante quem): every name on the card sought in them; these two the only new ones
+VOLAPUK.update({
+    "meier": ("≤ 1882", "«L. E. Meier, redakel», Munich, in the Volapükabled zenodik's list, 1882 (ANNO_e2s_18820061, l. 563, l. 584), by name and town"),
+    # the editor 2026-11-06: Le Volapük's 26 issues had been left out of that search
+    "krikortz": ("≤ 1888", "«L'Association française a accordé le diplôme de spodal à: [...] MM Krikortz de Nerikes Knista» (Le Volapük, Dec 1888, l. 392); he was born in Knista parish"),
+    "nylen": ("≤ 1889", "«A. P. Nylen, Norrköping», Volapükisten 1889 (PDF 89, l. 12143; l. 9984), an inference: Adresaro 1893, n-ro 2255, «Nylén, A. P., studento. Gierdtorp, Hellestad» is La Esperantisto's «Nylen, Paul» at the same address, so the flipped initials are his; and he sends Adresaro names from Östergötland and Norrköping, 1897–1898"),
+})
+OWN_AUXLANG = {   # the year and the project, Dulichenko 1990 (the entry's number) unless said
+    "zamenhof": ("1878", "Lingwe Universala, then Esperanto (Dulichenko 189, 210)"), "de-beaufront": ("≤ 1887", "Adjuvanto, by his own account before he read Esperanto; Dulichenko 268 files it under 1896"),
+    "grabowski": ("1896", "Modern Latin, Linguo Moderna (Dulichenko 269, 271)"), "berthelot": ("1904", "Fonetiko Litera (Dulichenko 316)"), "de-saussure": ("1907", "Antido (Dulichenko 337)"),
+    ("lemaire", "Belgium"): ("1908", "Ilo (Dulichenko 354)"), "jamin": ("1908", "Mez-Voio (Dulichenko 357)"), "de-wahl": ("1906", "Auli, «ekde 1906» (Manders 1950, PDF 22); Dulichenko 362 files it at 1909; then Occidental"),
+    "michaux": ("1909", "Romanal (Dulichenko 372)"), "sentis": ("1910", "Esperanta evoluo, to 1928 (Dulichenko 538)"), "talmey": ("1924", "Arulo, also Gloro (Dulichenko 498)"),
+    "meazzini": ("1928", "Idiom Di Omni (Dulichenko 532.1)"),
+}
+
+# 🟧 where the other auxlang was their own, so 🟠 says it already (the editor 2026-11-06: Michaux's orange square beside his orange
+# circle possibly redundant, unless the square stands for Latino sine Flexione: Michaux's 1909 was his Romanal,
+# but he did turn to the Academia pro Interlingua in 1912): stem → the mark to drop, the mark in its place or None, why
+OWN_ORANGE = {
+    "michaux": ("🟧 1909", "🟧 1912", "the 1909 mark was his own Romanal; 1912, the Academia pro Interlingua (La Belga Sonorilo 1910, PDF 150; the profile, May 1912)"),
+    "talmey": ("🟧 1924", None, "his own Arulo"), "de-wahl": ("🟧 1922", "🟠 1922", "his own Occidental"), "de-saussure": ("🟧 1910", "🟠 1910", "his own Antido 2 (Dulichenko)"),
+}
+
+# The inventors who stayed (the editor 2026-11-06: the inventors who stayed told apart from those who left;
+# one still active after inventing a language gets a green square back at the next recorded
+# Esperanto activity, and the same for Ido). Those with a mark after 🟠 stayed: here, or Jamin and Ch. Lemaire's 🟦 1908. No later mark: left
+BACK = {
+    "berthelot": [("🟩 1905", "Vocabulaire Français-Esperanto, 3rd edition, with Cart and Merckens, Jan 1905")],
+    # the editor 00:0x: not a stayer
+    "grabowski": [("⬜ 1894", "left Esperanto after the vote of May 1894, «por preskaŭ dek jaroj» (Korĵenkov 2005)"),
+                  ("🟢 1904", "returned, May 1904, after reading Couturat and Leau's Histoire (Lingvo Internacia; Sinjorino Twardowska, July 1904)")],
+    "de-saussure": [("🟩 1908", "public letter in Paris-Esperanto, May 1908"), ("🟩 1910", "translated Naville's La Devo into Esperanto, 1910")],
+    "michaux": [("🟩 1910", "greetings to the Sixth Universal Congress, 15 Aug 1910")],
+    "sentis": [("🟩 1910", "the Lingva Komitato's grammar commission, 25 July 1910")],
+    # the editor 2026-11-06: his last acts of his own, the vote of April 1896 and the
+    # Princidino of August 1896, reviewed February 1897; then only the catalogues' reprints. Auli's 1906 then has the 🟦 1908 after it
+    "de-wahl": [("⬜ 1897", "stayed away after 1897; Lingvo Internacia 1896-04, 1896-08, 1897-02 his last, the catalogues to 1904 only reprints (Manders 1950 has him leave in 1894)")],
+}
+
+# THE NAMESAKES THE HARVEST SPLIT (the editor 2026-11-06: Postnikov is Fjodor, Aleksandr too late for Bein's speech, hence
+# no facts for him; the St. Atanasoff of Plovdiv and Lojko's zero both queried as wrong): the card read their
+# shared profile, by then only an index, so no lines and no marks. stem → the sequence on his own profile, why, the hand-pass cell
+NAMESAKE = {
+    "postnikov": ("🟩 → † 1952", "Fjodor A. Postnikov, by the editor's ruling; † from fjodor-a-postnikov.md", ""),
+    "lojko": ("🟩 → ‡ 1905", "Ivan Markoviĉ Lojko, as with Postnikov: the pioneer, Vsevolod the son too recent for «de longe» (Schuck p. 17); † 23 June 1905, ivan-markovic-lojko.md", ""),
+    "atanasov": ("🟩", "Georgi Atanasov: the album's prose, «Sroj Oreŝkow kaj Atanasow en Plovidiv, la redaktoroj de Rondiranto», and every witness to the Plovdiv editing name G.; no St. in Plovdiv is held. The other reading, Sterio of Varna's portrait with Georgi's role (schuck-album-missing-three-2026-09-15.md)", ""),
+    "morin": ("🟩 → † 1916", "Anselmo Morin; † from Amerika Esperantisto, Sept–Oct 1916, anselmo-morin.md. The tool's 🟦 1908 there not taken: the line is Boirac representing him at Dresden", ""),
+    # the editor 2026-11-06. Not a namesake, a row re-read whole: the LK check took the garbled notice for a guess
+    "twombley": ("🟩 ≤ 1904 → Ⓚ 1906 → 🟦 1909 → ◐ 1909 → ⭘ 1910 → 🧡 1911 → · 1934", "⭘: «sendis sian eksiĝon» (OGE vol. 3, 25 June 1910), the reason in Boirac's report (OGE, 25 Oct 1910): the LK not progressive enough. Ⓚ: the Boulogne roll, «Twombly (Brooklyn)». 🟦 and ◐, Miles's reading: «partiani di la reformo» (Progreso 2, PDF 87, March 1909), some ten signed pieces there 1909–1910, on the LK till June 1910. 🧡, Miles's reading: two pieces in Discussiones, Feb 1911", ""),
+}
+NAMESAKE["lloyd"] = ("🟩 1903 → ‡ 1906", "Richard John Lloyd drowned in the Rhône, 29 Aug 1906, at the Geneva congress (EdE s.v. Lloyd; the profile; Zamenhof's speech): the «·» 1908 and 1917 no acts of his", "")
+NAMESAKE["davidov"] = ("🟩 1898", "the album's Jonko Davidov of Silistra, the merchant; the † 1967 and · 1921 of the earlier cards were Georgo Karpoviĉ Davidov's (the ÖNB, «Davidov, Georgo, 1879-1967»)", "")
+NAMESAKE["blanc"] = ("🟩 1902 → ‡ ≤ 1906", "RULED 2026-11-06 19:3x, correcting 🟩 1898: Prof. G. Blanc of Perugia, then Rome, LK for Italy. 🟩 1902: L'Espérantiste 1902-6, PDF 14, l. 1018 (SFPE), and the Adresaro's series 23, no. 7553. ‡ ≤ 1906: his questionnaire came back marked «la adresato mortis», L'Espérantiste 1906-6, PDF 23, l. 2169. The 1898 and 1899 lines in the profile are Henri Blanc of Livron, France; the Blancs of Dijon and Lyon other people", "")
+ROW_CAMP = {"twombley": (1, 1, 1), "hanauer": (1, 0, 1), "peltier": (1, 0, 1)}   # the country tables' gains of a re-read row: Ido, other, any camp
+NAMESAKE["boulet"] = ("🟩 → · 1908 → Ⓚ 1909 → ⭘", "«LK, 1909; eksiĝis pro troa laboro» (Enciklopedio, PDF 101); still on the roll of 1 Jan 1920, so the resignation undated (the review of 2026-11-06, item 5)", "")
+
+# THE REVIEW OF THE MARKS (bingo-card/REVIEW-2026-11-06-marks.md; the editor 2026-11-06, to its 14 recommendations).
+# stem → the marks to add, each with why, and any mark they replace; ahead of: a mark of that year put before those glyphs
+MARKS_REVIEWED = {
+    "ellis": [("⭘ 1911", "«sendis al ni sian eksiĝon de Akademiano» (Oficiala Gazeto 3, PDF 387, 25 Feb 1911)")],
+    "pollen": [("⭘ 1920", "his name struck at his own request (Oficiala Gazeto 7, PDF 197, 25 Jan 1920)")],
+    "abesgus": [("⭘ 1906", "«kelkaj komitatanoj ĉu eksiĝis, nome Sroj» Abesgus and Oreskov (Dua Universala Kongreso, PDF 20)")],
+    "oreskov": [("⭘ 1906", "«kelkaj komitatanoj ĉu eksiĝis, nome Sroj» Abesgus and Oreskov (Dua Universala Kongreso, PDF 20); Schuck 1906 still captions him L. K.")],
+    "de-beaufront": [("🟦 1907", "«En 1907, kiam la aŭtoro fariĝis ‹ private › Idisto» (Lingvo Internacia 1908-5, PDF 23); in place of 🟦 1909"),
+                     ("⭘ ≤ 1908", "«11 eksiĝis propravole (inter ili L de» Beaufront, before 2 Jan 1908 (Zakrzewski 1913, PDF 125)")],
+    "hanauer": [("🟦 1912", "«So Hanauer, ex-Esp-isto», with the Ido lecture at Chemnitz (Progreso 5, PDF 609, Nov 1912)")],
+    "peltier": [("💙 ≤ 1909", "one of the first and most fervent pioneers of the reform (L'Espérantiste, Nov 1909, PDF 1); Progreso 4, PDF 221: the Ido side's, after his death")],
+    "de-wahl": [("🟧 ≤ 1906", "«aliĝis al Idiom Neutral, provante ankaŭ ĝin reformi» (Lingvo Internacia 1908-4, PDF 32); Dulichenko 328")],
+    "michaux": [("⬜ 1911", "forced to leave the Esperantists after Antwerp (La Belga Sonorilo, May 1912, PDF 6); Korĵenkov 2005, PDF 56")],
+    "holub": [("⬜ 1911", "struck for silence, as Allum and Emeric, with no exactly dated act after")],
+}
+MARK_REPLACES = {"de-beaufront": "🟦 1909"}
+MARK_AHEAD = {"de-wahl": "🟠"}
+# the second round, items 15–22 (the editor): Asnes corrected; the rest kept, the other year noted
+# v0.4.4 (the editor 2026-11-06; dowse/onb-katalogo-2026-11-06/ONB-DIFFERENCES-VERDICTS-2026-11-06.md): item 22 of the review overturned, a 30 November on eo.wikipedia being a year-only Wikidata date of the year after
+DEATH_CORRECT = {"asnes": ("† 1922", "Esperanto Wikipedia's «18xx — 1922» and the ÖNB's «1871-1922»; the card's 1921 came from a summary of the article, not the article"),
+                 "meazzini": ("† 1939", "the ÖNB's 1939; Wikidata's 30 Nov 1938 reads as a year-only date of 1939, probably, as on Atanasov (ONB-DIFFERENCES-VERDICTS-2026-11-06)"),
+                 "bricard": ("† 1943", "most likely 26 Nov 1943: Wikidata, from a Wikipedia, and the ÖNB on one record; 1944 from the GND and eo-Raoul_Bricard; no source of the time checked (ONB-DIFFERENCES-VERDICTS-2026-11-06)")}
+MARK_NOTE = {"meier": "† 1916 kept: a notice of the time, 2 Jan 1916 (Amerika Esperantisto, April 1916, PDF 10); the ÖNB has 1919",
+             "talmey": "⭕ kept: Privat's proposal to strike him for acting against Esperanto, Antwerp 1911 (Oficiala Gazeto 4, PDF 118; the name garbled), was one member's, and Boirac's report of 1912 gives no reason"}
+
+# THE CANONICAL FULL NAME (the editor 2026-11-06; for example Evgenij Viktorovič Radvan-Rypinskij,
+# as the ÖNB gives it): by his rule for a person's main form, of 2026-10-17 (NAMES-REGISTER.tsv's head), the title of the saved Esperanto Wikipedia page,
+# else the Enciklopedio's heading, else the usual form as the sources print it; patronymics and middle names added where a source spells them
+# out. stem, or (stem, country) where one stem is two people → the name; the source by the lists below
+_NAME_EO = {
+    "de-beaufront": "Louis de Beaufront", "geoghegan": "Richard Geoghegan", "talmey": "Max Talmey", "vargas": "Ambrosio Vargas", "beauchemin": "A. P. Beauchemin", "kuhnl": "Eduard Kühnl",
+    "simon": "Otto Simon", "cejka": "Theodor Čejka", "jamin": "Joseph Jamin", "seynaeve": "Maurice Seynaeve", ("lemaire", "Belgium"): "Charles Lemaire", ("lemaire", "France"): "René Lemaire",
+    "van-melckebeke": "Raymond Van Melckebeke", "matton": "Pierre Ernest Matton", "sebert": "Hippolyte Sebert", "peltier": "Émile Peltier", "boirac": "Émile Boirac", "meray": "Charles Méray",
+    "michaux": "Alfred Michaux", "deligny": "Ernest Deligny", "moch": "Gaston Moch", "javal": "Emile Javal", "bourlet": "Carlo Bourlet", "lambert": "Charles Lambert",
+    "zabilon-d-her": "Jeanne Zabilon d'her Ranfaing", "cart": "Théophile Cart", "verax": "Charles Verax", "fruictier": "Paul Fruictier", "einstein": "Leopold Einstein",
+    "trompeter": "Wilhelm Heinrich Trompeter", "borel": "Jean Borel", "meier": "Ludwig Emil Meier", "christaller": "Paul Gottfried Christaller", "schmidt": "Adolf Schmidt", "ebner": "Adolf Ebner",
+    "hanauer": "Julius Hanauer", "barthel": "Karl Barthel", "inglada": "Vicente Inglada Ors", "villanueva": "Antonio López Villanueva", "costa-e-almeida": "Manuel Ribeiro da Costa e Almeida",
+    "sepulveda": "Luis Enrique Sepúlveda Cuadra", "junck": "Rosa Junck", "gallois": "Albert Gallois", "meazzini": "Giacomo Meazzini", "marignoni": "Daniele Marignoni", "bagnulo": "Raffaele Bagnulo",
+    "sussmuth": "John Joseph Sussmuth", "lengyel": "Paŭlo Lengyel", "marich": "Ágoston Marich", "busuttil": "Gustavo Busuttil", "grabowski": "Antoni Grabowski", "bein": "Kazimierz Bein",
+    "wasniewski": "Jozefo Wasniewski", "kofman": "Abram Kofman", "asnes": "Aleksandr Asnes", "oreskov": "Georgi Oreŝkov", "ahlberg": "Per Ahlberg", "nylen": "Paul Axel Nylén",
+    "langlet": "Valdemar Langlet", "thorsteinsson": "Thorsteinn Thorsteinsson", "uitterdijk": "Dreves Uitterdijk", "bulthuis": "Hendrik Bulthuis", "hageler": "Alf Hageler", "renard": "Théodore Renard",
+    "privat": "Edmond Privat", "schneeberger": "Friedrich Schneeberger", "kotzin": "Boris Kotzin", "boulet": "Paul Boulet", "bricard": "Raoul Bricard", "chavet": "Gabriel Chavet", "holub": "Jan Holub",
+    "kraus": "Vojtěch Kraus", "krumpholc": "Josef Krumpholc", "coutinho": "Antonio Caetano Coutinho", "guillaume": "Jean Guillaume", "huet": "Horace Huet", "saint-martin": "Albert Saint-Martin",
+    "evstifejev": "Nikolaj Evstifejev", "mann": "William W. Mann", "de-saussure": "René de Saussure", "millidge": "Edward Alfred Millidge", "allum": "Jean Allum",
+}
+_NAME_EDE = {
+    "zamenhof": "Ludoviko Lazaro Zamenhof", "rhodes": "Joseph Rhodes", "pollen": "John Pollen", "mudie": "Harold Bolingbroke Mudie", "wackrill": "Alfred Edward Wackrill", "motteau": "Achille Motteau",
+    "moscheles": "Felix Stone Moscheles", "schafer": "Louisa Frederica Adela Schafer", "villareal": "Frederiko Villareal", "schroder": "Johann Schröder", "fried": "Alfred Hermann Fried", "meyer": "Samuel Meyer",
+    "berthelot": "Paul Berthelot", "mybs": "Eduard Mybs", "wallon": "Karl Wallon", "codorniu": "Ricardo Codorniu", "bicknell": "Clarence Bicknell", "miletz": "József Miletz", "midthus": "Haldor Midthus",
+    "hodler": "Hector Hodler", "sentis": "Henri Sentis", "nalli": "Vitangelo Nalli", "runeberg": "Hjalmar Johannes Runeberg", "twombley": "John Fogg Twombly", "lloyd": "Richard John Lloyd",
+    "evrot": "Joseph Evrot", "sabadell": "Alfons Sabadell", "dambrauskas": "Aleksandro Dambrauskas", "asada": "Eiĵi Asada", "atanasov": "Georgi Atanasov", "devjatnin": "Vasilij Nikolajeviĉ Devjatnin",
+}
+_NAME_PROFILE = {   # the fullest form its own profile prints; «brzostowski» and the patronymics on an Esperanto Wikipedia or Enciklopedio name
+    "ellis": "John Ellis", "o-connor": "John Charles O'Connor", "hoveler": "Herbert Frederich Höveler", "chettiar": "T. Adinarayana Chettiar", "coox": "J. Coox", "cape": "Augusto Capé-Montrosier",
+    "brzostowski": "Aleksandro Boleslavo Brzostowski", "blumenthal": "Leopold Blumental (Leo Belmont)", "avilov": "Fjodor Dmitriĉ Avilov", "ostrovskij": "Ilja Davidoviĉ Ostrovskij",
+    "davidov": "Jonko Davidov", "gernet": "Vladimir Aleksandroviĉ Gernet", "dragoumis": "Emmanuel Dragoumis", "krikortz": "S. E. Krikortz", "skeel-giorling": "Frederik Skeel-Giörling", "lauren": "Augustinus Theodor Laurén",
+    "de-wahl": "Edgar de Wahl", "zinoviev": "A. A. Zinoviev", "lojko": "Ivan Markoviĉ Lojko", "dor": "Henri Dor", "lallemant": "Félix Lallemant", "saquet": "Saquet", "postnikov": "Fjodor Aleksejeviĉ Postnikov",
+    "emeric": "J. Emeric", "gustafsson": "F. W. Gustafsson", "benoit": "René Benoît", "guilbeau": "Edgard Guilbeau", "blanc": "G. Blanc", "gauntlett": "Edward Gauntlett", "mac-kenzie": "D. R. Mackenzie",
+    "morin": "Anselmo Morin", "abesgus": "M. M. Abesgus", "cederblad": "Hilda Cederblad",
+}
+FULL_NAME = {k: (v, s) for t, s in ((_NAME_EO, "Esperanto Wikipedia"), (_NAME_EDE, "Enciklopedio de Esperanto"), (_NAME_PROFILE, "profile")) for k, v in t.items()}
+FULL_NAME["radvan-ripinski"] = ("Evgenij Viktorovič Radvan-Rypinskij", "ÖNB, by the editor")
+FULL_NAME["krikortz"] = ("Sven Erik Krikortz", "Esperanto Wikipedia")
+FULL_NAME["cederblad"] = ("Hilda Karolina Fredrika Thisell, naskita Cederblad", "Esperanto Wikipedia")
+FULL_NAME["atanasov"] = ("Georgi Atanasov", "Esperanto Wikipedia")
+# the main forms ruled, v0.4.4 (the editor 2026-11-06: the Enciklopedio's headword is yielded to, and people's other names shown prominently): the headword's form leads, the other beside it
+FULL_NAME.update({"de-wahl": ("Edgar von Wahl (de Wahl)", "Enciklopedio de Esperanto"), "blumenthal": ("Leo Belmont (Leopold Blumental)", "Enciklopedio de Esperanto"),
+                  "kofman": ("Abram Kofman", "Enciklopedio de Esperanto"), "sebert": ("Hippolyte Sebert", "Enciklopedio de Esperanto"),   # 2026-11-07, Ezri: the print has «Kofman» and «Sebert»; «Koffman» and «Sébert» are the 2005 retyping's (failure map R108)
+                  "cejka": ("Teodor Ĉejka (Theodor Čejka)", "Enciklopedio de Esperanto")})
+# fuller by the ÖNB's author forms (bingo-card/ONB-NAMES-2026-11-06.tsv), each person checked by his records' titles; patronymics in č, as the ÖNB writes them
+FULL_NAME.update({k: (v, "ÖNB") for k, v in {
+    "benoit": "Jean René Benoît", "asnes": "Aleksandr Isaakovič Asnes", "avilov": "Fjodor Dmitrievič Avilov", "lojko": "Ivan Markovič Lojko", "postnikov": "Fjodor Alekseevič Postnikov", "zinoviev": "Aleksej Zinovjev",
+    "coox": "Jean Coox", "saquet": "Donatien Saquet", "gauntlett": "George Edward Luckman Gauntlett", "bulthuis": "Hindrik Jan Bulthuis", "mann": "William Walter Mann",
+    "cape": "Auguste Capé", "evrot": "Marie-Joseph Evrot", "codorniu": "Ricardo Codorníu y Stárico", "marich": "Ágoston H. de Marich", "geoghegan": "Richard H. Geoghegan", "oreskov": "Georgi P. Oreškov",
+}.items()})
+FULL_NAME.update({"kotzin": ("Boris Isidorovič Kotzin", "profile"), "ostrovskij": ("Ilja Davidovič Ostrovskij", "profile"), "gernet": ("Vladimir Aleksandrovič Gernet", "profile"), "devjatnin": ("Vasilij Nikolajevič Devjatnin", "Enciklopedio de Esperanto")})
+
+# «†≥», A TERMINUS POST QUEM FOR THE DEATH, where none is held (the editor 2026-11-06: Radvan-Rypinskij was writing in Ondo de Esperanto
+# in 1912; a terminus post quem is needed for every death not known): his latest dated act of his own, the
+# spellings' profiles too; a roll counts, weakly; a mention in a rival organ does not, nor being struck for silence. Not a † in the totals
+DEATH_TPQ = {
+    "allum": ("1910", "in the Tutmonda Jarlibro's «Nomaro de ĉiuj anoj la 1ᵃ de Januaro 1910», a member of the LK, with a new address, «ALLUM, r. Dutertre, Boulogne-sur-Mer» (tutmonda-jarlibro-esperantista-1910-anno-0005, PDF 14, l. 590); struck for silence 1911"),   # was 1905 (the Boulogne comedy) to 2026-11-08, the rolls passed over (failure map R119; the editor) "atanasov": ("1933", "EdE 1933, «loĝas en Sofia»"),
+    "avilov": ("1940", "taught in the postgraduate school of the Georgian Academy of Sciences, 1930s–1940s: Этюды и исследования, p. 212 (the editor, 2026-11-06)"), "benoit": ("1914", "did not stand again for the LK, 1914"),
+    "boulet": ("1920", "LK roll of 1 Jan 1920 (OGE 7); EdE 1933 gives no death"),
+    "busuttil": ("1929", "on the LK at least to 1929 (Vikipedio)"), "cederblad": ("1907", "Hilda Cederblad's course at Mariannelund, 1907"),
+    "chettiar": ("1937", "The Christukula Ashram (Tirupattur, 1940), p. 243: «M. Rv Ry. Adinarayana Chettiar of Salem» lectured at the village-work training of 18 May–15 June 1937; p. 205, «Mr, T. Adinarayana Chettiar, Bar at-law, Salem» at the conference of 31 Dec. 1936–8 Jan. 1937 (https://archive.org/details/in.ernet.dli.2015.68754/, sources/web-2026-11-08-dli-68754/; Ezri 2026-11-08; the editor first gave «†≥ 1936» from it); before it 1934, his address at the All India Swadeshi Exhibition (The Covai Mail, 14 Aug 2025); the man ruled ours by the editor; was 1906, Tra la Mondo"), "coox": ("1909", "the Belgian philatelists' delegate, June 1909"),
+    "costa-e-almeida": ("1920", "LK roll of 1 Jan 1920 (OGE 7); a candidate in 1914"),   # «dervaux» 1920 off: Lambert Delvaux of Charleroi's (the editor, 2026-11-09); ROW_SET holds the row
+    "ebner": ("1914", "did not stand again for the LK, 1914; EdE 1933 gives no death"), "emeric": ("1908", "LK roll of 1 Jan 1908 with a new address (OGE 1); struck for silence 1911"),
+    "evstifejev": ("1920", "elected to the Academy, May 1920 (OGE 7)"), "gauntlett": ("1913", "his resignation from the LK, for overwork (OGE 6)"),
+    "guilbeau": ("1909", "named in Lingvo Internacia 1909-4"), "guillaume": ("1920", "at the Brussels congress for de Saussure, 1920"),
+    "jamin": ("1914", "signed his history of Belgian Esperanto, La Belga Sonorilo, May 1914"), "krikortz": ("1930", "the ruled 🧡, the Swedish Occidental federation"),
+    "lallemant": ("1920", "asked to resign from the LK for his health, 1920 (OGE 7)"), "mac-kenzie": ("1905", "Rev. D. R. Mackenzie of Kanazawa on the Boulogne roll; the delegate at Cupar in 1914 another man, by every sign"),
+    "oreskov": ("1933", "EdE 1933, «loĝas en Burgas»"), "radvan-ripinski": ("1914", "selling his library, La Ondo de Esperanto, May 1914, at Lodejnoje Pole (radvan-ripinskij.md); his last piece there 1912"),
+    "renard": ("1914", "a candidate for the LK, 1914 (OGE 6)"), "saquet": ("1910", "elected to the French society's committee, 1910"),
+    "twombley": ("1911", "gave Lowell roses for the Boston society, Apr 1911; EdE 1933 gives no death"), "vargas": ("1920", "LK roll of 1 Jan 1920 (OGE 7); a candidate in 1914"),
+    "zinoviev": ("1913", "his resignation from the LK, Dec 1913 (OGE 6)"), "davidov": ("1909", "secretary of the Silistra group, 1909"),
+}
+
+# DEATHS FROM THE LIVE PAGES (the editor 2026-11-06):
+# our saved wikitext has an empty {{Informkesto homo}}, the dates coming from Wikidata when the page loads, so everyone with a †≥ was
+# looked up live (sources/web-2026-11-06-eo-wikipedia/). The page's person checked each time against the card's by birth or office
+DEATH_KNOWN = {
+    "busuttil": ("1928", "31 Aug 1928, Esperanto Wikipedia's infobox and category, the same page's «ĝis minimume 1929» notwithstanding; confirmed by a University of Malta document, https://www.um.edu.mt/library/oar/handle/123456789/49495 (the editor)"),
+    "atanasov": ("1960", "Esperanto Wikipedia's text and the ÖNB; its infobox's 30 Nov 1959 is a year-only Wikidata date, +1960 (ONB-DIFFERENCES-VERDICTS-2026-11-06)"), "boulet": ("1971", "28 June 1971, Vaucresson, Esperanto Wikipedia"),
+    "cederblad": ("1939", "22 Jan 1939, Stockholm, Esperanto Wikipedia, s.v. Hilda Thisell, née Cederblad"), "krikortz": ("1931", "11 Jan 1931, Stockholm, Esperanto Wikipedia; the ÖNB's «1868-1931»"),
+    "twombley": ("1959", "June 1959, Esperanto Wikipedia"),
+    # the ÖNB's catalogue (tools/onb-card-names.py, bingo-card/ONB-NAMES-2026-11-06.tsv; the editor), the person checked by the records' titles
+    "vargas": ("1951", "the ÖNB, «Vargas, Ambrosio, 1864-1951», author of the Mexican Esperanto lectures of 1904-1908"),
+    "gauntlett": ("1956", "the ÖNB, «Gauntlett, Edward, 1868-1956» and «Gauntlett, George Edward Luckman, 1868-», of Okayama"),
+    "benoit": ("1922", "the ÖNB, «Benoît, Jean René, 1844-1922»"),
+    "guilbeau": ("1930", "the ÖNB, «Guilbeau, Edgar, 1850-1930», author of «L'Espéranto jugé par un aveugle»"),
+}
+
+def _ruled(table, stem, country):
+    return table.get((stem, re.sub(r"\s*\(.*\)$", "", country))) or table.get(stem)
+
+def volapuk_seq(stem, country, seq, ev):
+    """v0.3.5 on one sequence: «🟪 †» to «‡»; the initial 🟩 ruled or found; 🟪 and 🟠 put in by their year"""
+    year = lambda t: int(re.search(r"(\d{4})", t).group(1)) if re.search(r"(\d{4})", t) else None
+    if stem in NAMESAKE:
+        seq, ev = NAMESAKE[stem][0], f"RULED 2026-11-06: {NAMESAKE[stem][1]}"
+    toks = [t for t in seq_text(seq).split(" → ") if t]
+    dead = [t for t in toks if DEATH_TOK.match(t)]; toks = [t for t in toks if not DEATH_TOK.match(t)]
+    def put(tok, before):   # before the first dated mark later than it, and before an equal year's marks in «before»
+        y = year(tok)
+        at = next((i for i, t in enumerate(toks) if year(t) is not None and (year(t) > y or (year(t) == y and t[0] in before))), len(toks))
+        toks.insert(at, tok)
+    j = _ruled(JOIN_RULED, stem, country)
+    if j:
+        toks[:] = [t for i, t in enumerate(toks) if not t.startswith("🟩") or i > 0]
+        put(f"🟩 {j[0]}", "🟩💛💚🟨Ⓚ🟦")
+        ev = f"🟩: RULED 2026-11-05: {j[1]} [BINGO-EVIDENCE-2026-11-05]" + (" ‖ " + ev if ev else "")
+    elif not any(t.startswith("🟩") for t in toks):
+        found = join_of(lines_of(stem, ""))
+        if found:
+            put(f"🟩 {found[0]}", "🟩💛💚🟨Ⓚ🟦")
+            ev = f"🟩: {found[2]}" + (" ‖ " + ev if ev else "")
+    x = OWN_ORANGE.get(stem)
+    if x and x[0] in toks:
+        toks.remove(x[0])
+        if x[1]: put(x[1], "🟩💛💚🟨Ⓚ🟦")
+        ev = f"🟧: RULED 2026-11-06: {x[2]} [BINGO-EVIDENCE-2026-11-05]" + (" ‖ " + ev if ev else "")
+    o = _ruled(OWN_AUXLANG, stem, country)
+    if o:
+        put(f"🟠 {o[0]}", "🟩💛💚🟨Ⓚ🟦")
+        ev = f"🟠: RULED 2026-11-05: {o[1]} [BINGO-EVIDENCE-2026-11-05]" + (" ‖ " + ev if ev else "")
+    for tok, why in BACK.get(stem, []):
+        put(tok, "")
+        ev = f"{tok[0]}: RULED 2026-11-06: around his own auxlang: {why} [the profile]" + (" ‖ " + ev if ev else "")
+    v = _ruled(VOLAPUK, stem, country)
+    if v:
+        if v[0].startswith("≤"): toks.insert(0, f"🟪 {v[0]}")   # a terminus ante quem: he had come to it first, whatever the date
+        else: put(f"🟪 {v[0]}", "🟠🟩💛💚🟨Ⓚ🟦")
+        ev = f"🟪: RULED 2026-11-05: {v[1]} [BINGO-EVIDENCE-2026-11-05]" + (" ‖ " + ev if ev else "")
+    if MARK_REPLACES.get(stem) in toks: toks.remove(MARK_REPLACES[stem])
+    for tok, why in MARKS_REVIEWED.get(stem, []):
+        put(tok, MARK_AHEAD.get(stem, ""))
+        ev = f"{tok[0]}: RULED 2026-11-06: {why} [REVIEW-2026-11-06-marks]" + (" ‖ " + ev if ev else "")
+    if stem in DEATH_CORRECT:
+        dead = [DEATH_CORRECT[stem][0]]
+        ev = f"†: RULED 2026-11-06: {DEATH_CORRECT[stem][1]} [REVIEW-2026-11-06-marks]" + (" ‖ " + ev if ev else "")
+    if stem in MARK_NOTE: ev = f"{MARK_NOTE[stem]} [REVIEW-2026-11-06-marks]" + (" ‖ " + ev if ev else "")
+    if stem in DEATH_KNOWN and not dead:
+        dead = [f"† {DEATH_KNOWN[stem][0]}"]
+        ev = f"†: 2026-11-06: {DEATH_KNOWN[stem][1]}" + (" ‖ " + ev if ev else "")
+    if stem in DEATH_TPQ and not dead:
+        dead = [f"†≥ {DEATH_TPQ[stem][0]}"]
+        ev = f"†≥: 2026-11-06: {DEATH_TPQ[stem][1]}" + (" ‖ " + ev if ev else "")
+    return " → ".join(toks + dead), ev
+
+GAP_DEATHS = {"vargas", "chettiar", "jamin", "coox", "dervaux", "ebner", "costa-e-almeida", "busuttil", "avilov", "oreskov", "atanasov", "krikortz", "renard"}   # v0.3's list of pressing gaps
+def volapuk_step(old, new):
+    """--volapuk-step OLD NEW (2026-11-05): the card of version OLD with volapuk_seq() on every sequence and the totals and
+    legend following, and nothing else, as version NEW. Writes bingo-card-v<NEW>.csv, -supplement.csv, -lk1905.csv and .md; refuses if any exists."""
+    out_dir = os.environ.get("BINGO_OUT", os.path.join(GEN, "bingo-card"))
+    P = lambda v, suf: os.path.join(out_dir, f"bingo-card-v{v}{suf}")
+    sufs = [".csv", "-supplement.csv", "-lk1905.csv", ".md"]
+    there = [P(new, s) for s in sufs if os.path.exists(P(new, s))]
+    if there: sys.exit("refusing, nothing written: exists: " + ", ".join(os.path.basename(p) for p in there))
+    n, MAP, LINES = 0, {}, {}
+    for s in sufs[:3]:
+        R = list(csv.DictReader(open(P(old, s), encoding="utf-8")))
+        with open(P(new, s), "w", newline="", encoding="utf-8") as fh:
+            names = list(R[0].keys()); at = names.index("stem") + 1; names[at:at] = ["full_name", "name_source"]
+            w = csv.DictWriter(fh, fieldnames=names); w.writeheader()
+            for r in R:
+                r["full_name"], r["name_source"] = (_ruled(FULL_NAME, r["stem"], r["country"]) or ("", "")) if r["stem"] else ("", "")
+                if r["stem"] and not r["full_name"]: sys.exit(f"no full name: {r['stem']}, {r['country']}")
+                orig = r["tags_in_sequence"]
+                ev = r["evidence"].replace("🟪: ", "‡: ") if "🟪 †" in orig else r["evidence"]
+                t, r["evidence"] = volapuk_seq(r["stem"], r["country"], orig, ev)
+                MAP[(r["stem"], orig)] = t; n += t != orig; r["tags_in_sequence"] = t
+                if r["stem"] in NAMESAKE and "hand_pass" in r: r["hand_pass"] = NAMESAKE[r["stem"]][2]
+                # v0.4.0 (the editor, through Ezri, 2026-11-06: the card to read the new profiles): every row's count of lines as they now stand
+                if os.path.exists(os.path.join(PROFILES, r["stem"] + ".md")) or r["stem"] in CARD_BUCKET:
+                    r["n_fact_lines"] = str(len(lines_of(r["stem"], r.get("caption") or "")))
+                    LINES[(r["stem"], orig)] = r["n_fact_lines"]
+                w.writerow(r)
+    L, col, table, ccol = [], None, None, None
+    delta = collections.defaultdict(collections.Counter)
+    # the editor 19:1x; 19:3x: ruled by the editor,
+    # «other» counts only memberships after 1907, since it measures the impact of the Ido schism. So «other», and «any camp»,
+    # which holds it, take 🟠 only from 1908. table → country → [other, any camp] gained; table → «any camp» gained, and 🟠 from 1908
+    cdelta = collections.defaultdict(lambda: collections.defaultdict(lambda: [0, 0, 0, 0])); anyd = collections.Counter(); late = collections.Counter()   # the third, ‡ gained; the fourth, Ido
+    has = lambda q: {w for t in q.split(" → ") for w in t.split(" ") if w and not re.match(r"^(\d{4}|≤)$", w)}
+    for line in open(P(old, ".md"), encoding="utf-8"):
+        if line.startswith("|"):
+            cells = line.rstrip("\n").split(" | ")
+            hd = [c.strip().strip("|").strip() for c in cells]
+            if "tags in sequence" in hd:
+                col = hd.index("tags in sequence")
+                ccol = hd.index("country") if "country" in hd else None
+                table = {"| plate": "album", "| stem": "supplement"}.get(cells[0].strip(), "supplement")
+                if "as the roll prints him" in hd: table = "table3"
+                cells.insert(hd.index("stem") + 1, "full name"); line = " | ".join(cells) + "\n"
+            elif line.startswith("|-") and col is not None:
+                line = "|---" + line
+            elif col is not None and len(cells) > col and cells[col].strip() and not cells[col].startswith("-"):
+                st = next((m.group(1) for c in cells for m in [re.fullmatch(r"`([^`]+)`", c.strip().strip("|").strip())] if m), "")
+                tail = " |" if cells[col].rstrip().endswith(" |") else ""
+                orig = cells[col].rstrip()[:-2].strip() if tail else cells[col].strip()
+                nw = MAP.get((st, orig))
+                own = max((int(y) for y in re.findall(r"🟠 (?:≤ )?(\d{4})", nw or "")), default=0)
+                if own >= 1908: late[table] += 1
+                if own >= 1908 and ccol is not None:
+                    cty = re.sub(r"\s*\(.*\)$", "", cells[ccol].strip().strip("|").strip()); g0 = has(orig)
+                    cdelta[table][cty][0] += not (g0 & {"🟧", "🧡"}); gained = not (g0 & {"🟦", "💙", "🟧", "🧡"})
+                    cdelta[table][cty][1] += gained; anyd[table] += gained
+                if nw is None: sys.exit(f"a row of the .md not in the CSVs: {st}: {orig}")
+                cells[col] = nw + tail
+                was = {"‡" if g == "🟪" else g for g in has(orig)}   # the old 🟪 was the death
+                if (st, orig) in LINES: cells[col - 1] = LINES[(st, orig)]
+                if st in NAMESAKE:
+                    if "‡" in has(nw) and "‡" not in was and ccol is not None:
+                        cdelta[table][re.sub(r"\s*\(.*\)$", "", cells[ccol].strip().strip("|").strip())][2] += 1
+                    if len(cells) > col + 1: cells[col + 1] = NAMESAKE[st][2] + " |"
+                if st in ROW_CAMP and ccol is not None:
+                    cd = cdelta[table][re.sub(r"\s*\(.*\)$", "", cells[ccol].strip().strip("|").strip())]
+                    cd[3] += ROW_CAMP[st][0]; cd[0] += ROW_CAMP[st][1]; cd[1] += ROW_CAMP[st][2]; anyd[table] += ROW_CAMP[st][2]
+                for g_ in was | has(nw):
+                    delta[table][g_] += (g_ in has(nw)) - (g_ in was)
+                at = next(i for i, c in enumerate(cells) if re.fullmatch(r"`[^`]+`", c.strip().strip("|").strip()))
+                cells.insert(at + 1, _ruled(FULL_NAME, st, cells[ccol].strip().strip("|").strip())[0])
+                line = " | ".join(cells) + "\n"
+            line = line.replace("| struck 🔴/⭕ | 🟪 |", "| struck 🔴/⭕ | ‡ |").replace("| other 🟧+🧡 |", "| other 🟧+🧡+🟠 from 1908 |")
+        else:
+            col = None if line.strip() else col
+        if line.startswith("- `atanasov` — no fact lines"):
+            continue
+        if any(line.startswith(f"- `{s}` — thin profile") for s in NAMESAKE): continue
+        if any(line.startswith(f"- `{s}` — death year open") for s in DEATH_KNOWN): continue
+        if line.startswith("## P-GAP v0.3 — cells a human must rule (2)"):
+            line = line.replace("close (14;", f"close ({13 - sum(1 for g in GAP_DEATHS if g in DEATH_KNOWN)};").replace("must rule (2)", "must rule (1)")
+        if line.startswith("### Totals") and "hand-pass cells: 2" in line: line = line.replace("hand-pass cells: 2", "hand-pass cells: 1")
+        if line.startswith("# The Schuck-album bingo card — v" + old):
+            line = line.replace("— v" + old, "— v" + new, 1).rstrip("\n") + (f" · v{new}, 2026-11-05, from v{old}: 🟪 now the date of "
+                   "adherence to Volapük (a report's date only a terminus ante quem, «≤»); «‡» for died before end-1908, replacing «🟪 †»; "
+                   "🟠 for the authors of their own auxlangs, in place of a 🟧 for the same language; the initial 🟩 for everyone, dated from the whole Adresaro and the "
+                   "Enciklopedio de Esperanto (bingo-card/BINGO-EVIDENCE-2026-11-05.md); 2026-11-06: the namesakes read from their own profiles, "
+                   "F. A. Postnikov, I. M. Lojko, G. Atanasov, A. Morin; de Wahl ⬜ 1897, Auli 🟠 1906; J. F. Twombly's row re-read, ⭘ 1910; R. J. Lloyd ‡ 1906, Blanc of Rome ‡ ≤ 1906; «†≥», a terminus post quem where no death is held; six deaths from the live Esperanto Wikipedia pages, two from the ÖNB's catalogue; Jonko Davidov's † taken off, it was Georgo's; a column of canonical full names; read against the profiles as they stood after the harvest of 2026-11-06, 09:27 (the line counts all refreshed); v0.4.2, the review of the marks (REVIEW-2026-11-06-marks.md), R. Benoît † 1922, Asnes † 1922, Krikortz 🟪 ≤ 1888; v0.4.3, Dambrauskas read from jakstas.md; v0.4.4, Atanasov † 1960, Meazzini † 1939, Bricard † 1943 (a 30 November on Esperanto Wikipedia being a year-only date), Dambrauskas read from dambrauskas.md, five names by the Enciklopedio's headwords with the other form beside them\n")
+        if line.startswith("**Grammar of the card:**"):
+            line = (line.replace("🟩 stayed", "🟩 joined Esperanto, dated; stayed unless a later square says otherwise")
+                    .replace("🟪 died ≤ 1908", "🟪 Volapük, dated, «≤» where only reported")
+                    .replace("⭘ resigned · 🟢 returned", "⭘ resigned · 🟢 returned · 🟠 invented an auxlang of their own (a 🟩 or 🟦 after it: stayed; none: left)")
+                    .replace("◐ double membership · †", "◐ double membership · † · †≥ death not held, alive at that date · ‡ died ≤ 1908"))
+        L.append(line)
+    adds = {"the album's": ["album"], "the supplement's": ["supplement"], "both tables together": ["album", "supplement"],
+            "table 3's": ["table3"], "all three tables": ["album", "supplement", "table3"]}
+    head, out = None, []
+    for line in L:
+        if line.startswith("### Totals"): head = next((k for k in adds if k in line), None)
+        c = re.match(r"^\| (\*\*total\*\*|[^|*]+?) \| (\**\d+\**) \| (\**\d+\**) \| \**(\d+)\** \| \**(\d+)\** \| (\**\d+\**) \| (\**\d+\**) \|$", line.rstrip("\n"))
+        if c and head:
+            gain = [sum(cdelta[t][k][j] for t in adds[head] for k in ([c.group(1)] if "total" not in c.group(1) else list(cdelta[t]))) for j in (0, 1, 2, 3)]
+            b = "**" if "total" in c.group(1) else ""
+            line = (f"| {c.group(1)} | {c.group(2)} | {b}{int(c.group(3).strip('*')) + gain[3]}{b} | {b}{int(c.group(4)) + gain[0]}{b} | {b}{int(c.group(5)) + gain[1]}{b} | {c.group(6)} | {b}{int(c.group(7).strip('*')) + gain[2]}{b} |\n")
+        a = re.match(r"^\| 🟦💙🟧🧡 \| \*\*any camp — Ido or other auxlang, adherent or sympathiser\*\* \| \*\*(\d+)\*\* \|$", line.rstrip("\n"))
+        if a and head:
+            line = f"| 🟦💙🟧🧡🟠 | **any camp — Ido or other auxlang, adherent, sympathiser or author (🟠 from 1908)** | **{int(a.group(1)) + sum(anyd[t] for t in adds[head])}** |\n"
+        m = re.match(r"^\| (\S+) \| ([^|]+) \| (\d+) \|$", line.rstrip("\n"))
+        if m and head and m.group(1) in ORDER + ["🟪"]:
+            d = lambda g: sum(delta[t][g] for t in adds[head])
+            if m.group(1) == "🟪":   # the old row, the deaths: now ‡, after the two new marks
+                out += [f"| 🟪 | {LEGEND['🟪']} | {d('🟪')} |\n", f"| 🟠 | invented an auxlang of their own, before 1908 | {d('🟠') - sum(late[t] for t in adds[head])} |\n", f"| 🟠 | invented an auxlang of their own, from 1908 | {sum(late[t] for t in adds[head])} |\n", f"| ‡ | {LEGEND['‡']} | {int(m.group(3)) + d('‡')} |\n"]
+                continue
+            line = f"| {m.group(1)} | {LEGEND.get(m.group(1), m.group(2)) if m.group(1) in ('🟩', '†') else m.group(2)} | {int(m.group(3)) + d(m.group(1))} |\n"
+        out.append(line)
+    open(P(new, ".md"), "w", encoding="utf-8").write("".join(out))
+    print(f"v{old} → v{new}: {n} sequences rewritten in the three CSVs; → {', '.join(os.path.basename(P(new, s)) for s in sufs)}")
+    return 0
+
+# v0.4.7 (2026-11-07; the editor 13:3x; Ezri's
+# bingo-card/LK-JOINING-2026-11-07.tsv, read from the rolls by eye). Each person's Ⓚ from her table; Sentis's Ⓚ and Ⓐ and Hodler's Ⓚ and ⭘ taken off.
+# THE NAMES, as agreed with Ezri (the editor 13:5x): the column stops being its own source:
+# the Enciklopedio's heading, initials standing; a register row overrides it; else the Esperanto Wikipedia's title; else what the column had, as a source prints it.
+# A diacritic the OCR may have dropped from a heading is kept till the print is read (Emile, Theophile, Lopez, Sepulveda, Codorniu)
+_E = "Enciklopedio de Esperanto"
+LK_NAMES = {
+    "o-connor": ("James Charles O'Connor", _E), "hoveler": ("Herbert F. Höveler", _E), "geoghegan": ("Richard H. Geoghegan", _E), "beauchemin": ("A. P. Beauchemin", _E),
+    "kuhnl": ("Eduard Kühnl", _E), "simon": ("Otto Simon", _E), "jamin": ("Joseph Jamin", _E), "cape": ("Auguste Capé", _E), "matton": ("Pierre Ernest Matton", _E),
+    "boirac": ("Émile Boirac", _E), "meray": ("Charles Méray", _E), "michaux": ("Alfred Michaux", _E), "deligny": ("Ernest Deligny", _E), "moch": ("Gaston Moch", _E),
+    "javal": ("Emile Javal", _E), "bourlet": ("Carlo Bourlet", _E), "lambert": ("Charles Lambert", _E), "zabilon-d-her": ("Jeanne Zabilon D'her Ranfaing", _E),
+    ("lemaire", "France"): ("René Lemaire", _E), "cart": ("Théophile Cart", _E), "verax": ("Charles Verax", _E), "fruictier": ("Paul Fruictier", _E), "einstein": ("Leopold Einstein", _E),
+    "trompeter": ("W. H. Trompeter", _E), "borel": ("Jean Borel", _E), "meier": ("Ludwig Emil Meier", _E), "christaller": ("Paul Gottfried Christaller", _E), "schmidt": ("Adolf Schmidt", _E),
+    "ebner": ("Adolf Ebner", _E), "hanauer": ("Julius Hanauer", _E), "barthel": ("Karl Barthel", _E), "inglada": ("Vicente Inglada Ors", _E), "villanueva": ("Antonio López Villanueva", _E),
+    "codorniu": ("Ricardo Codorníu", _E), "sepulveda": ("Luis Enrique Sepúlveda Cuadra", _E), "junck": ("Rosa Junck, naskita Bílek", _E), "gallois": ("Albert Gallois", _E),
+    "marignoni": ("Daniele Marignoni", _E), "bagnulo": ("Raffaele Bagnulo", _E), "sussmuth": ("John Joseph Sussmuth", _E), "lengyel": ("Pál Lengyel", _E), "marich": ("Ágoston Marich", _E),
+    "grabowski": ("Antoni Grabowski", _E), "wasniewski": ("Jozefo Wasniewski", _E), "brzostowski": ("Aleksandro Brzostowski", _E), "kofman": ("A. Kofman", _E),
+    "dambrauskas": ("Aleksandro Dambrauskas (Dombrovski)", _E), "ostrovskij": ("Ilja Ostrovskij", _E), "oreskov": ("Georgi Oreŝkov", _E), "gernet": ("Vladimir Gernet", _E),
+    "ahlberg": ("Per Ahlberg", _E), "nylen": ("Paul Axel Nylén", _E), "langlet": ("Valdemar B. Langlet", _E), "thorsteinsson": ("Thorsteinn Thorsteinsson", "Esperanto Wikipedia"),
+    "skeel-giorling": ("Frederik Skeel-Giörling", _E), "uitterdijk": ("Dreves Uitterdijk", _E), "bulthuis": ("Hindrik Jan Bulthuis", _E), "hageler": ("Alf Hageler", _E), "privat": ("Edmond Privat", _E),
+    "schneeberger": ("Friedrich Schneeberger", _E), "kotzin": ("Boris Kotzin", _E), "boulet": ("Paul Boulet", _E), "bricard": ("Raoul Bricard", _E), "chavet": ("Gabriel Chavet", _E),
+    "evrot": ("Joseph Evrot", _E), "kraus": ("Vojtěch Kraus", _E), "krumpholc": ("Josef Krumpholc", _E), "postnikov": ("Feodor A. Postnikov", _E), "coutinho": ("Antonio Caetano Coutinho", _E),
+    "gauntlett": ("George Edward Luckman Gauntlett", _E), "huet": ("Horace Huet", _E), "allum": ("J. Allum", _E), "abesgus": ("M. Abesgus", _E),
+    "cederblad": ("Hilda Thisell, naskita Cederblad", _E), "evstifejev": ("Nikolai Evstifejev", _E), "de-saussure": ("René de Saussure", _E), "millidge": ("Edward Alfred Millidge", _E), "talmey": ("Max Talmey", _E),
+    "de-beaufront": ("Louis de Beaufront", _E), "atanasov": ("Georgi Atanasov", _E), "dor": ("Henri Dor", _E), "seynaeve": ("Maurice Seynaeve", "Esperanto Wikipedia"), "ellis": ("John Ellis", _E), "lloyd": ("Richard John Lloyd", _E),
+    "bein": ("Kazimierz Bein (Kabe)", "the register"), "guillaume": ("Ch. Ed. Guillaume", "the register"),
+    # the Enciklopedio's «Karl» set aside (the editor 2026-11-08 02:3x: «Karl» a clear error for Karp, short for Polykarp, as two
+    # contemporary mentions in Germana Esperantisto show): Germana Esperantisto 1921 No 8/9 p. 191 and 1932 No. 8-9 p. 138
+    "wallon": ("Karp Wallon", "Germana Esperantisto"),
+}
+# Ezri's table, and hers of 2026-11-07 through the editor: the marks that fall with it, and Guillaume, who is the Nobel physicist; his 🟩 stays, by the editor, as a bound
+LK_OFF = {"sentis": {"Ⓐ 1909"}, "hodler": {"⭘"}, "guillaume": {"🟩 1903", "†≥ 1920"}, "mac-kenzie": {"🟩", "· 1914"}}
+LK_EV_OFF = {"sentis": ("Ⓐ:",), "hodler": ("⭘:",), "guillaume": ("†≥:", "🟩:"), "mac-kenzie": ("🟩:", "·:")}
+LK_ON = {"guillaume": ("† 1938", "†: Charles-Édouard Guillaume, 1861-1938, physics prize of 1920 (Jean Amouroux, Esperanto 1067 (2), Feb 1995, p. 29, sources/web-2026-11-07-uea-1995-guillaume/, PDF 11; de.wikipedia, 13 June 1938, Sèvres); †≥ 1920 was a S-ro Guillaume at Brussels")}
+# v0.4.8 (the editor 2026-11-07 16:4x): a supporter who never learned the language, so a leaning, not an act
+LK_FIRST = {"guillaume": ("💚 ≤ 1903", "💚: RULED 2026-11-07, the editor, a one-off: a supporter, who never joined: named as «Guillaume, (Svisujo) subdirektoro de internacia laborejo de pesiloj kaj mezuriloj» (Lingvo Internacia 1903-7, PDF 4); Amouroux, Esperanto 1067 (2), p. 29: his work kept him from learning Esperanto, and he stayed a firm supporter; 🟩 1903 was P. Guillaume of Chaumont"),
+            "mac-kenzie": ("🟩 ≤ 1903", "🟩: Enciklopedio de Esperanto, our text's p. 668, «En la printempo de 1903 Mac Kenzie, skota pastro, Kanazawa» (Ezri, 2026-11-07); Saiko Gauntlett 2007, «At that time McKenzie was reading a text for students in Esperanto», summer 1903 (gauntlett-2007-edward-gauntlett, PDF 5, p. 303)")}
+# Ⓐ by the Akademio's own lists, as Ⓚ by the Komitato's (Ezri, bingo-card/AKADEMIO-CHECK-2026-11-07.tsv, her nine; Michaux's off pending one more line of hers, Waringhien at no. 367)
+AK_SET = {"millidge": ("Ⓐ 1923", "elected June 1923, ROLL 11; in none of the lists before it, a candidate in 1911 and 1912"), "michaux": (None, ""), "ostrovskij": (None, ""), "sebert": (None, ""), "bourlet": (None, ""), "chavet": (None, ""),
+          "inglada": ("Ⓐ 1910", "elected 1 Aug 1910, oge-3 PDF 221; Enciklopedio PDF 403"), "christaller": ("Ⓐ 1911", "elected 1 Aug 1911, oge-4 PDF 104; Enciklopedio PDF 141"),
+          "hoveler": ("Ⓐ 1911", "elected 1 Aug 1911, as Ĉefeĉ, oge-4 PDF 104; the Enciklopedio, PDF 375, says 1912")}
+LK_COUNTRY_SET = {"guillaume": "France (Swiss)", "dor": "France (Swiss)"}   # «dervaux» «France (Belgian)» off 2026-11-09, Lambert Delvaux's, not the caption's Maurice of Boulogne; Swiss, living in France at the album's date: counted under France as before; Dor: «Dor Henri, sviso, d-ro, kuracisto», the editor's print, 2026-11-07
+
+# a card row whose profile the sinter renamed (Ezri, 2026-11-07 21:5x): the Kanazawa missionary's lines are in mac-kenzie.md, MAC KENZIE
+# the Enciklopedio's form; mac-kensie.md now holds only Arthur Mackenzie of Cupar. The older cards and Ezri's table keep the old key
+STEM_NOW = {"mac-kensie": "mac-kenzie"}
+# his «· 1914» (six mentions in Progreso) was other men's: Dr W. Mackenzie of the Archives de Psychologie (Progreso 7, 1914), «Sri. Mackenzie
+# ed Pannell» of the USA (Progreso 8, 1915), a Mackenzie Street in North Sydney (Progreso 14); his own lines end in 1908 (Ezri, 2026-11-07 22:0x)
+
+def lk_seq(stem, seq, ev, mark, why):
+    year = lambda t: int(re.search(r"(\d{4})", t).group(1)) if re.search(r"(\d{4})", t) else None
+    last = lambda t: t[0] in "†‡" or t.startswith("🟪 †")
+    toks = [t for t in seq.split(" → ") if t and not t.startswith("Ⓚ") and t not in LK_OFF.get(stem, ())]
+    parts = [p for p in ev.split(" ‖ ") if p and not p.startswith("Ⓚ:") and not p.startswith(LK_EV_OFF.get(stem, ("\0",)))]
+    if stem in LK_ON: toks.append(LK_ON[stem][0]); parts.insert(0, LK_ON[stem][1])
+    if stem in LK_FIRST: toks.insert(0, LK_FIRST[stem][0]); parts.insert(0, LK_FIRST[stem][1])
+    if mark:
+        y = year(mark)
+        at = next((i for i, t in enumerate(toks) if last(t) or (year(t) is not None and (year(t) > y or (year(t) == y and t[0] not in "🟪🟠🟩💛💚🟨")))), len(toks))
+        toks.insert(at, mark); parts.insert(0, f"Ⓚ: {why} [LK-JOINING-2026-11-07.tsv]")
+    if stem in AK_SET:
+        toks = [t for t in toks if not t.startswith("Ⓐ")]; parts = [p for p in parts if not p.startswith("Ⓐ:")]
+        am, awhy = AK_SET[stem]
+        if am:
+            y = year(am)
+            at = next((i for i, t in enumerate(toks) if last(t) or (year(t) is not None and (year(t) > y or (year(t) == y and t[0] not in "🟪🟠🟩💛💚🟨Ⓚ")))), len(toks))
+            toks.insert(at, am); parts.insert(0, f"Ⓐ: {awhy} [AKADEMIO-CHECK-2026-11-07.tsv]")
+    return " → ".join(toks), " ‖ ".join(parts)
+
+def lk_step(old, new, tsv):
+    """--lk-step OLD NEW TSV (2026-11-07): the card of version OLD with Ⓚ from Ezri's table, the names by LK_NAMES, the marks that fall with it, and the
+    tag totals following; nothing else. Writes bingo-card-v<NEW>.csv, -supplement.csv, -lk1905.csv and .md; refuses if any exists."""
+    out_dir = os.environ.get("BINGO_OUT", os.path.join(GEN, "bingo-card"))
+    P = lambda v, suf: os.path.join(out_dir, f"bingo-card-v{v}{suf}")
+    sufs = [".csv", "-supplement.csv", "-lk1905.csv", ".md"]
+    there = [P(new, s) for s in sufs if os.path.exists(P(new, s))]
+    if there: sys.exit("refusing, nothing written: exists: " + ", ".join(os.path.basename(p) for p in there))
+    T = {}
+    for l in open(tsv, encoding="utf-8"):
+        if l.startswith("#") or l.startswith("stem\t"): continue
+        x = l.rstrip("\n").split("\t") + [""] * 5
+        T[STEM_NOW.get(x[0], x[0])] = (x[2].strip(), x[3].strip())
+    n, MAP = 0, {}
+    tag = lambda q: {w for t in q.split(" → ") for w in t.split(" ") if w and not re.match(r"^(\d{4}|≤|≥)$", w)}
+    for s in sufs[:3]:
+        R = list(csv.DictReader(open(P(old, s), encoding="utf-8")))
+        with open(P(new, s), "w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(R[0].keys())); w.writeheader()
+            for r in R:
+                if not r["stem"]: w.writerow(r); continue
+                r["stem"] = STEM_NOW.get(r["stem"], r["stem"])
+                if r["stem"] not in T: sys.exit(f"not in the table: {r['stem']}")
+                orig, cty0, name0 = r["tags_in_sequence"], r["country"], r["full_name"]
+                t, r["evidence"] = lk_seq(r["stem"], orig, r["evidence"], *T[r["stem"]])
+                r["full_name"], r["name_source"] = _ruled(LK_NAMES, r["stem"], r["country"]) or (r["full_name"], r["name_source"])
+                r["country"] = LK_COUNTRY_SET.get(r["stem"], r["country"])
+                MAP[(r["stem"], orig)] = (t, r["full_name"], r["country"])
+                n += t != orig; r["tags_in_sequence"] = t; w.writerow(r)
+    L, col, table, ccol, delta = [], None, None, None, collections.defaultdict(collections.Counter)
+    for line in open(P(old, ".md"), encoding="utf-8"):
+        if line.startswith("|"):
+            cells = line.rstrip("\n").split(" | ")
+            hd = [c.strip().strip("|").strip() for c in cells]
+            if "tags in sequence" in hd:
+                col = hd.index("tags in sequence"); ccol = hd.index("country") if "country" in hd else None
+                table = {"| plate": "album", "| stem": "supplement"}.get(cells[0].strip(), "supplement")
+                if "as the roll prints him" in hd: table = "table3"
+            elif col is not None and len(cells) > col and cells[col].strip() and not cells[col].startswith("-"):
+                at = next((i for i, c in enumerate(cells) if re.fullmatch(r"`[^`]+`", c.strip().strip("|").strip())), None)
+                st = cells[at].strip().strip("|").strip().strip("`") if at is not None else ""
+                if st in STEM_NOW: cells[at] = cells[at].replace(st, STEM_NOW[st]); st = STEM_NOW[st]
+                tail = " |" if cells[col].rstrip().endswith(" |") else ""
+                orig = cells[col].rstrip()[:-2].strip() if tail else cells[col].strip()
+                got = MAP.get((st, orig))
+                if got is None and st: sys.exit(f"a row of the .md not in the CSVs: {st}: {orig}")
+                if got:
+                    cells[col] = got[0] + tail; cells[at + 1] = got[1]
+                    if ccol is not None: cells[ccol] = got[2]
+                    for g_ in tag(orig) | tag(got[0]):
+                        delta[table][g_] += (g_ in tag(got[0])) - (g_ in tag(orig))
+                line = " | ".join(cells) + "\n"
+        else:
+            col = None if line.strip() else col
+        if line.startswith("# The Schuck-album bingo card — v" + old):
+            line = line.replace("— v" + old, "— v" + new, 1).rstrip("\n") + (f" · v{new}, 2026-11-07, from v{old}: Ⓚ by the date of joining in our records, not the album's "
+                   "mark (Ezri, bingo-card/LK-JOINING-2026-11-07.tsv); Sentis and Hodler not members; Ch. Ed. Guillaume the physicist; nine Ⓐ by the Akademio's own lists (bingo-card/AKADEMIO-CHECK-2026-11-07.tsv); the names by the Enciklopedio's heading, then the register, then the Esperanto Wikipedia\n")
+        L.append(line)
+    adds = {"the album's": ["album"], "the supplement's": ["supplement"], "both tables together": ["album", "supplement"],
+            "table 3's": ["table3"], "all three tables": ["album", "supplement", "table3"]}
+    head, out = None, []
+    for line in L:
+        if line.startswith("### Totals"): head = next((k for k in adds if k in line), None)
+        m = re.match(r"^\| (\S+) \| ([^|]+) \| (\d+) \|$", line.rstrip("\n"))
+        if m and head and m.group(1) in ORDER + ["Ⓚ", "Ⓐ"]:
+            line = f"| {m.group(1)} | {m.group(2)} | {int(m.group(3)) + sum(delta[t][m.group(1)] for t in adds[head])} |\n"
+        if m and m.group(1) == "💚":
+            line = line.replace("before the 1894 vote", "before the 1894 vote; dated later, one person only: Guillaume, a supporter who never learned the language")
+        if m and head == "table 3's" and m.group(1) == "🟦" and delta["table3"]["💚"]:   # the first 💚 of that table: no row to add to
+            out.append(f"| 💚 | green heart — sympathy for the language as it was, before the 1894 vote; dated later, one person only: Guillaume, a supporter who never learned the language | {delta['table3']['💚']} |\n")
+        if line.startswith("**Grammar of the card:**"):
+            line = line.replace("💚 for the language as it was, before 1894", "💚 for the language as it was, before 1894; one later date, Guillaume, a supporter who never learned it")
+        out.append(line)
+    open(P(new, ".md"), "w", encoding="utf-8").write("".join(out))
+    print(f"v{old} → v{new}: {n} sequences rewritten in the three CSVs; → {', '.join(os.path.basename(P(new, s)) for s in sufs)}")
+    return 0
+
+# --row-step (2026-11-08, Miles; the editor): the rows ruled since v0.4.9, one by one
+ROW_JOIN = {"de-beaufront"}   # the 🟩 now JOIN_RULED's (1887 → 1888, the editor)
+ROW_VOLAPUK = {"wallon"}      # a 🟪 new since v0.4.9, from VOLAPUK
+# Dervaux: the album's caption is Maurice of Boulogne (Ezri, the editor 2026-11-08); the row held Lambert of Charleroi's name, country and marks
+ROW_SET = {"dervaux": ("Maurice Dervaux", "profile", "France", "🟩 1903 → †≥ 1908",
+                       "🟩: Adresaro 1903, serio 24, n-ro 8789, «Maurice Derveaux», Boulogne-sur-Mer (adresaro-1903-serio-24, ¶ 1090) ‖ †≥: his last dated act, the Esperanto festival of Amiens, 26 Apr 1908 (lesperantiste-1908-5, PDF 9, l. 597) ‖ the row was Lambert Dervaux's to v0.4.9 (Ⓚ 1913, †≥ 1920, «France (Belgian)», and a «· 1908» from a surname search): Maurice of the caption ruled the card's man (the editor, through Ezri, 2026-11-08); profiles/dervaux.md, Lambert «(Lambert)»")}
+
+
+def row_seq(stem, name, seq, ev, births):
+    """one row's sequence and evidence with the rulings made since v0.4.9; (seq, ev, what changed)"""
+    toks = [t for t in seq.split(" → ") if t]
+    parts = [p for p in ev.split(" ‖ ") if p]
+    did = []
+    if stem in ROW_JOIN:
+        y, why = JOIN_RULED[stem]
+        i = next((k for k, t in enumerate(toks) if t.startswith("🟩")), None)
+        if i is not None and toks[i] != f"🟩 {y}":
+            did.append(f"{toks[i]} → 🟩 {y}"); toks[i] = f"🟩 {y}"
+            parts = [p for p in parts if not p.startswith("🟩: RULED")]; parts.insert(0, f"🟩: RULED 2026-11-08: {why}")
+    if stem in ROW_VOLAPUK and not any(t.startswith("🟪") for t in toks):
+        y, why = VOLAPUK[stem]
+        toks.insert(0, f"🟪 {y}"); parts.insert(0, f"🟪: RULED 2026-11-08: {why}"); did.append(f"+🟪 {y}")
+    if stem in DEATH_TPQ:
+        i = next((k for k, t in enumerate(toks) if t.startswith("†≥")), None)
+        if i is not None and toks[i] != f"†≥ {DEATH_TPQ[stem][0]}":
+            did.append(f"{toks[i]} → †≥ {DEATH_TPQ[stem][0]}"); toks[i] = f"†≥ {DEATH_TPQ[stem][0]}"
+            parts = [p for p in parts if not p.startswith("†≥:")]; parts.insert(0, f"†≥: RULED 2026-11-08: {DEATH_TPQ[stem][1]}")
+    b = births.get((stem, name))
+    if b and b[0] and not any(t.startswith("*") for t in toks):
+        toks.insert(0, f"* {b[0]}"); parts.insert(0, f"*: {b[1]}: {b[2]}" + (f" ({b[3]})" if b[3] else "") + " [BIRTHS-PROPOSED-2026-11-08.tsv]"); did.append(f"+* {b[0]}")
+    return " → ".join(toks), " ‖ ".join(parts), did
+
+
+def row_step(old, new, births_tsv):
+    """--row-step OLD NEW BIRTHS.tsv (2026-11-08): the card of version OLD with the births as «* year» (the reviewed list), the death floors,
+    joinings and Volapük dates ruled since (DEATH_TPQ, ROW_JOIN, ROW_VOLAPUK), the names by LK_NAMES, the rows set whole (ROW_SET); the tag
+    totals following. Writes bingo-card-v<NEW>.csv, -supplement.csv, -lk1905.csv and .md; refuses if any exists."""
+    out_dir = os.environ.get("BINGO_OUT", os.path.join(GEN, "bingo-card"))
+    P = lambda v, suf: os.path.join(out_dir, f"bingo-card-v{v}{suf}")
+    sufs = [".csv", "-supplement.csv", "-lk1905.csv", ".md"]
+    there = [P(new, s) for s in sufs if os.path.exists(P(new, s))]
+    if there: sys.exit("refusing, nothing written: exists: " + ", ".join(os.path.basename(p) for p in there))
+    births = {}
+    for r in csv.DictReader(open(births_tsv, encoding="utf-8"), delimiter="\t"):
+        births[(r["stem"], r["card_name"])] = (r["proposed_birth"], r["source"], r["locator"], r["flag"])
+    MAP, log = {}, []
+    tag = lambda q: {w for t in q.split(" → ") for w in t.split(" ") if w and not re.match(r"^(\d{4}|≤|≥|\*)$", w)}
+    for s in sufs[:3]:
+        R = list(csv.DictReader(open(P(old, s), encoding="utf-8")))
+        with open(P(new, s), "w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(R[0].keys())); w.writeheader()
+            for r in R:
+                if not r["stem"]: w.writerow(r); continue
+                orig, name0 = r["tags_in_sequence"], r["full_name"]
+                if r["stem"] in ROW_SET:
+                    r["full_name"], r["name_source"], r["country"], t, r["evidence"] = ROW_SET[r["stem"]]; did = [f"row set: {orig} ⇒ {t}"]
+                else:
+                    t, r["evidence"], did = row_seq(r["stem"], name0, orig, r["evidence"], births)
+                    r["full_name"], r["name_source"] = _ruled(LK_NAMES, r["stem"], r["country"]) or (r["full_name"], r["name_source"])
+                if r["full_name"] != name0: did.append(f"name {name0} → {r['full_name']}")
+                MAP[(r["stem"], orig)] = (t, r["full_name"], r["country"])
+                if did: log.append(f"{s}: {r['stem']}: " + "; ".join(did))
+                r["tags_in_sequence"] = t; w.writerow(r)
+    L, col, table, ccol, delta = [], None, None, None, collections.defaultdict(collections.Counter)
+    for line in open(P(old, ".md"), encoding="utf-8"):
+        if line.startswith("|"):
+            cells = line.rstrip("\n").split(" | ")
+            hd = [c.strip().strip("|").strip() for c in cells]
+            if "tags in sequence" in hd:
+                col = hd.index("tags in sequence"); ccol = hd.index("country") if "country" in hd else None
+                table = {"| plate": "album", "| stem": "supplement"}.get(cells[0].strip(), "supplement")
+                if "as the roll prints him" in hd: table = "table3"
+            elif col is not None and len(cells) > col and cells[col].strip() and not cells[col].startswith("-"):
+                at = next((i for i, c in enumerate(cells) if re.fullmatch(r"`[^`]+`", c.strip().strip("|").strip())), None)
+                st = cells[at].strip().strip("|").strip().strip("`") if at is not None else ""
+                tail = " |" if cells[col].rstrip().endswith(" |") else ""
+                orig = cells[col].rstrip()[:-2].strip() if tail else cells[col].strip()
+                got = MAP.get((st, orig))
+                if got is None and st: sys.exit(f"a row of the .md not in the CSVs: {st}: {orig}")
+                if got:
+                    cells[col] = got[0] + tail; cells[at + 1] = got[1]
+                    if ccol is not None: cells[ccol] = got[2]
+                    for g_ in tag(orig) | tag(got[0]):
+                        delta[table][g_] += (g_ in tag(got[0])) - (g_ in tag(orig))
+                line = " | ".join(cells) + "\n"
+        else:
+            col = None if line.strip() else col
+        if line.startswith("# The Schuck-album bingo card — v" + old):
+            line = line.replace("— v" + old, "— v" + new, 1).rstrip("\n") + (f" · v{new}, 2026-11-08, from v{old}: the births as «* year» where known (bingo-card/BIRTHS-REVIEW-2026-11-08.md: the Enciklopedio, then the ÖNB, then Wikipedia, then a period source; never «≤»); "
+                   "Allum †≥ 1910, Chettiar †≥ 1937; de Beaufront 🟩 1888; Karp Wallon, 🟪 ≤ 1890; the Dervaux of the caption, Maurice of Boulogne\n")
+        if line.startswith("**Grammar of the card:**"):
+            line = line.replace("tags (Ⓚ Lingva Komitato", "the birth first, «* year», where known; tags (Ⓚ Lingva Komitato", 1)
+        L.append(line)
+    adds = {"the album's": ["album"], "the supplement's": ["supplement"], "both tables together": ["album", "supplement"],
+            "table 3's": ["table3"], "all three tables": ["album", "supplement", "table3"]}
+    head, out = None, []
+    for line in L:
+        if line.startswith("### Totals"): head = next((k for k in adds if k in line), None)
+        m = re.match(r"^\| (\S+) \| ([^|]+) \| (\d+) \|$", line.rstrip("\n"))
+        if m and head and m.group(1) in ORDER + ["Ⓚ", "Ⓐ"]:
+            line = f"| {m.group(1)} | {m.group(2)} | {int(m.group(3)) + sum(delta[t][m.group(1)] for t in adds[head])} |\n"
+        out.append(line)
+    open(P(new, ".md"), "w", encoding="utf-8").write("".join(out))
+    print("\n".join(log))
+    print(f"v{old} → v{new}: {len(log)} rows changed; the totals' deltas: " + "; ".join(f"{t} {dict((k, v) for k, v in c.items() if v)}" for t, c in delta.items() if any(c.values())))
+    return 0
+
+
 def compare(a, b):
     """--compare A.csv B.csv (2026-10-20): the cards' sequences person by person (plate, position): every cell that
     differs, and the counts of † and of each camp glyph in both. Reads only."""
     def load(p):
         return {(r["plate"], r["pos"]): r for r in csv.DictReader(open(p, encoding="utf-8"))}
     A, B = load(a), load(b)
-    glyphs = ["†", "🟪", "🟦", "💙", "🟧", "🧡", "🟩", "🟢", "🔴", "⭕", "⭘", "⬜", "⬛", "🟨", "Ⓚ", "Ⓐ"]
+    glyphs = ["†", "‡", "🟦", "💙", "🟧", "🧡", "🟩", "🟢", "🔴", "⭕", "⭘", "⬜", "⬛", "🟨", "Ⓚ", "Ⓐ"]
     count = lambda D, g: sum(1 for r in D.values() if g in r["tags_in_sequence"])
     print("glyph: people in A → in B")
     print("  " + "; ".join(f"{g} {count(A, g)} → {count(B, g)}" for g in glyphs))
@@ -781,6 +1651,14 @@ def compare(a, b):
 def main():
     if "--compare" in sys.argv:
         i = sys.argv.index("--compare"); return compare(sys.argv[i + 1], sys.argv[i + 2])
+    if "--resequence" in sys.argv:
+        i = sys.argv.index("--resequence"); return resequence(sys.argv[i + 1], sys.argv[i + 2])
+    if "--lk-step" in sys.argv:
+        i = sys.argv.index("--lk-step"); return lk_step(sys.argv[i + 1], sys.argv[i + 2], sys.argv[i + 3])
+    if "--volapuk-step" in sys.argv:
+        i = sys.argv.index("--volapuk-step"); return volapuk_step(sys.argv[i + 1], sys.argv[i + 2])
+    if "--row-step" in sys.argv:
+        i = sys.argv.index("--row-step"); return row_step(sys.argv[i + 1], sys.argv[i + 2], sys.argv[i + 3])
     allstems = stems()
     rows, unmatched = [], []
     for raw in open(CAPTIONS, encoding="utf-8"):
@@ -799,7 +1677,7 @@ def main():
     # outputs: CREATE-ONLY (2026-10-20: a re-cut once overwrote the hand-edited card, restored from the backup and git;
     # the default version 0.1 would overwrite v0.1): BINGO_OUT names the folder (default the geniza root), and every
     # file a run writes must not exist, or nothing is written
-    out_dir = os.environ.get("BINGO_OUT", GEN)
+    out_dir = os.environ.get("BINGO_OUT", os.path.join(GEN, "bingo-card"))
     out_csv = os.path.join(out_dir, f"bingo-card-v{VER}.csv"); out_md = os.path.join(out_dir, f"bingo-card-v{VER}.md")
     planned = [out_csv, out_md, out_csv.replace(".csv", "-supplement.csv"), out_csv.replace(".csv", "-lk1905.csv"),
                os.path.join(out_dir, f"bingo-card-v{VER}-sources.csv"), os.path.join(out_dir, f"bingo-card-v{VER}-gaps.csv")]
@@ -809,7 +1687,7 @@ def main():
     with open(out_csv, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh); w.writerow(["plate", "pos", "caption", "stem", "country", "match", "n_fact_lines", "tags_in_sequence", "evidence", "hand_pass"])
         for r in rows:
-            seq = " → ".join(f"{g}{'' if y is None else ' ' + str(y)}" for g, y, _, _ in r["tags"])
+            seq = seq_of(r["tags"])
             ev = " ‖ ".join(f"{g}: {why} [{loc}]" for g, y, loc, why in r["tags"] if loc or why)
             hand = []
             if not r["stem"]: hand.append("UNMATCHED caption")
@@ -831,7 +1709,7 @@ def main():
     with open(out_md, "w", encoding="utf-8") as fh:
         fh.write(f"# The Schuck-album bingo card — v{VER} ({len(rows)} portraits; cut {__import__('datetime').date.today().isoformat()})\n\n")
         if VER != "0.1":
-            fh.write("**Grammar of the card:** squares are ACTS (🟩 stayed · 🟨 voted for reform 1894 · 🟦 Ido · 🟧 other auxlang · ⬜ lapse · ⬛ renounced · 🟪 died ≤ 1908); circles are SEATS (🔴 struck for disloyalty · ⭕ struck for silence · ⭘ resigned · 🟢 returned); hearts are LEANINGS (💛 for reform before 1894 · 💚 for the language as it was, before 1894 · 💙 Ido sympathiser · 🧡 other-auxlang sympathiser); tags (Ⓚ Lingva Komitato · Ⓐ Akademio · ◈ unifier · ◐ double membership · †). v0.1 was the mechanical proposal; this version carries the hand pass — every cell a human had to rule is ruled, and the rulings are listed at the end.\n\n")
+            fh.write("**Grammar of the card:** squares are ACTS (🟩 stayed · 🟨 voted for reform 1894 · 🟦 Ido · 🟧 other auxlang · ⬜ lapse · ⬛ renounced · ‡ died ≤ 1908); circles are SEATS (🔴 struck for disloyalty · ⭕ struck for silence · ⭘ resigned · 🟢 returned); hearts are LEANINGS (💛 for reform before 1894 · 💚 for the language as it was, before 1894 · 💙 Ido sympathiser · 🧡 other-auxlang sympathiser); tags (Ⓚ Lingva Komitato · Ⓐ Akademio · ◈ unifier · ◐ double membership · †). v0.1 was the mechanical proposal; this version carries the hand pass — every cell a human had to rule is ruled, and the rulings are listed at the end.\n\n")
             # v0.3 (2026-10-20; the editor): what changed against v0.2, and the witness marks left out
             if VER.startswith("0.3"):
                 fh.write("**v0.3, re-cut 2026-10-20 from the profiles as they now stand** (the facts rewritten in Esperanto with event kinds; "
@@ -848,7 +1726,7 @@ def main():
         fh.write("`[cut by tools/bingo-card.py from profiles/*.md; every tag carries the year and locator of the fact line that earned it; ⬛ is never proposed; HAND-PASS = the cells a human must rule. Palette: QUEUE U11-B.]`\n\n")
         fh.write("| plate | pos | caption | stem | country | lines | tags in sequence | hand-pass |\n|---|---|---|---|---|---|---|---|\n")
         for r in rows:
-            seq = " → ".join(f"{g}{'' if y is None else ' ' + str(y)}" for g, y, _, _ in r["tags"])
+            seq = seq_of(r["tags"])
             hand = "; ".join(h for h in [
                 "UNMATCHED" if not r["stem"] else "", "no lines" if r["stem"] and r["n"] == 0 else "",
                 "confirm?" if any(("hand-confirm" in why or "hand-date" in why or "HAND-ONLY" in why) and not why.startswith("RULED") and not (g == "·" and r["stem"] in HAND_RETURN_DISMISSED) for g, y, loc, why in r["tags"]) and r["stem"] not in HAND_CONFIRMED_CAMP else "", "strike" if any(g in "🔴⭕" for g, *_ in r["tags"]) and r["stem"] not in HAND_RESOLVED_STRIKE else "",
@@ -877,13 +1755,13 @@ def main():
         fh.write(country_table([(r["country"], r["tags"]) for r in rows] + [(SUPP_COUNTRY.get(st, "?"), t) for st, _, t, _ in supp]) + "\n")
         fh.write("| stem | canon | country | lines | tags in sequence |\n|---|---|---|---|---|\n")
         for st, canon, tags2, n2 in supp:
-            seq = " → ".join(f"{g}{'' if y is None else ' ' + str(y)}" for g, y, _, _ in tags2)
+            seq = seq_of(tags2)
             fh.write(f"| `{st}` | {' + '.join(canon)} | {SUPP_COUNTRY.get(st, '?')} | {n2} | {seq} |\n")
         with open(out_csv.replace('.csv', '-supplement.csv'), "w", newline="", encoding="utf-8") as fs:
             w2 = csv.writer(fs); w2.writerow(["stem", "canon", "country", "n_fact_lines", "tags_in_sequence", "evidence"])
             for st, canon, tags2, n2 in supp:
                 w2.writerow([st, " + ".join(canon), SUPP_COUNTRY.get(st, "?"), n2,
-                             " → ".join(f"{g}{'' if y is None else ' ' + str(y)}" for g, y, _, _ in tags2),
+                             seq_of(tags2),
                              " ‖ ".join(f"{g}: {why} [{loc}]" for g, y, loc, why in tags2 if loc or why)])
         # TABLE 3
         roll = lk_roll1(allstems)
@@ -910,14 +1788,14 @@ def main():
         fh.write(country_table([(r["country"], r["tags"]) for r in rows] + [(SUPP_COUNTRY.get(st, "?"), t) for st, _, t, _ in supp] + [(c, t) for _, _, c, _, t, _ in lk3]) + "\n")
         fh.write("| stem | as the roll prints him | country | source | lines | tags in sequence |\n|---|---|---|---|---|---|\n")
         for stem3, printed, c3, src3, t3, n3 in lk3:
-            seq = " → ".join(f"{g}{'' if y is None else ' ' + str(y)}" for g, y, _, _ in t3)
+            seq = seq_of(t3)
             fh.write(f"| `{stem3}` | {printed} | {c3} | {src3} | {n3} | {seq} |\n")
         if unmatched3:
             fh.write("\n**ROLL 1 names with no profile stem (not on the roster — add to LK_HAND if a profile exists under another spelling):** " + "; ".join(f"{p} ({c}, l.{l})" for p, c, l in unmatched3) + "\n")
         with open(out_csv.replace('.csv', '-lk1905.csv'), "w", newline="", encoding="utf-8") as f3:
             w3 = csv.writer(f3); w3.writerow(["stem", "printed", "country", "source", "n_fact_lines", "tags_in_sequence", "evidence"])
             for stem3, printed, c3, src3, t3, n3 in lk3:
-                w3.writerow([stem3, printed, c3, src3, n3, " → ".join(f"{g}{'' if y is None else ' ' + str(y)}" for g, y, _, _ in t3), " ‖ ".join(f"{g}: {why} [{loc}]" for g, y, loc, why in t3 if loc or why)])
+                w3.writerow([stem3, printed, c3, src3, n3, seq_of(t3), " ‖ ".join(f"{g}: {why} [{loc}]" for g, y, loc, why in t3 if loc or why)])
         # ---- publication components (v0.2, 2026-09-20 «go»): P-SRC and P-GAP as CSVs beside the card, and the rulings as the changelog ----
         def src_kind(x):
             xl = x.lower()
@@ -948,7 +1826,7 @@ def main():
             if not r["stem"]: pg.append((r["caption"][:40], "unmatched caption", "identify the sitter")); continue
             g = [t[0] for t in r["tags"]]
             if r["n"] < 12: pg.append((r["stem"], f"thin profile ({r['n']} lines)", "any dated act 1908–1914 (roll, congress, organ)"))
-            if "†" not in g and "🟪" not in g: pg.append((r["stem"], "death year open", "an obituary or a register entry"))
+            if "†" not in g and "‡" not in g: pg.append((r["stem"], "death year open", "an obituary or a register entry"))
             for gl, y, loc, why in r["tags"]:
                 if "⚠" in why and gl in "🟨🟦🟧⬜⬛💛💚": pg.append((r["stem"], f"{gl} {y} carries a ⚠", re.sub(r"^.*?⚠\s*", "", why).strip(" ()—")[:140] or why[:140]))
             if r["stem"] not in HAND_RESOLVED_STRIKE and "⭕" in g and "⬜" not in g and "⬛" not in g and not any(t[0] in "🟦🟧🟢" and t[1] and t[1] > [x[1] for x in r["tags"] if x[0] == "⭕"][0] for t in r["tags"]):

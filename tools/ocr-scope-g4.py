@@ -34,6 +34,8 @@ if A.lex("estonian"):
     A._LEX["estonian"] = A.FoldedEstonian(A.lex("estonian"), "wv")
 if A.lex("portuguese"):
     A._LEX["portuguese"] = A.OO.FoldedPortuguese(A.lex("portuguese"))
+for _n, _v in (("german", A.OO.german_variants), ("swedish", A.OO.swedish_variants)):   # 2026-10-31
+    if A.lex(_n): A._LEX[_n] = A.OO.FoldedVariants(A.lex(_n), _v)
 PLANNED = [n for n in ("esperanto", "ido", "occidental") if A.lex(n)]
 
 

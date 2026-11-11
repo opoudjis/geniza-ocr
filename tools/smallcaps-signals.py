@@ -406,7 +406,7 @@ def select(a):
     # BORN-DIGITAL pages (their own text layer is the printed text, `ocr-rebuild-combined.py`'s rule): nothing to read
     # by vision; their flags are the layer's own spellings (the Berlina Komentario, the ŜTABA almanac)
     born = set()
-    tk = os.path.join(G, "sources", "ocr-text-layer-2026-09-30", "tl-kind.tsv")
+    tk = sorted(glob.glob(os.path.join(G, "sources", "ocr-text-layer-*", "tl-kind.tsv")))[-1]   # the newest (ocr-tl-kind.py)
     for l in open(tk, encoding="utf-8"):
         x = l.rstrip("\n").split("\t")
         try:

@@ -3,8 +3,9 @@ r"""dowse-conventions-audit.py — the audit of the conventions of the dowse fil
 
 Renamed 2026-10-22 from dowse-conventions-key.py (the editor): what
 it writes is an audit, the code's rules and the files' usage, for finding drift; the key for a reader is a separate,
-hand-written page, geniza/prosopografio/sxlosilo.md (moved 2026-10-24 from ocr/method/DOWSE-CONVENTIONS-KEY-2026-10-22.md
-into the prosopography's documentation folder, for the editor's review before publication).
+hand-written page, published/genizo/pages/sxlosilo.md (moved 2026-10-24 from ocr/method/DOWSE-CONVENTIONS-KEY-2026-10-22.md
+into the prosopography's documentation folder, geniza/prosopografio/, for the editor's review before publication; on
+2026-10-30 into the site's pages, the editor: every site page's source in the one place).
 
 Why (2026-10-22; the editor). The conventions of a dowse line (its fields, the
 date vocabulary, the plan mark, the kinds, the themes, the voice, our ⟦…⟧ notes, the marks only the profiles show) are
@@ -24,6 +25,7 @@ ROOT = os.path.dirname(HERE)
 GEN = os.path.join(ROOT, "published", "heterophony-resources", "geniza")
 sys.path.insert(0, HERE)
 import date_vocab
+import factline as FL   # a line's own fields, the source's words left out (2026-10-28)
 
 
 def module(name, fn):
@@ -94,7 +96,7 @@ def main():
         for lab, rx in (("sendependa", r"\bsendependa\b"), ("derivita ↤ …", r"\bderivita\b"), ("refutas: …", r"\brefutas:"),
                         ("sen fontindiko", r"\bsen fontindiko\b"), ("(refutita aserto), in the fact", r"\(refutita aserto\)"),
                         ("⟳ atestanto: … (a witness line)", r"⟳ atestanto:")):
-            if re.search(rx, l): labels[lab] += 1
+            if re.search(rx, FL.ours(l)): labels[lab] += 1   # not a label word in the anchor (the trigger audit, 35)
         for n in re.findall(r"⟦([^⟧]*)⟧", v):
             head = re.split(r"[:,;]| \d| «", n.strip(), maxsplit=1)[0].strip()
             if len(re.sub(r"\W", "", head)) < 2: head = n.strip()[:30]    # «⟦— …⟧», «⟦«x» …⟧»: show the note's start

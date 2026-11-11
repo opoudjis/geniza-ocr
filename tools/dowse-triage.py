@@ -15,11 +15,12 @@ from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G = os.path.join(ROOT, "published", "heterophony-resources", "geniza")
-WEEK = 4_000_000   # tokens one Max account dowses a week (2026-10-18: Amerika Esperantisto, 1.84M tokens = 45% of a week)
+WEEK = 10_000_000  # tokens one Max account dowses a week (the editor, 2026-10-29; was 4M, from
+                   # Amerika Esperantisto's 45% of 2026-10-18, run with briefs since cut; readings in ocr/method/QUOTA-READINGS.tsv)
 
 TIERS = [
     ("0", "done", "already dowsed"),
-    ("1", "first journals", "the founding era: Esperanto periodicals to 1905, the first congress"),
+    ("1", "first journals; contemporary primary", "the founding era: Esperanto periodicals to 1905, the first congress; and Zamenhof's works and letters and the era's major correspondence, whole, to 1917 (the editor, 2026-11-04)"),
     ("2", "crisis core", "the international organs of both camps during the crisis, 1906–1914, where the Delegation, Ido and the purges were fought out"),
     ("3", "major secondary", "the histories, encyclopaedias, letters and works the venture leans on"),
     ("2b", "crisis, national organs", "the national and specialist organs of the crisis years, 1906–1914 (the editor, 2026-10-20)"),
@@ -50,21 +51,46 @@ RULES = [
     ("0", r"^kk\b", None, "dowsed 2026-10-21 (dowse/kongresa-gazeto: 1908, 1911, 1912, 1913, 1914)"),
     ("0", r"zakrzewski - historio de esperanto|zakrzewski-historja", None, "dowsed 2026-10-21 (dowse/zakrzewski-historio-1913, dowse/zakrzewski-historja-1906)"),
     ("0", r"lingvo ?internacia", (1895, 1905), "dowsed 2026-10-22 (dowse/lingvo-internacia, Picard)"),
-    ("0", r"the ?esperantist\b", (1903, 1905), "dowsed 2026-10-22 (dowse/the-esperantist: both volumes, 1903–1905; the theesperantist-pg issues are copies of it)"),
+    # (not the ÖNB copy, cupel21's anno_e2a: second copies kept, for triangulation, the editor 2026-11-04;
+    # it falls to tier 1 with the first journals)
+    ("0", r"^(?!anno_e2a\b).*the ?esperantist\b", (1903, 1905), "dowsed 2026-10-22 (dowse/the-esperantist: both volumes, 1903–1905; the theesperantist-pg issues are copies of it)"),
     ("0", r"la ?suno ?hispana|espero.pacifista|juna.?esperantisto", None, "dowsed 2026-10-22 (dowse/la-suno-hispana, dowse/espero-pacifista, dowse/juna-esperantisto: whole runs)"),
     ("0", r"esperantoruslando", None, "dowsed 2026-10-22 (dowse/esperanto-ruslando)"),
     ("0", r"kongresa.libro", (1905, 1905), "dowsed 2026-10-22 (dowse/kongresa-libro-1905)"),
     # cupel17's periodicals (signed 2026-10-23; the editor), by their ÖNB codes until the item table has
     # their titles, and by title after; before the Volapük rule, which would take «Rund um die Welt» for the Volapük one of
     # 1888–1892
-    ("4", r"(anno_e0d_|cirka[uŭ]i? la mondo|rund.um.die.welt.*(19(09|1\d)))", (1909, 1914),
-     "Ĉirkaŭ la mondo / Rund um die Welt (Schramm), a German magazine for Esperantists, not Volapük (the editor, 2026-10-23)"),
+    # (the title key without the item's underscore, «anno_e0d», and «Ĉirkaŭ» with its Ĉ, once the item table had the
+    # title: the rule missed both and the Volapük rule took the run, 2026-11-02; the editor: two distinct
+    # Rund um die Welt journals)
+    ("4", r"(anno_e0d\b|[cĉ]irka[uŭ]i? la mondo|rund.um.die.welt.*(19(09|1\d)))", (1909, 1914),
+     "Ĉirkaŭ la mondo / Rund um die Welt (ed. Siegfried Lederer with Albert Schramm, Heckners Verlag, Wolfenbüttel; no. 1, November 1909: a new journal, not Lederer's Volapük one of 1888–1892), a German magazine for Esperantists, not Volapük (the editor, 2026-10-23)"),
     ("4", r"anno_e1w_|scienca ?gazeto", None, "Scienca Gazeto, a specialist organ, as Internacia Scienca Revuo (the editor, 2026-10-23)"),
     ("1", r"anno_e1v_|rondiranto", (1887, 1905), "Rondiranto (Plovdiv), a first journal, its run to 1904 (the editor, 2026-10-23)"),
     ("4", r"anno_e0h_|la ?dek.?sepa", None, "La Deksepa (H. de Coppet), a French local monthly (the editor, 2026-10-23)"),
     ("2b", r"anno_e5e_|portugala ?revuo", (1906, 1914), "Portugala Revuo, a national organ of the crisis years (the editor, 2026-10-23)"),
+    ("2b", r"anno_e1q|dia ?regno", (1906, 1914), "Dia Regno, the Christian specialist organ, as L'Espérantiste Catholique (the editor, 2026-10-28)"),
+    ("2b", r"anno_e0y|german.?a.?stria|germanaustria|deutsch.?.sterreich", (1906, 1914), "German-Aŭstria Esperantisto, Austria's national organ, its 1910 supplement with its 1911–1914 run (the editor, 2026-10-28)"),
+    # Denmark's national organs: Danlando (ANNO e5k, 1912–1913, and a second copy) and the league's Esperanto-Raporto
+    # (ANNO e5j) that replaced it from December 1913, to 1914; its 1915–1919 stay tier 5
+    ("2b", r"anno_e5k|danlando|anno_e5j|esperanto-raporto", (1906, 1914), "Danlando and its successor, the Centra Dana Esperantista Ligo's Esperanto-Raporto, Denmark's national organs (the editor, 2026-11-10)"),
     ("4", r"anno_e6g_|lingua ?internationale", None, "Lingua Internationale, in Latino sine flexione and French (the editor, 2026-10-23)"),
     ("4", r"onb_e1n_|vespera ?horo", None, "Vespera Horo, 1910 (the editor, 2026-10-23)"),
+    # the Wikipedia page saves (2026-11-04; the editor): their year was the subject's birth year, so
+    # about 120 stood in tier 4 as «a single primary text to 1914»
+    ("6", r"wikipedia", None, "a Wikipedia page save: the editor, 2026-11-04,"),
+    # contemporary primary (2026-11-04; the editor: Originala Verkaro and Leteroj de Zamenhof, with the major
+    # correspondence of the era, tier 1 contemporary primary, the whole corpus of them taken to 1917):
+    # whole, not cut at 1914; out of the tier-3 rule below
+    # (10:4x: ruled by the editor, on Zamenhof's separate works in the Tekstaro; the major
+    # correspondence: Ostwald's Briefwechsel on the world language and the Nefermita letero, the Epistolaro da Ido-poeti
+    # out, as almost certainly later)
+    ("1", r"leteroj-de-zamenhof|originala-verkaro|ostwald-briefwechsel|zamenhofaj_paroladoj"
+          r"|tekstaro-(unua-libro|dua-libro|aldono-dua-libro|fundamenta-|poezio-zamenhofa|lingvaj-respondoj|paroladoj-de-zamenhof"
+          r"|homaranismo|pri-la-homaranismo|dogmoj-de-hilelismo|aldono-al-la-dogmoj|esenco-kaj-estonteco|gentoj-kaj-lingvo"
+          r"|kion-zamenhof|post-la-granda-milito|nefermita-letero|reformoj-esperanto|proverbaro-esperanta"
+          r"|la-batalo-de-l-vivo-antauparolo|elektitaj-fabeloj-antauparolo)", None,
+     "contemporary primary, the whole corpus to 1917: the editor, 2026-11-04; Zamenhof's separate works tier 1, probably preferred over their duplicates in OV"),
     # bibliographies skipped, dictionaries for their forewords (an article ABOUT one is neither)
     ("S", r"^(?!.*(wikipedia|rimarkoj)).*(bibliogra|katalog|catalog|^bpeape\b)", None,
      "a bibliography or catalogue: the editor, 2026-10-20,"),
@@ -88,12 +114,16 @@ RULES = [
     ("5", r"^progreso|bulteno", (1915, 2100), "a periodical after 1914 (Progreso's later volumes, the Soviet bulletins)"),
     ("4", r"\bla ?revuo\b|literatura\.aldono", (1906, 2100),
      "literary: the editor, 2026-10-20,; dowsed as belles lettres: "
-     "kept in scope only where it relates directly to Esperanto (parody, polemic, hagiography in; else front matter only)"),
-    ("4", r"internacia ?scienca ?revuo", None, "the editor, 2026-10-20; 1904 too (2026-10-27: tier 4)"),
-    # one year of 1905 read with the run it opens (the editor, 2026-10-23
-    #): each to the tier of its 1906–1914 years
+     "in scope only where it bears directly on Esperanto (parody, polemic, hagiography in; else front matter only)"),
+    ("4", r"internacia ?scienca ?revuo", None, "the editor, 2026-10-20; 1904 too (2026-10-27: approved, in tier 4)"),
+    # one year of 1905 read with the run it opens (the editor, 2026-10-23: tier 1 overridden, so as not to mix and match
+    # too much: Esperanto (UEA), British Esperantist and Tra la Mondo, one year each of 1905, moved to the tier
+    # 2 runs): each to the tier of its 1906–1914 years
     ("2", r"esperanto[- ]\(?uea", (1905, 1905), "1905 with its 1906–1914 run (the editor, 2026-10-23)"),
     ("2b", r"brita ?esperantisto|british esperantist|tra ?la ?mondo", (1905, 1905), "1905 with its 1906–1914 run (the editor, 2026-10-23)"),
+    ("2b", r"germana ?esperantisto|deutsche ?esperantist", (1905, 1905), "1905 with its 1906–1910 run (the editor, 2026-11-02)"),
+    # the later Esperanto (UEA) files, 1915–1980 (36), with the run they close, rather than tier 5
+    ("2", r"esperanto[- ]\(?uea", (1915, 2100), "after 1914 with its 1905–1914 run (the editor, 2026-11-10)"),
     # the first journals: to 1905
     ("1", r"\bla esperantisto\b", (1889, 1895), "the first Esperanto periodical (Nürnberg, 1889–1895)"),
     # its own rule, so the note on what anno_e4a is stays on its row (2026-10-20: one reason for all, it stood on every
@@ -114,7 +144,7 @@ RULES = [
      "a national or specialist organ of the crisis years"),
     # the major secondary sources
     ("3", r"enciklopedio.de.esperanto|the-esperanto-movement|garv[ií]a|privat-(historio|vivo)|zakrzewski|oralibro"
-          r"|leteroj-de-zamenhof|originala-verkaro|drezen|histoire.?de.?la.?lang|couturat.?leau|encycl|blanke|gordin"
+          r"|drezen|histoire.?de.?la.?lang|couturat.?leau|encycl|blanke|gordin"
           r"|esperanto-en-perspektivo|sikosek|\blins\b|^bk[- ]", None,
      "a major secondary source (history, encyclopaedia, letters, collected works)"),
 ]
@@ -189,10 +219,21 @@ def main():
     # TIER 0 FROM THE DOWSED LIST (2026-10-24; the editor
     #): an item in dowse/DOWSED-ITEMS-LATEST.tsv (tools/dowse-done.py, rewritten at every harvest) is done, by its
     # source; the hand rules of tier 0 above stay for what the list does not hold
+    # DONE ONLY IF READ (2026-11-04; the editor): the list holds every item a facts file cites, so
+    # the Enciklopedio de Esperanto 1933 (350k tokens) read «done» from the Beauchemin additions' few lines. An item now
+    # counts done when a dowse with readers or tools wrote its row (the list's «readers_tag»: every source but the
+    # Beauchemin additions, the Somme records and Szerdahelyi has one), or when it is small enough to have been read whole
+    # by hand (SMALL tokens: the Somme records, the Beauchemin documents); else the rules decide its tier (Szerdahelyi's
+    # hand rule among them). A test by the dowse folder's files naming the item dropped real dowses (the Volapük journals)
+    # SIZE NEVER MAKES A TEXT DONE (the editor, 2026-11-09, on Miles's finding that the 20,000-token clause had kept small
+    # texts from being dowsed at all, Schuck's album among them): only a readers tag does; a text a hand file covers whole
+    # gets a hand rule of tier 0 above, by name
+    words = {it: n for n, key, title, year, kind, it in texts}
     done = {}
     dp = os.path.join(G, "dowse", "DOWSED-ITEMS-LATEST.tsv")
     if os.path.exists(dp):
         for r in csv.DictReader((l for l in open(dp, encoding="utf-8") if not l.startswith("#")), delimiter="\t"):
+            if not r["readers_tag"]: continue
             done[r["item"]] = f"dowsed {r['readers_tag'] or '(an older dowse)'} (dowse/{r['source']}; DOWSED-ITEMS-LATEST.tsv)"
     nitems = defaultdict(int)
     for n, key, title, year, kind, it in texts: nitems[key] += 1
@@ -227,7 +268,7 @@ def main():
          f"`[tools/dowse-triage.py: every text of the corpus by its title and year, the first matching rule giving the tier; "
          f"proposals for the editor to rule. {allw:,} tokens (every whitespace token a reader is given; not Miles's «words on signed pages»). "
          f"Weeks = tokens ÷ {WEEK:,}, one Max account's week of dowsing "
-         f"(2026-10-18: Amerika Esperantisto's 1.84M tokens were 45% of a week). «double?» = another title has the same token "
+         f"(the editor, 2026-10-29: a million tokens about 10% of the week; more for lists). «double?» = another title has the same token "
          f"total, or a known second copy: a pair for the doubles method (`ocr/method/DOWSE-DOUBLES-METHOD-PROPOSAL-2026-10-20.md`, "
          f"`COPIES` in `tools/ocr-dowse.py`): both read where both are kept, never dropped on this list's word.]`", "",
          "| tier | name | what | titles | items | tokens | weeks | cumulative weeks |", "|---|---|---|---|---|---|---|---|"]

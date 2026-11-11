@@ -12,7 +12,11 @@ those hits apart, and leaves those pages out of the reading and of silences.
 
 WHAT, each source by its own markers, its extent measured in the item (never assumed):
 - «ÖNB cover sheet»: a page among an item's first 3 and last 2 holding at least two of the ÖNB sheet's field words
-  (Nationalbibliothek, Zitierlink, Signatur:, Umfang:, data.onb, Ort:, Jahr:): one word alone may be running text.
+  (Nationalbibliothek, Zitierlink, Signatur:, Umfang:, data.onb, Ort:, Jahr:): one word alone may be running text;
+  and one of them a catalogue field (Zitierlink, Signatur:, Umfang:; 2026-11-03: a volume's own cover photographed with
+  ÖNB's shelf label, «Nationalbibliothek», and the page footer, «data.onb», is the source's page). Since 2026-11-03 the
+  cover sheets are withdrawn from the readings (`tools/ocr-duplicate-pages.py library`, `ocr/method/LIBRARY-PAGES.tsv`),
+  so their pages are empty here.
 - «Google front matter»: a page with Google's preface («digital copy of a book», «Google Book Search»); the
   «Digitized by Google» footer on a page of text is a line, not a metadata page, and is left.
 - «archive.org stamp»: a page among the first 3 and last 2 with «Internet Archive» or «archive.org» and «Digitized».
@@ -41,7 +45,10 @@ G = BDL.G
 S = os.path.join(G, "sources")
 ONB = [re.compile(x, re.I | re.M) for x in (r"Nationalbibliothek", r"Zitierlink", r"Signatur\s*:", r"Umfang\s*:",
                                               r"data\.onb", r"^\s*Ort\s*:", r"^\s*Jahr\s*:")]
-GOOGLE = re.compile(r"digital copy of a book|Google Book Search|books\.google", re.I)
+ONB_FIELD = re.compile(r"Zitierlink|Signatur\s*:|Umfang\s*:", re.I)
+# Google's preface by its own words (2026-11-03): «books.google» matched 14 article pages citing a Google Books link
+# (IpI, the Polish and Stasi essays), marked metadata since 2026-10-10
+GOOGLE = re.compile(r"digital copy of a book|copie num.rique d.un ouvrage|digitized\s+by\s+Google\s+as\s+part", re.I)
 ARCH = re.compile(r"(Internet Archive|archive\.org)", re.I)
 DIGI = re.compile(r"digiti[sz]ed", re.I)
 TEK_FIELD = re.compile(r"^(Verkis|El|Eldono|Eldonado|Grandeco|Paĝoj?|Numero|Proksimuma verkojaro[^:]{0,20}|Kreis la Esperantan "
@@ -59,7 +66,9 @@ def scanned(item, path):
     out = []
     for p, t in look:
         k = sum(1 for rx in ONB if rx.search(t))
-        if k >= 2:
+        # and a catalogue field (2026-11-03): «Nationalbibliothek» on the shelf label of a volume's own photographed cover,
+        # with the page footer's «data.onb», made two words, and 22 real covers (page 2) were marked metadata
+        if k >= 2 and ONB_FIELD.search(t):
             out.append((p, "ÖNB cover sheet", f"{k} ÖNB field words"))
         elif ARCH.search(t) and DIGI.search(t):
             out.append((p, "archive.org stamp", "«Internet Archive/archive.org» with «digitized»"))

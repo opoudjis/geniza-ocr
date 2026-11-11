@@ -58,7 +58,9 @@ def main():
                     # day from the passage, came after a misdated «1911-08»; two Berthelots under one head): «antaŭ ‹its
                     # date›» is true of any death line dated by its issue, whoever the person, and false of a date the
                     # passage gives; the others are listed for a look, not changed
-                    if "la dato de la numero" not in line: looks.append((s, who, first, d, loc)); continue
+                    # our note ⟦la dato de la numero⟧ only, not the phrase in a quoted anchor (the trigger audit of
+                    # 2026-10-28, item 32)
+                    if "⟦la dato de la numero" not in line: looks.append((s, who, first, d, loc)); continue
                     props.append((who, first, d, anchor, k2n.get(item, item) + loc[len(item):], line))
         if not props: continue
         total += len(props)

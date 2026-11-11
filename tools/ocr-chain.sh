@@ -6,7 +6,9 @@
 #
 # Replaces the hand-copied chain scripts (untracked, not published). Run from
 # the repo root. Order, and why:
-#   1. rebuild      tools/ocr-rebuild-combined.py — the combined search text per item, from every reading on disk
+#   0. withdrawn    tools/ocr-duplicate-pages.py withdraw, check — the pages scanned twice inside a file emptied again
+#   0b. tl-kind     tools/ocr-tl-kind.py --auto — the text-layer kind of every page not yet listed, read by the rebuild
+#   1. rebuild     tools/ocr-rebuild-combined.py — the combined search text per item, from every reading on disk
 #   2. Russian      tools/ocr-rus-companion.py — the Russian search (ocr-rendersearch-rus/), rewritten in place; the old
 #                   folder is kept as sources/ocr-work/ocr-rendersearch-rus.bak-<suffix>
 #   3. G1           tools/ocr-g1-ink.py → ocr/runs/OCR-GATE-G1-<suffix>.md
@@ -71,7 +73,7 @@ fi
 # running by its process name. (Matching «ocr-chain.sh» itself would also catch the shell that launched this one.)
 # pgrep answers 0 (found) or 1 (none); anything else (3 in the sandbox: «Cannot get process list») means it cannot look.
 if [ "$DRY" != "--dry" ]; then
-  pg=0; pgrep -f "tools/ocr-rebuild-combined.py|tools/ocr-accept.py|tools/ocr-g1-ink.py|tools/ocr-absence-ledger.py|scripts/chain-[0-9a-z-]+\.sh" >/dev/null 2>&1 || pg=$?
+  pg=0; pgrep -f "tools/ocr-tl-kind.py|tools/ocr-rebuild-combined.py|tools/ocr-accept.py|tools/ocr-g1-ink.py|tools/ocr-absence-ledger.py|scripts/chain-[0-9a-z-]+\.sh" >/dev/null 2>&1 || pg=$?
   case $pg in
     0) echo "a chain step (or an old chain script) is running — refusing"; exit 1 ;;
     1) ;;
@@ -115,6 +117,15 @@ fi
 # the selective redowse (2026-10-24, the editor; Ezri's form, ocr/method/REDOWSE-PAGES-PROPOSAL-2026-10-24.md): a
 # SIGNED item with new readings has its preferred text kept before the rebuild rewrites it, and a notice after
 if todo snapshot; then step snapshot; run python3 tools/ocr-recupel-notice.py snapshot --suffix "$SUF"; mark snapshot; fi
+# the duplicate pages (2026-10-30, cupel19c; the editor: the duplicate pages taken out of the readings): a page scanned twice
+# inside one file, listed in ocr/method/DUPLICATE-PAGES.tsv, is emptied again before the rebuild, so a re-read since
+# does not put its words back; then checked. Since 2026-11-03 also the library pages of ocr/method/LIBRARY-PAGES.tsv
+# (a library's cover sheet; the editor: left out, metadata not data)
+if todo withdrawn; then step withdrawn; run python3 tools/ocr-duplicate-pages.py withdraw; run python3 tools/ocr-duplicate-pages.py check; mark withdrawn; fi
+# the text layer's kind (2026-11-03, the editor; run sheet C1): the pages with a layer that no
+# sources/ocr-text-layer-*/tl-kind.tsv lists yet (a new batch's, from C4) measured, scan or born-digital, into a new timed
+# folder that the rebuild, smallcaps-signals.py select and the dowse read as the newest; nothing new, nothing written
+if todo tl-kind; then step tl-kind; run python3 tools/ocr-tl-kind.py --auto "$G/sources" --pdfs "$P" --root "$R"; mark tl-kind; fi
 if todo rebuild; then step rebuild; run python3 tools/ocr-rebuild-combined.py "$R" --verdicts "$V"; mark rebuild; fi
 if todo russian; then
   step russian; [ -e "$RUSBAK" ] || run cp -Rp "$RUS" "$RUSBAK"; run python3 -W ignore tools/ocr-rus-companion.py "$R" "$RUS"; mark russian
@@ -137,17 +148,24 @@ if todo swap; then
 fi
 if todo notices; then step notices; run python3 tools/ocr-recupel-notice.py notice --suffix "$SUF" ${WHY:+--why "$WHY"} ${WHYI:+--why-items "$WHYI"}; mark notices; fi
 # the run sheet's backup trim, inside the chain so that no `rm` is typed by hand (2026-10-24, the box-free cupel; the editor
-# 2026-10-17 18:4x: all but two to go): of each search folder's rollback copies, the two newest by VERSION order are kept,
-# the rest removed by name; only folders named <search folder>.bak-<suffix> (failure map R40)
+# 2026-10-17 18:4x ruled by the editor): of each search folder's rollback copies, the two newest by VERSION order are kept,
+# the rest removed by name; only folders named <search folder>.bak-<suffix> (failure map R40). Since 2026-11-03 also the
+# text-layer tables the `tl-kind` step makes: of the folders named ocr-text-layer-<YYYY-MM-DD>T<HHMMSS> holding a
+# tl-kind.tsv, the two newest kept (each holds every row of the one before it); the dated folders made by hand never removed
 step trim
 [ "$DRY" = "--dry" ] || python3 -c '
 import os, re, shutil, sys
-W = sys.argv[1]
+W, S = sys.argv[1], sys.argv[2]
 key = lambda s: [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", s)]
 for k in ("ocr-rendersearch-all", "ocr-rendersearch-rus"):
     bak = sorted((d for d in os.listdir(W) if d.startswith(k + ".bak-") and os.path.isdir(os.path.join(W, d))), key=key, reverse=True)
     for d in bak[2:]:
         shutil.rmtree(os.path.join(W, d)); print("removed", d)
-    print("kept", bak[:2])' "$W"
+    print("kept", bak[:2])
+tl = sorted(d for d in os.listdir(S) if re.fullmatch(r"ocr-text-layer-\d{4}-\d\d-\d\dT\d{6}", d)
+            and os.path.isfile(os.path.join(S, d, "tl-kind.tsv")))
+for d in tl[:-2]:
+    shutil.rmtree(os.path.join(S, d)); print("removed", d)
+print("kept", tl[-2:])' "$W" "$G/sources"
 mark trim
 step done; mark done

@@ -12,7 +12,8 @@ dense pages to presence-only with a principled rule: an absence claim on a SPECI
 WHAT. For every item the ledger classes SPECIAL HANDLING, writes `<out>/<item>.txt` in the combined files' format
 (`=== page N ===` blocks); each block is every `page-NNNN*.txt` in the item's folder (main text, psm4, rus, orus, rusfull,
 layout, sc3x, eo-/ru-clean, text layer, second-language merges, vision), each headed `--- <kind> ---`, plus the page of
-the Russian search file (`ocr-rendersearch-rus/<item>.txt`) if present. SEARCH ONLY: not a citation text, never a
+the Russian search file (`ocr-rendersearch-rus/<item>.txt`) if present; a page marked `page-NNNN.setoff` (a mirrored
+set-off, tools/ocr-setoff-check.py) or `page-NNNN.blank` (ruled blank) is left out whole (2026-10-28). SEARCH ONLY: not a citation text, never a
 reading of record. WRITE-SET: the new <out> folder only (refuses to write into an existing one). Re-run after any re-read.
 """
 import os, re, sys, glob, argparse, collections
@@ -44,6 +45,11 @@ def main():
         rp = pages(os.path.join(rus, c + ".txt"))
         body = []
         for p in sorted(set(by) | set(rp)):
+            # a SET-OFF page (`page-NNNN.setoff`, tools/ocr-setoff-check.py) or a page ruled BLANK (`page-NNNN.blank`):
+            # no reading of it is searched (2026-10-28, the editor 12:1x and 13:1x)
+            mk = next((k for k in ("setoff", "blank") if os.path.exists(os.path.join(d, f"page-{p:04d}.{k}"))), None)
+            if mk:
+                kinds[f"{mk}-skipped"] += 1; continue
             blk = []
             for kind, f in sorted(by.get(p, []), key=lambda x: (x[0] != "main", x[0])):
                 t = open(f, encoding="utf-8", errors="ignore").read().strip()

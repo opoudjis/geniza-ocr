@@ -1,6 +1,6 @@
 #!/bin/bash
-# cupel-c7c — the run sheet's C7b.2 (small capitals) and C7c (columns rounds 1 and 2, the blocks cut, Fraktur, second
-# readings, empty pages) for one batch, under rule 0, as ONE repo tool so that no step asks (the editor 2026-10-24: «cupel
+# cupel-c7c — the run sheet's C7b.2 (small capitals) and C7c (columns rounds 1 and 2, the blocks cut, the gutter cut (since
+# 2026-10-28), Fraktur, second readings, empty pages) for one batch, under rule 0, as ONE repo tool so that no step asks (the editor 2026-10-24: «cupel
 # fix to make it autopilot: approved»; the run sheet's command templates). Made general from cupel18a's driver of 2026-10-23.
 #
 #   python3 tools/cupel-detach.py --log <batch-dir>/C7C.out --pid <batch-dir>/C7C.pid -- \
@@ -47,6 +47,18 @@ for it in json.load(open(f"{B}/columns-items.json", encoding="utf-8")):
                 rows.append(it + "\t" + str(r["page"]) + "\n")
 open(f"{B}/BLOCKS-PAGES.tsv", "x", encoding="utf-8").write("".join(rows)); print(len(rows), "pages to the blocks cut")' "$R" "$B"
 step BLOCKS blocks $R --pdfs $L --list $B/BLOCKS-PAGES.tsv
+# C7c.2b, THE GUTTER CUT, STANDARD FOR EVERY BATCH (2026-10-28, the editor to failure map R75's proposal: cupel18c's
+# Internacia Scienca Revuo and cupel19a's Germana-Aŭstria Esperantisto both failed G5 on columns read across, which the
+# column measures above did not catch): every page of every batch item tried; a page.gutter.txt written only where the page
+# is in 2+ columns and the reading is no worse (tools/ocr-gutter-cut.py). Languages: the fifth argument, else LANGS, else
+# epo+deu+fra (2026-10-29: the argument, since a leading LANGS= before the detached call is a command shape of its own)
+GL=${5:-${LANGS:-epo+deu+fra}}
+if [ ! -e $B/GUTTER.done ]; then
+  echo "=== GUTTER $(date '+%F %T') jobs $J lang $GL"
+  python3 tools/ocr-gutter-cut.py $R --pdfs $L --items-file $B/columns-items.json --lang $GL \
+    --journal $B/GUTTER.journal.jsonl --progress $B/PROGRESS.txt --jobs $J >> $B/GUTTER.log 2>&1
+  tail -1 $B/GUTTER.log; date '+%F %T' > $B/GUTTER.done
+fi
 [ -e $B/FRAKTUR-PAGES.tsv ] || { python3 $T frkcands $R --pdfs $L --items $B/columns-items.json --out $B/FRAKTUR-PAGES.tsv >> $B/FRKCANDS.log 2>&1; tail -1 $B/FRKCANDS.log; }
 step FRAKTUR fraktur $R --pdfs $L --list $B/FRAKTUR-PAGES.tsv
 step ADDS adds $R --pdfs $L --items $B/columns-items.json

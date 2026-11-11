@@ -233,6 +233,15 @@ def scan(a):
         if r["verdict"] != "CANT-TELL":
             bytitle[title_of(c)].append(c)
     joins = []
+    # every file of a title in name order, CANT-TELL ones too: a JOIN names the files that lie between its two issues,
+    # which the join passes over because they could not be numbered (failure map R56; the build queue's item 6, 2026-11-03)
+    alltitle = collections.defaultdict(list)
+    for c in rows:
+        alltitle[title_of(c)].append(c)
+    order = {}
+    for t in alltitle:
+        alltitle[t].sort(key=natural)
+        order.update((c, i) for i, c in enumerate(alltitle[t]))
     for t, cs in bytitle.items():
         # consecutive issues OF ONE YEAR, in the order their names give (natural sort), and only where the second
         # continues the first's pagination: sorting a whole title by page number paired different years' volumes
@@ -248,7 +257,8 @@ def scan(a):
             short = ry["first_printed"] - rx["last_printed"] - 1
             if 1 <= short <= 8:
                 joins.append((x, y, short, rx["last_printed"], ry["first_printed"]))
-                rx.setdefault("join_gaps", []).append({"next": y, "printed_missing": list(range(rx["last_printed"] + 1, ry["first_printed"]))})
+                rx.setdefault("join_gaps", []).append({"next": y, "printed_missing": list(range(rx["last_printed"] + 1, ry["first_printed"])),
+                                                       "between": alltitle[t][order[x] + 1:order[y]]})
     # THE COUNT JOIN (2026-10-07; Kapis's La Suda Kruco 1934 n163, which the join above missed). A short issue whose own
     # numbers are too few to follow is CANT-TELL, and so left out of the join; yet its neighbours' printed ranges say
     # how many pages it should have: (next's first printed) − (previous's last printed) − 1. A neighbour that is itself
@@ -332,7 +342,8 @@ def scan(a):
             for g in r["repeats"]:
                 ev.append(f"REPEAT/RESTART step {g['step']} between scan {g['after_scan']} and {g['before_scan']}")
             for g in r.get("join_gaps", []):
-                ev.append(f"JOIN printed {g['printed_missing'][0]}–{g['printed_missing'][-1]} missing before {g['next']}")
+                ev.append(f"JOIN printed {g['printed_missing'][0]}–{g['printed_missing'][-1]} missing before {g['next']}"
+                          + (f" (a file between, not numbered: {', '.join(g['between'])})" if g.get("between") else ""))
             if "short_issue" in r:
                 over = " that year" if r["short_issue"].get("over") == "year" else ""
                 ev.append(f"SHORT {r['short_issue']['pages']} pages against the title's usual {r['short_issue']['title_mode']}{over}")
@@ -491,6 +502,27 @@ SEGMENTS = {"338579940-Historio-de-La-Lingvo-Esperanto-Edmond-Privat": [
     (3, 3, 4, "iss", "contents, its first page (unnumbered [7])"),
     (4, 195, 4, "iss", ""),
 ]}
+# DANLANDO 1912–1913 (2026-10-31, cupel19c C13, rule 15; the editor: both Danlando copies kept, page-number
+# tracking needed to settle it; approved): Miles's look at 69 pages of both copies (thumbnail sheets, 12:5x) and the
+# two maps of ocr/runs/OCR-COPY-ALIGN-2026-10-31-danlando-1912-1913.*. Seven numbers of 16 pages, printed 1–112 through
+# the volume, each in a cover of four unnumbered pages (front cover with «N-ro k», blank inside, two of advertisements).
+# The Vienna files: one number each, front cover and inside at PDF 1–2, the 16 pages at 3–18, the back covers at 19–20
+# (file 0060's map had read 51–56 as «1–6» and taken PDF 3–4 for front matter). Danlando.pdf: ÖNB's sheet, the binding
+# and blank leaves at PDF 1–4, then the seven covered numbers in order, the back board at 145.
+for _k, (_f, _y) in enumerate((("57", "1912"), ("58", "1912"), ("59", "1912"), ("60", "1912"), ("61", "1912"),
+                                 ("62", "1912"), ("51", "1913")), 1):
+    SEGMENTS[f"ANNO_e5k_{_y}00{_f}"] = [
+        (1, 2, None, "front", f"n-ro {_k}: front cover and its blank inside"),
+        (3, 18, 16 * (_k - 1) - 2, "iss", f"n-ro {_k}, printed {16 * (_k - 1) + 1}–{16 * _k}"),
+        (19, 20, None, "?", f"n-ro {_k}: the back covers (advertisements), unnumbered")]
+SEGMENTS["Danlando"] = [(1, 1, None, "front", "the ÖNB cover sheet"), (2, 4, None, "front", "the binding and blank leaves")]
+for _k in range(1, 8):
+    _c = 5 + 20 * (_k - 1)
+    SEGMENTS["Danlando"] += [
+        (_c, _c + 1, None, "front" if _k == 1 else "?", f"n-ro {_k}: front cover and its blank inside, unnumbered"),
+        (_c + 2, _c + 17, -(6 + 4 * (_k - 1)), "iss", f"n-ro {_k}, printed {16 * (_k - 1) + 1}–{16 * _k}"),
+        (_c + 18, _c + 19, None, "?", f"n-ro {_k}: the back covers (advertisements), unnumbered")]
+SEGMENTS["Danlando"].append((145, 145, None, "?", "the back board of the binding"))
 
 SPREADS = {"338579940-Historio-de-La-Lingvo-Esperanto-Edmond-Privat":
            "check 2 of the page map, 2026-10-08 (b01/033): PDF page 121 shows printed pages 140 and 141"}
@@ -711,6 +743,10 @@ if __name__ == "__main__":
     ap.add_argument("--out"); ap.add_argument("--items"); ap.add_argument("--n", type=int, default=60)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--preferred", action="store_true", help="read each page's PREFERRED reading (ocr-preferred/)")
+    ap.add_argument("--items-file", help="the items named in this file (one a line), exactly: the --items pattern made "
+                    "from them (2026-10-29: in place of the run sheet's `python3 -c` pattern)")
     a = ap.parse_args()
+    if a.items_file:
+        a.items = "^(" + "|".join(re.escape(l.strip()) for l in open(a.items_file, encoding="utf-8") if l.strip()) + ")$"
     PREFERRED = a.preferred
     {"scan": scan, "simulate": simulate, "simulate-last": simulate_last, "map": page_map}[a.mode](a)

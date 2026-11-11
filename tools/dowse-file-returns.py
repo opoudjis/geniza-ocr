@@ -2,7 +2,9 @@
 """File a batch of readers' returns with tools/file-return.py (made a tool 2026-10-14, from the stage-1 helper
 file_done.sh: a stage runs on approved tools).
 
-    tools/dowse-file-returns.py <agents.tsv> [--note TEXT]
+    tools/dowse-file-returns.py <agents.tsv> [--note TEXT] [--quiet]
+
+--quiet: only the parts joined, filed or refused, then «N already filed» (Miles, 2026-11-10).
 
 agents.tsv: one reader a line, tab-separated: <agent id> <destination under geniza/> [<note>]. A line starting «#» is
 skipped; a destination that exists is skipped (already filed). Prints one line a reader: filed, already there, or why
@@ -35,20 +37,28 @@ def join_pieces(path, note):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("agents"); ap.add_argument("--note", default="Filed by Ezri")
+    # --quiet (2026-11-10, Miles: a table rebuilt from many runs printed a line for every part, and a redirect to a log
+    # raises an approval box): the «already filed» lines left out, their count printed at the end; every part joined,
+    # filed or refused still printed
+    ap.add_argument("--quiet", action="store_true", help="print only the parts joined, filed or refused, and a count of those already filed")
     a = ap.parse_args()
+    already = 0
     for l in open(a.agents, encoding="utf-8"):
         if not l.strip() or l.startswith("#"): continue
         parts = l.rstrip("\n").split("\t")
         aid, dest = parts[0], parts[1]; note = parts[2] if len(parts) > 2 else a.note
         path = os.path.join(G, dest.removeprefix("geniza/"))
         if os.path.exists(path):
-            print(f"{dest}: already filed"); continue
+            already += 1
+            if not a.quiet: print(f"{dest}: already filed")
+            continue
         j = join_pieces(path, f"{a.note}; {parts[2]}" if len(parts) > 2 else a.note)
         if j is not None:
             print(f"{dest}: {j}"); continue
         r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "file-return.py"), "--note", note, f"agent:{aid}={dest}"], capture_output=True, text=True)
         out = (r.stdout + r.stderr).strip().split("\n")
         print(f"{dest}: {out[-1][:200] if out else '(no output)'}")
+    if a.quiet: print(f"{already} already filed")
 
 if __name__ == "__main__":
     main()

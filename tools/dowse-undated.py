@@ -25,6 +25,8 @@ undated-page-<tag>.md, for a look at the page. --skip drops items, --set N=VALUE
 of the DATO items, before --write). Without --write it prints only. Prints the number of lines the reassembly should
 change, to check against git diff --numstat. Ezri, 2026-10-15."""
 import argparse, csv, glob, importlib.util, json, os, re, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import factline as FLN   # the source's words left out of a trigger (2026-10-28)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G = os.path.join(ROOT, "published", "heterophony-resources", "geniza")
 TEMPLATE = os.path.join(G, "ocr", "method", "DOWSE-TEMPLATE-UNDATED-BRIEF-EO-2026-10-15.md")
@@ -57,12 +59,35 @@ def fields(line):
     i = next((k for k, x in enumerate(f) if THEME.match(x.strip())), None)
     return (f[i - 3].strip(), f[i - 2].strip(), f[i - 1].strip()) if i and i >= 3 else None
 
+def no_lines(loc):
+    """A locator without its line numbers («…, PDF 13 (prese 27), l. 1311» → «…, PDF 13 (prese 27)»)."""
+    return re.sub(r", l\. ?\d+", "", loc)
+
+class Kept(dict):
+    """{(locator, anchor): verdict}, sought by the page when the line number has moved (2026-11-04: a recupel moves a
+    page's line numbers, the ÖNB footer stripped from the texts, and 94 of R6's 132 PAĜO rows no longer met their lines,
+    so the page look found none of them and a plain prep would have asked them again): a key not found is sought by its
+    locator without the line numbers and its anchor, when one verdict stands there; as `apply`'s hits() does."""
+    def __init__(self, rows):
+        super().__init__(rows); bp = {}
+        for (loc, anchor), v in self.items(): bp.setdefault((no_lines(loc), anchor), set()).add(v)
+        self.by_page = {k: next(iter(v)) for k, v in bp.items() if len(v) == 1}
+    def key_of(self, k):
+        return k if dict.__contains__(self, k) else ((no_lines(k[0]), k[1]) if (no_lines(k[0]), k[1]) in self.by_page else None)
+    def get(self, k, d=None):
+        if dict.__contains__(self, k): return self[k]
+        return self.by_page.get((no_lines(k[0]), k[1]), d)
+    def __contains__(self, k):
+        return self.key_of(k) is not None
+
 def kept(D):
     """-> {(locator, anchor): the last verdict} of UNDATED-KEPT.tsv (a PAĜO line later ruled RESTU reads RESTU)."""
     p = os.path.join(D, "UNDATED-KEPT.tsv")
-    if not os.path.exists(p): return {}
-    return {(r[0], r[1]): r[3] for r in csv.reader((l for l in open(p, encoding="utf-8") if not l.startswith("#")), delimiter="\t")
-            if r and r[0] != "locator"}
+    if not os.path.exists(p): return Kept({})
+    # (unquoted: an anchor opening on a typed «"» swallowed its row, the Tutmonda prose's «" Krom tio …», 2026-11-01)
+    return Kept({(r[0], r[1]): r[3] for r in csv.reader((l for l in open(p, encoding="utf-8") if not l.startswith("#")), delimiter="\t",
+                                                        quoting=csv.QUOTE_NONE)
+                 if r and r[0] != "locator"})
 
 REASK = ("**Por ĉi tiuj linioj (la dua demando, 2026-10-26):** ĉiu el ili jam estis legita unu- aŭ dufoje, kaj la respondo "
          "estis dato per vortoj («merkrede matene», «post kelkaj semajnoj», «la 2-an (matene)»), kiun la iloj ne povas legi. "
@@ -190,7 +215,7 @@ def owed(a):
         for r in with_sen_dato(s, [r for r in rows if r[0] == f"{s}-dowse.md"]):
             if not (fl := fields(r[3])) or k.get((fl[2], fl[1])) != "PAĜO": continue
             reason, tag = why.get((fl[2], fl[1]), ("", ""))
-            flag = "requested" if loc_pages(fl[2]) & vr else "ocr?" if OCR_WORDS.search(reason) else ""
+            flag = "requested" if loc_pages(fl[2]) & vr else "ocr?" if OCR_WORDS.search(FLN.noquotes(reason)) else ""   # audit 42
             out.append([s, fl[2], fl[1], tag, flag, reason, r[3]])
             c = n.setdefault(s, [0, 0, 0]); c[0] += 1; c[1] += flag == "ocr?"; c[2] += flag == "requested"
     for s, (t, f, q) in n.items(): print(f"  {s}: {t} owed, {f} naming OCR damage, {q} already requested")
@@ -215,19 +240,26 @@ def line_texts(rows_):
     source_texts() takes the texts of the latest stage brief, and since the per-reader briefs (2026-10-18) a brief names
     only its own reader's texts, so the page look was given two 1904 issues for lines of 1904 and 1905. Here each item
     a line cites, by its permanent key, with its own text file (OCR-ITEM-TABLE.tsv: key → item → the preferred text,
-    else the born-digital one): «‹key›: `‹path›`»."""
+    else the born-digital one): «‹key›: `‹path›`». A text the readers read numbered (2026-11-05, tier 1: «¶ N, l. M» names
+    the numbered copy, whose lines and ¶ marks the raw text lacks) by the copy its source's brief-config.json names."""
     k2n = {}
     with open(os.path.join(G, "OCR-ITEM-TABLE.tsv"), encoding="utf-8") as fh:
         for r in csv.DictReader((l for l in fh if not l.startswith("#")), delimiter="\t"):
             if (r.get("key") or "").strip(): k2n[r["key"].strip()] = r["item"]
+    numbered = {}
+    for src in {r[0][:-len("-dowse.md")] for r in rows_ if r[0].endswith("-dowse.md")}:
+        cp = os.path.join(G, "dowse", src, "brief-config.json")
+        if not os.path.exists(cp): continue
+        for t in json.load(open(cp, encoding="utf-8")).get("texts") or []:
+            if t.endswith(".numbered.txt"): numbered[os.path.basename(t)[:-len(".numbered.txt")]] = os.path.join(G, t)
     out = {}
     for r in rows_:
         fl = fields(r[3])
         if not fl: continue
         for p in fl[2].split("; "):
             key = p.split(",")[0].strip(); item = k2n.get(key, key)
-            path = next((x for x in (os.path.join(G, "sources", "ocr-preferred", item + ".txt"),
-                                     os.path.join(G, "sources", "born-digital-text", item + ".txt")) if os.path.exists(x)), None)
+            path = next((x for x in (numbered.get(item), os.path.join(G, "sources", "ocr-preferred", item + ".txt"),
+                                     os.path.join(G, "sources", "born-digital-text", item + ".txt")) if x and os.path.exists(x)), None)
             if path: out[key] = path
     return [f"«{k}»: `{v}`" for k, v in sorted(out.items())]
 
@@ -260,7 +292,8 @@ def prep(a):
             kp = os.path.join(D, "UNDATED-KEPT.tsv")
             tagged = {(r[0], r[1]) for r in csv.reader((l for l in open(kp, encoding="utf-8") if not l.startswith("#")), delimiter="\t")
                       if len(r) > 5 and r[3] == "PAĜO" and r[5].startswith(a.kept_tag)}
-            todo = [r for r in todo if (fl := fields(r[3])) and (fl[2], fl[1]) in tagged]
+            tagged |= {(no_lines(x), y) for x, y in tagged}   # a line number moved since (Kept, 2026-11-04)
+            todo = [r for r in todo if (fl := fields(r[3])) and ((fl[2], fl[1]) in tagged or (no_lines(fl[2]), fl[1]) in tagged)]
         print(f"{len(todo)} lines of {a.source} sent to the page (UNDATED-KEPT.tsv)")
         if not todo: print("nothing for the page"); return
     else:
@@ -376,7 +409,7 @@ def apply(a):
     # D4b (2026-10-26): a page look's PAĜO that names OCR damage goes to Miles for vision; the check that it has
     vr = vision_requested()
     for n, loc, why, _ in page:
-        if OCR_WORDS.search(why) and not loc_pages(loc) & vr:
+        if OCR_WORDS.search(FLN.noquotes(why)) and not loc_pages(loc) & vr:   # the reader's words, not a quotation (audit 42)
             print(f"  ⚠ OCR DAMAGE, NOT YET IN ocr/VISION-REQUESTS.tsv (runbook D4b): item {n}, {loc}")
     for n, why in hand: print(f"  ⚠ HAND {n}: {why}")
     if not a.write: print("(dry run: nothing written; --write to write)"); return

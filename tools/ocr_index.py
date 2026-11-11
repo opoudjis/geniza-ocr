@@ -174,6 +174,20 @@ def _prefilter(idx, kind, lens, targets):
     return keep
 
 
+def match_words(f, idx):
+    """{form: why}: the word forms of idx that one form of a name matches, the first step of match() below on its own, for
+    the stored index (tools/ocr-index-store.py, 2026-11-07): the result depends only on the name's form and the word's, so
+    it can be kept. The prefilter's forms need no walk through _cands, which is the same forms in another order."""
+    targets = NS.name_targets(f)
+    lens = _lengths(targets)
+    keep = _prefilter(idx, "w", lens, targets)
+    out = {}
+    for form in (keep if keep is not None else _cands(idx, "w", lens)):
+        w = next((why for tg, why, c in targets if NS.close(form, tg, c)), None)
+        if w is not None: out[form] = w
+    return out
+
+
 def match(name, idx):
     """[(page, how, as read)] — what find(name, page text) returns, over every page of the indexed text."""
     out, done = [], set()

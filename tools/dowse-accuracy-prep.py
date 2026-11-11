@@ -2,7 +2,7 @@
 """The accuracy check's preparation, so that its reader reads passages, not the whole source (the editor, 2026-10-14:
 , after the Manders check read the whole book, 130,326 tokens for 40 lines).
 
-    tools/dowse-accuracy-prep.py <source> [--n 40] [--konkludita 10] [--seed N] [--date YYYY-MM-DD] [--window 120] [--redowsed TAG]
+    tools/dowse-accuracy-prep.py <source> [--n 40] [--konkludita 10] [--seed N] [--date YYYY-MM-DD] [--window 120] [--redowsed TAG | --from-returns TAG]
 
 (--konkludita K: up to K more lines whose date the assembler inferred from the issue, ⟦la dato de la numero,
 konkludita⟧, numbered after the sample and each put to the reader under the brief's date rule 6; 2026-10-24.)
@@ -19,17 +19,34 @@ The reader then judges B (the fact as the source says it) and E (the kind) for e
 notes flag them. Ezri, 2026-10-14."""
 import argparse, datetime, importlib.util, os, random, re, sys
 from collections import defaultdict
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import factline as FL   # a line's own fields, the source's words left out (2026-10-28)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G = os.path.join(ROOT, "published", "heterophony-resources", "geniza")
 YEAR = re.compile(r"(?<!\d)(1[6-9]\d\d|20\d\d)(?!\d)")   # «1907b», a cited work's year, counts (2026-10-14)
-PAGECAP = 600   # words of a whole page given when the anchor is on none of the line's pages
+PAGECAP = 2000  # words of a whole page given when the anchor is on none of the line's pages (600 until 2026-11-04: a
+                # Belga page is about 950 words, and two anchors past word 600 were judged «not on the page»)
 
 def load(name, file):
     spec = importlib.util.spec_from_file_location(name, os.path.join(ROOT, "tools", file))
     m = importlib.util.module_from_spec(spec); sys.argv, saved = ["x"], sys.argv
     spec.loader.exec_module(m); sys.argv = saved
     return m
+
+def is_unpaged(item):
+    """A born-digital text without «=== page N ===», which item_pages reads by paragraphs (2026-11-01)."""
+    if os.path.exists(os.path.join(G, "sources", "ocr-preferred", item + ".txt")): return False
+    b = os.path.join(G, "sources", "born-digital-text", item + ".txt")
+    return os.path.exists(b) and not re.search(r"^=== page \d+ ===", open(b, encoding="utf-8").read(), re.M)
+
+def numbered_pages(item):
+    """A paragraph-numbered copy (sources/ocr-work/<item>.numbered.txt, «=== ¶ N ===»), which the harvest takes as its
+    item: its ¶ as pages (2026-11-07, Privat's Vivo: item_pages knows no «.numbered», and none of the 40 anchors was found)."""
+    p = os.path.join(G, "sources", "ocr-work", item + ".txt")
+    if not item.endswith(".numbered") or not os.path.exists(p): return None
+    parts = re.split(r"^=== ¶ (\d+) ===\s*$", open(p, encoding="utf-8").read(), flags=re.M)
+    return {int(parts[i]): parts[i + 1].split() for i in range(1, len(parts), 2)}
 
 def roster_forms(path):
     """Roster label (a profile stem) -> its search forms, lower-cased and normalised by the caller."""
@@ -49,6 +66,7 @@ def main():
     ap.add_argument("--facts", default=None, help="draw from this facts file instead (a test against an earlier version)")
     ap.add_argument("--konkludita", type=int, default=10, help="up to K more lines whose date was inferred from the issue (default 10)")
     ap.add_argument("--redowsed", default=None, metavar="TAG", help="draw only from the lines on the pages this tag redowsed (R6)")
+    ap.add_argument("--from-returns", default=None, metavar="TAG", help="draw only from the lines this tag's returns wrote (R6 of an extracts run)")
     a = ap.parse_args()
     seed = a.seed if a.seed is not None else int(a.date.replace("-", ""))
     sample_p = os.path.join(a.outdir or os.path.join(G, "dowse", a.source), f"accuracy-sample-{a.date}.md")
@@ -71,6 +89,22 @@ def main():
         L = [l for l in L if {(hf.item_key(m.group(1).strip()), int(m.group(2)))
                               for m in re.finditer(r"(?:^|; | · )([^·;]+?), PDF (\d+)\b", l)} & rp]
         if not L: sys.exit(f"refusing: no line of {a.source} cites a page redowsed by {a.redowsed}")
+    # --from-returns TAG (2026-11-03; the editor, on Rondiranto's sample): the population is the lines
+    # the tag's returns wrote, for a run that redowsed no whole page (the extracts run of redowse-pages.py prep
+    # --other-readings writes no «redowsed_pages»); a line is the return's by its NAME, its kind and its fact, which the
+    # assembler copies unchanged (the date, the anchor's «» and the locator it rewrites)
+    if a.from_returns:
+        import glob
+        def key(l):
+            f = l.split(" · ")
+            m = re.match(r"^- \$\$\$ (.+?) \$\$\$", l)
+            return (m.group(1), f[1].strip(), f[2].strip()) if m and len(f) > 2 else None
+        rf = [f for f in glob.glob(os.path.join(G, "dowse", a.source, f"facts-return-{a.from_returns}-*.md"))
+              if not re.search(r"-p\d+\.md$", f)]
+        mine = {key(l) for f in rf for l in open(f, encoding="utf-8") if l.startswith("- $$$")} - {None}
+        L = [l for l in L if key(l) in mine]
+        print(f"{len(rf)} returns of {a.from_returns}: {len(mine)} lines; {len(L)} of them in the facts file")
+        if not L: sys.exit(f"refusing: no line of {a.source} is one {a.from_returns}'s returns wrote")
     pick =sorted(random.Random(seed).sample(range(len(L)), min(a.n, len(L))))
     # THE «KONKLUDITA» LINES (2026-10-24; the editor, on the dates the tool infers from the issue
     #): up to --konkludita more lines, seeded, of
@@ -87,13 +121,22 @@ def main():
         # Every locator of the line, not only the first (2026-10-14, the Neves check: an anchor quoted from the Esperanto
         # edition was sought only in the Ido one, and the top of that page, another text, was given as the passage).
         segs = hf.segments(fact, last=True); words = max(segs, key=len) if segs else []
-        nw = [fid.norm(w) for w in words]
+        # normalised as the harvest does, the whole then split (2026-11-04, Belga 1906–1914's lines 26 and 35): word by
+        # word, «›» and «:» became empty words that no page holds, and «La 29an › Fino Guilliaume» was never found
+        nw = fid.norm(" ".join(words)).split()
         locs = []
         for m in hf.locators(src):
             item = m.group("item").strip(); page = int(m.group("pdf") or m.group("para"))
-            if item not in cache: cache[item] = hf.item_pages(item, fid)
+            if item not in cache: cache[item] = hf.item_pages(item, fid) or numbered_pages(item)
             pages = cache[item] or {}
             hit = fid.find(pages, page, nw) if pages and nw else None
+            # A BORN-DIGITAL TEXT WITHOUT PAGES, CITED «PDF N, l. K» (2026-11-01, the Russian Adresaro's check: read as
+            # paragraphs, «PDF 1» was its heading, and all 40 passages were «=== section 1 … ===» alone): the anchor
+            # sought in the whole text read as one page, so that its window holds the neighbouring entries and the heading
+            if not hit and pages and nw and is_unpaged(item):
+                if (item, "whole") not in cache: cache[(item, "whole")] = {1: [w for q in sorted(pages) for w in pages[q]]}
+                whole = cache[(item, "whole")]; hit = fid.find(whole, 1, nw)
+                if hit: pages, page = whole, 1
             locs.append((item, page, pages, hit))
         found = [x for x in locs if x[3]]
         cuts = []   # (item, page, how, words)
@@ -103,7 +146,7 @@ def main():
             rel = i / max(1, len(toks))
             # the other editions only where the line is about the copies' differences: elsewhere they repeat the same
             # passage and double the checker's reading (the test of 2026-10-14: 50k → 94k characters for Neves)
-            others = [x for x in locs if x is not found[0]] if "diferenco inter la kopioj" in line else []
+            others = [x for x in locs if x is not found[0]] if "diferenco inter la kopioj" in FL.ours(line) else []   # audit 36
             for it2, pg2, pages2, hit2 in others:
                 if hit2:
                     q, j = hit2[0], hit2[1]; t2 = pages2[q]
@@ -127,7 +170,7 @@ def main():
         if n in extra:
             notes.append("D ? la dato konkludita el la numero («dum aŭ antaŭ …», plano «dum aŭ post …☞»): juĝu, laŭ regulo 6")
             flags["D"] += 1; flags["K"] += 1
-        elif ly and not (ly & py) and not re.search(r"kalkulite|laŭ ¶|laŭ PDF", line):
+        elif ly and not (ly & py) and not re.search(r"kalkulite|laŭ ¶|laŭ PDF", FL.ours(line)):   # audit 36
             notes.append(f"D ? la jaro {', '.join(sorted(ly))} ne en la pasaĝo: juĝu"); flags["D"] += 1
         elif not ly and py and "sen dato" in date:
             notes.append(f"D ? sen dato, sed la pasaĝo nomas {', '.join(sorted(py))}: juĝu"); flags["D"] += 1

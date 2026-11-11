@@ -243,7 +243,8 @@ def file_pair(pair, a, note):
 # checks (format 4: the kind field and its list, then the format-3 line through parse() and strict()), so a malformed
 # reader shows the moment it is filed, not after every reader of the source is assembled and `harvest-facts.py --check`
 # refuses the build. The return is filed all the same (it is the record); the pair counts as refused (exit 1).
-# --lines FILE … checks returns already filed, and writes nothing.
+# --lines FILE … checks returns already filed, and writes nothing. With --fixes, a line that a «replace_lines» entry of
+# its folder's facts-config.json keys (for that return) is checked as the entry gives it (2026-11-11).
 _HF = []
 def _hf():
     if not _HF:
@@ -266,12 +267,24 @@ def pages_of(dest):
     texts = json.loads(cfg.read_text(encoding="utf-8")).get("texts", []) if cfg.is_file() else []
     return pf.read_text(encoding="utf-8").split("\n"), (Path(texts[0]).stem if len(texts) == 1 else "")
 
-def line_faults(body, pages=None, item=""):
-    """Every «- $$$» line of a return that the harvest would refuse: [«line N: why · the line's start»]."""
+FIXED = []   # --fixes: the lines checked in the form a «replace_lines» entry gives them, counted
+def line_faults(body, pages=None, item="", fixes=(), ret=""):
+    """Every «- $$$» line of a return that the harvest would refuse: [«line N: why · the line's start»]. FIXES: the
+    «replace_lines» entries of the source's facts-config.json (--fixes, 2026-11-11): a line one of them keys, for this
+    return RET, is checked as the entry gives it, since the assembler takes that line instead (the chain of 2026-11-11
+    stopped at 6b on lines already fixed in the settings)."""
     hf, kinds = _hf(); out = []
     for n, l in enumerate(body.split("\n"), 1):
         if not l.startswith("- $$$"): continue
+        # a line its legilo withdrew («- $$$ BARCAROLA $$$ — forigita», 2026-11-11): the assembler leaves it out as
+        # unreadable, so it is no fault here (the dress runbook: a 6b fault on a line left out anyway)
+        if re.match(r"^- \$\$\$ .+? \$\$\$\s*[—–-]+\s*(?:forigita|nuligita|forstrekita)\.?\s*$", l): continue
         l = hf.expand_lean(l, pages, item)        # the lean brief's locator, from the reader's pages file (2026-10-18)
+        mine =[rl for rl in fixes if isinstance(rl, list) and len(rl) > 1 and (len(rl) < 3 or rl[2] == ret)]
+        if mine:
+            fl = hf.form_repair(l)   # once a line, not once a fix (the first run over 448 fixes took over ten minutes)
+            rl = next((rl for rl in mine if rl[0] in fl), None)
+            if rl: l = rl[1]; FIXED.append(n)
         l3, k = hf.take_kind(hf.form_repair(l))   # the cut brief's two form faults are the assembler's to repair (2026-10-17)
         why = "no kind field «{…}» after the date (facts format 4)" if k is None else hf.kind_problem(k, kinds)
         if not why:
@@ -343,6 +356,32 @@ def timing(path):
             "calls": len(per), "out": s("output_tokens"), "in": s("input_tokens"),
             "cw": s("cache_creation_input_tokens"), "cr": s("cache_read_input_tokens"), "model": model}
 
+def calls_report(aids):
+    """`--calls <agent id> …`: each call of a reader, its time, the gap since the call before, its output, cache written
+    and cache read, and the cache's lifetime where the record names it (the Devjatnin test, 2026-10-30: the cache written
+    rose by half when the readers wrote in pieces; a whole context written again after a long pause would show here)."""
+    import datetime
+    for aid in aids:
+        hits = list(PROJECT.glob(f"*/subagents/**/agent-{aid}.jsonl"))
+        if len(hits) != 1: print(f"{aid}: {len(hits)} transcripts"); continue
+        per, when = {}, {}
+        for raw in open(hits[0], encoding="utf-8"):
+            try: d = json.loads(raw)
+            except json.JSONDecodeError: continue
+            msg = d.get("message") if isinstance(d, dict) else None
+            if isinstance(msg, dict) and d.get("type") == "assistant" and isinstance(msg.get("usage"), dict):
+                per[msg.get("id")] = msg["usage"]
+                when.setdefault(msg.get("id"), datetime.datetime.fromisoformat(d["timestamp"].replace("Z", "+00:00")))
+        print(f"{aid}: {len(per)} calls\n  {'time':<9} {'gap s':>6} {'output':>7} {'cache w':>8} {'cache r':>8}  lifetime of the write")
+        prev = None
+        for k, u in per.items():
+            t = when[k]; gap = (t - prev).total_seconds() if prev else 0; prev = t
+            cc = u.get("cache_creation") or {}
+            life = ", ".join(f"{x.replace('ephemeral_', '').replace('_input_tokens', '')} {v:,}" for x, v in cc.items() if v)
+            print(f"  {t.strftime('%H:%M:%S'):<9} {gap:>6.0f} {int(u.get('output_tokens') or 0):>7,} "
+                  f"{int(u.get('cache_creation_input_tokens') or 0):>8,} {int(u.get('cache_read_input_tokens') or 0):>8,}  {life}")
+    return 0
+
 def timing_report(tsvs):
     rows, seen = [], set()
     for tsv in tsvs:
@@ -382,9 +421,12 @@ def timing_report(tsvs):
 if __name__ == "__main__":
     if "--timing" in sys.argv:
         sys.exit(timing_report(sys.argv[sys.argv.index("--timing") + 1:]))
+    if "--calls" in sys.argv:
+        sys.exit(calls_report(sys.argv[sys.argv.index("--calls") + 1:]))
     if "--lines" in sys.argv:
         bad = 0; TOT = [0, 0, 0, 0]   # returns, faults, printed-page warnings, returns warned
         for f in sys.argv[sys.argv.index("--lines") + 1:]:
+            if f.startswith("--"): continue   # an option given after the files (--fixes, --quiet)
             p = (GENIZA / f[len("geniza/"):]) if f.startswith("geniza/") else Path(f)
             SHORT_ANCHORS.clear()
             if "--show" in sys.argv:   # each line as the assembler will take it: expanded and repaired (2026-10-18)
@@ -396,7 +438,13 @@ if __name__ == "__main__":
                     if "--show-all" in sys.argv or "laŭ la ankro⟧" in x or "la ankro ne troviĝis" in x: print(x)
                 print(f"{p.name}: {n} lines; the line number moved by the anchor {moved}; the anchor not found at its line {unfound}")
                 continue
-            errs = line_faults(p.read_text(encoding="utf-8"), *pages_of(p))
+            fx = []
+            if "--fixes" in sys.argv and (p.parent / "facts-config.json").is_file():
+                import json
+                fx = json.loads((p.parent / "facts-config.json").read_text(encoding="utf-8")).get("replace_lines", [])
+            FIXED.clear()
+            errs = line_faults(p.read_text(encoding="utf-8"), *pages_of(p), fixes=fx, ret=p.name)
+            if FIXED and "--quiet" not in sys.argv: print(f"{p.name}: {len(FIXED)} line(s) checked as the settings' «replace_lines» give them")
             pw = printed_pages(p.read_text(encoding="utf-8"), *pages_of(p))
             TOT[0] += 1; TOT[1] += len(errs); TOT[2] += len(pw); TOT[3] += bool(pw)
             if "--quiet" in sys.argv and not errs and not pw: continue   # only the files with something to say (2026-10-18)

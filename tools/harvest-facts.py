@@ -38,10 +38,12 @@ import os, re, sys, glob, csv, json, subprocess, unicodedata
 from collections import defaultdict, Counter
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import date_vocab                # the date field's vocabulary and its EDTF (2026-10-12)
+import factline as FL           # a fact line's fields; triggers kept out of the source's words (2026-10-28)
+import names_register           # the register's spellings: the ALIASES table (2026-10-31)
 
 # For the context dates (the Fable review's finding 4, 2026-10-12): month names; a fact that states a state, not an act
 # («[ĝenerala]» wanted); the items not told in the order of their pages, from profiles/CHRONOLOGY.tsv
-MONTHS = r"(?:januar|februar|mart|april|maj|juni|juli|aŭgust|septembr|oktobr|novembr|decembr)on?"
+MONTHS = MONTHS_RX = r"(?:januar|februar|mart|april|maj|juni|juli|aŭgust|septembr|oktobr|novembr|decembr)on?"
 STATE = re.compile(r"\s*(?:\([^)]*\)\s*)?(?:(?:Li|Ŝi|Ĝi|Ili|\w+) )?(?:estis|estas) (?!\w+(?:it|int)a?j?n?\b)", re.I)   # «estis elektita / mortinta» are events
 # An office held is not a state: undated, it is «[sen dato]» (the editor, 2026-10-12); the states check spares it (2026-10-13).
 OFFICE = re.compile(r"(?:unu el (?:la )?(?:\w+ )?|la |\w+ )?(?:honora |vic-?)?"
@@ -249,57 +251,10 @@ def parse(line):
 # Fix in two parts: fold diacritics before slugging (mechanical, safe), and apply an EXPLICIT alias
 # table (never a heuristic). The table is deliberately conservative -- THE POSTNIKOVS ARE DIFFERENT
 # MEN and must never be merged, which is exactly why prefix-matching or fuzzy-joining is refused here.
-ALIASES = {
-    "BEAUFRONT": "DE BEAUFRONT", "DE-BEAUFRONT": "DE BEAUFRONT",   # hyphen form used by some scouts (2026-09-12)
-    "SEBERT": "SÉBERT",
-    "WAHL": "DE WAHL", "DE-WAHL": "DE WAHL",   # hyphen form slugged to the same file and clobbered it (Brief 4 scout, 2026-09-12)
-    "DOMBROVSKI": "DAMBRAUSKAS", "DOMBROVSKIJ": "DAMBRAUSKAS",
-    "DOMBROWSKI": "DAMBRAUSKAS", "JAKŠTAS": "DAMBRAUSKAS", "DABRAUSKAS": "DAMBRAUSKAS",
-    "KABE": "BEIN", "BEIN/KABE": "BEIN",
-    "SAUSSURE": "DE SAUSSURE",
-    "ĈAJKOVSKAJA": "CHAJKOVSKAJA", "CAJKOVSKAJA": "CHAJKOVSKAJA",
-    "KORĴENKOV": "KORZHENKOV", "KORJENKOV": "KORZHENKOV",
-    "MERAY": "MÉRAY", "MOBUSZ": "MÖBUSZ", "KUNZLI": "KÜNZLI",
-    "WASNIEWSKI": "WAŚNIEWSKI", "ITO": "LUDOVIKITO", "ITÔ": "LUDOVIKITO",
-    "SATUNOVSKI": "ŜATUNOVSKIJ", "SATUNOVSKIJ": "ŜATUNOVSKIJ", "ŜATUNOVSKI": "ŜATUNOVSKIJ", "RUBLEV": "RUBLOV",   # two Satunovskij profiles found 2026-09-13; the 1923 page prints Ŝatunovskij; Rublev = the S. Rublov of OV III.5
-    "TWOMBLY": "TWOMBLEY",   # John Fogg Twombly of Brookline; the profile stem is twombley (2026-09-14)
-    "ULIANOV": "ULYANOV",   # Kharkiv Ido lexicographer, two spellings (Brief 14, 2026-09-14)
-    "RIC BERGER": "BERGER",
-    "WALRISAUN": "WALTISBÜHL",   # Neves's facsimile of the Progresido notice, OCR «Anton WaLrisaun, 36, Bahnhofstrasse Zurich»; Progreso 1910-02 prints «Anton WALTISBUHL, 36, Bahnhofstrasse Zurich» (profiles/waltisbuhl.md); the editor 2026-10-14 → approved (identifications live outside the lines)
-    # the redowse's NOMOs, 2026-10-15 (the editor; dowse/<source>/align-names-2026-10-15*.md; one profile each, the
-    # twins had two): Itô Kanzi is Ludovikito (eo.wikipedia «Ito Kanzi», saved in sources/ludovikito-inventory-2026-09-14/:
-    # «en la Esperanto-movado konata kiel Ludovikito»); Neves's «P. ALBERG, Surbrunsgatan 97, Stokholm» is the Stockholm
-    # AHLBERG; Korĵenkov's «hispana pastro Antonio Guinard» is EdE 1933's «Guinart (ginar) Antonio, hispano: pastro
-    # katolika»; Korĵenkov's «germanino Marie Henkel», poet with Privat, Schulhof and Belmont, is Marie Hankel (Dresden,
-    # «Sableroj»); «Julio Mangada Rosenorn» (Korĵenkov PDF 116) is the «kolonelo Julio Mangada» of PDF 89
-    "ITÔ KANZI": "LUDOVIKITO", "ITO KANZI": "LUDOVIKITO", "ALBERG": "AHLBERG", "P. ALBERG": "AHLBERG", "GUINARD": "GUINART",
-    "HENKEL": "HANKEL", "MANGADA ROSENORN": "MANGADA", "MANGADA ROSENÖRN": "MANGADA",
-    # Auguste Capé, ps. Auguste Montrosier (EdE 1933: «Capé (kape) Auguste, (ps. Auguste Montrosier), franco, kapitano»;
-    # Ruslanda Esperantisto 1905 n-ro 3-4, PDF 23: «Aŭgusto Cape—Montrosier, … sub la modesta nomo de Alĝera Kapitano
-    # Cape»); the editor, 2026-10-17 23:4x (CAPE and CAPÉ fold to one slug already)
-    "CAPE-MONTROSIER": "CAPÉ", "CAPÉ-MONTROSIER": "CAPÉ", "CAPE MONTROSIER": "CAPÉ", "CAPÉ MONTROSIER": "CAPÉ", "MONTROSIER": "CAPÉ",
-    # Georges Kolowrat, in Russian Kolovrat-Červinskij (Ruslanda Esperantisto 1906 n-ro 11, PDF 24: «Коловрат-Червинский»
-    # for its collaborator; eo.wikipedia «Georges Kolowrat»); 2026-10-18, the walk-through (the editor)
-    # the variant spellings the older roster files keep, which no dowse rename reaches (2026-10-18, found by the homograph
-    # rule of the fact-text listing): Antoni Grabowski in the Russian spelling; the printer of Ruslanda Esperantisto
-    "GRABOVSKI": "GRABOWSKI", "GRABOVSKIJ": "GRABOWSKI", "VEJSBRUT": "WEJSBRUT",
-    "KOLOVRAT": "KOLOWRAT", "KOLOVRAT-ČERVINSKI": "KOLOWRAT", "KOLOVRAT-ĈERVINSKI": "KOLOWRAT", "KOLOVRAT-ČERVINSKIJ": "KOLOWRAT", "KOLOWRAT-ĈERVINSKIJ": "KOLOWRAT",
-    # twins merged 2026-09-20 20:56 (editor; difflib scan of the 949 stems): same person, variant spellings
-    "LA FONTAINE": "LAFONTAINE", "BLUMENTAL": "BLUMENTHAL", "VAN LANGENMEERSCH": "VAN LANGERMEERSCH", "HOUZEAU DE LEHAYE": "HOUZEAU DE LEHAIE",
-    "SEYNAVE": "SEYNAEVE", "S ROSENBERGER": "ROSENBERGER", "ROZENBERGER": "ROSENBERGER", "LEIZEROWICZ": "LEJZEROWICZ", "CHAKHOTIN": "CAHOTIN",
-    "GALLARD": "GALARD", "L'ESPÉRANTISTE": "LESPERANTISTE", "PUJULA I VALLÈS": "PUJULA Y VALLES", "PUJULÀ I VALLÈS": "PUJULA Y VALLES", "PUJULA Y VALLÈS": "PUJULA Y VALLES", "PUJULÀ Y VALLÈS": "PUJULA Y VALLES", "PUJULA": "PUJULA Y VALLES", "P AHLBERG": "AHLBERG", "P. AHLBERG": "AHLBERG", "OSTROVSKI": "OSTROVSKIJ", "SHMURLO": "ŜMURLO", "SZMURLO": "ŜMURLO", "TSCHESCHICHIN": "ČEŠIXIN", "ĈEŜIĤIN": "ČEŠIXIN", "EDGAR DE WAHL": "DE WAHL", "LEO WIENER": "WIENER", "A MATEJKA": "MATEJKA", "OTTO JESPERSEN": "JESPERSEN", "PUJULA I VALLES": "PUJULÀ Y VALLÈS",   # full-name sigils surfaced by the B1 error fix 2026-09-14 (contract: ONE surname per pair); folded, not re-sigilled
-    "EVSTIFEIEFF": "EVSTIFEJEV", "EVSTIFEJEFF": "EVSTIFEJEV", "EVSTIFEEV": "EVSTIFEJEV", "JEVTIFEJEV": "EVSTIFEJEV",   # three profiles for one man found 2026-09-13 (35+8+12 lines); the 1914 «N. O.» censor carries a ❓ qualifier on the line, not a separate key
-    # Brief 16 (2026-09-14): the missing pre-1908 profiles — the spellings the sources use for the new keys (diacritic-only
-    # variants such as SUSSMUTH/SÜSSMUTH, SVACINA/SVAČINA, ROSICKY/ROSICKÝ already fold by slug and need no row)
-    "ANTTILA": "ANTILLA", "ANTTILLA": "ANTILLA",   # EdE «Anttila», the OGE rolls «Antilla», the 1922 list «Anttilla»
-    "FRIDERI": "FRIDORI", "FRIDÖRI": "FRIDORI",   # EdE «Fridöri», the 1922 list «Frideri»
-    "UITTERDYCK": "UITTERDIJK", "SEPULVEDA CUADRA": "SEPÚLVEDA", "SEPULVEDA-CUADRA": "SEPÚLVEDA",
-    "KRESTANOV": "KRESTANOF", "KRESTANOFF": "KRESTANOF", "GUMINSKI": "GUMINSKIJ", "GUMINSKY": "GUMINSKIJ",
-    "POLGAR-POLITZER": "POLGAR", "POLGÁR": "POLGAR", "MIKOŁAJSKI": "MIKOLAJSKI", "SOLOVJOV": "SOLOVJEV",
-    "SHCHELOKOV": "ŜĈELOKOV", "BEIRAKH": "BEJRAĤ", "OREŜKOFF": "OREŜKOV", "ORESHKOV": "OREŜKOV", "ORESKOFF": "OREŜKOV",
-    "TOEROEK": "TÖRÖK", "BUENEMANN": "BÜNEMANN", "OCONNOR": "O'CONNOR", "O’CONNOR": "O'CONNOR",
-    "BREMON": "BREMON Y MASGRAU", "BREMON MASGRAU": "BREMON Y MASGRAU", "COUTO": "COUTO FERNANDES", "SKEEL": "SKEEL-GIÖRLING", "SKEET-GIÖRLING": "SKEEL-GIÖRLING",
-}
+# THE TABLE IS THE NAMES REGISTER'S since 2026-10-31 (the editor, 2026-10-30: to be eliminated before the next
+# harvest): its rows of relation «fact key» whose main form is a NAME alone (tools/names_register.py); the 113 pairs
+# this code held moved there, each with the lines it files and the notes it had here. A new spelling is a register row.
+ALIASES = names_register.aliases()
 
 # SAME-SURNAME PERSONS, 2026-09-14 (editor
 #). The design above stands — one profile per surname, the qualifier on every line — but a
@@ -447,8 +402,14 @@ def bpeape_titles(word):
     if not _BPEAPE:
         p = os.path.join(GEN, "..", "bpeape-proofreading", "sources", "derived", "bpeape-entries.tsv")
         _BPEAPE["all"] = [l.split("\t")[2].strip() for l in open(p, encoding="utf-8").read().split("\n")[1:] if l.count("\t") >= 3] if os.path.exists(p) else []
+        # the titles by their words (2026-11-07: a regular expression over every title for each new word took 75 s of a
+        # harvest): a word of word characters only stands whole in a title just when it is one of the title's runs of them
+        _BPEAPE["words"] = defaultdict(set)
+        for t in _BPEAPE["all"]:
+            for w in re.findall(r"\w+", t): _BPEAPE["words"][w.casefold()].add(t)
     if word not in _BPEAPE:
-        _BPEAPE[word] = sorted({t for t in _BPEAPE["all"] if re.search(rf"\b{re.escape(word)}\b", t, re.I) and t.lower() != word.lower()}, key=len, reverse=True)
+        pool = _BPEAPE["words"].get(word.casefold(), ()) if re.fullmatch(r"\w+", word) else _BPEAPE["all"]
+        _BPEAPE[word] = sorted({t for t in pool if re.search(rf"\b{re.escape(word)}\b", t, re.I) and t.lower() != word.lower()}, key=len, reverse=True)
     return _BPEAPE[word]
 FT_TITLE = re.compile(r"(?:S-ro|Sro|S-ino|Sino|F-ino|D-ro|Dro|Prof\.?|Profesoro|Pastro|Kolonelo|Generalo|Majoro|Kapitano|Leŭtenanto|"
                       r"Sinjoro|Sinjorino|Fraŭlino|Doktoro|Mr\.?|Mrs\.?|Miss|Dr\.?|Rev\.?|Col\.?|Gen\.?|Capt\.?|Hon\.?|Sir|Lady|M\.|Mme\.?|Mlle\.?)\s+$")
@@ -485,7 +446,11 @@ def ft_context(body, nm):
     # THE PERIODICALS' TITLES (the editor, 2026-10-18
     #): an occurrence inside a
     # title of bpeape-entries.tsv that the fact text holds is the periodical, not a person
-    spans = [(t.start(), t.end()) for title in bpeape_titles(nm) for t in _rx(title, re.escape(title), re.I).finditer(body)]
+    # a title is searched only where the text holds it, case folded (2026-11-07: 313 s of a harvest went on searching
+    # titles the text did not hold); the regular expression stays the judge of each match
+    low = body.casefold() if "İ" not in body else None
+    spans = [(t.start(), t.end()) for title in bpeape_titles(nm) if low is None or title.casefold() in low
+             for t in _rx(title, re.escape(title), re.I).finditer(body)]
     for m in _rx(("nm", nm), rf"\b{re.escape(nm)}\b").finditer(body):
         before, after = body[:m.start()], body[m.end():]
         if any(a <= m.start() and m.end() <= b for a, b in spans): cls.add("out"); continue
@@ -708,7 +673,9 @@ def form_repair(line):
     ps0 = line.split(" · ")
     if len(ps0) == 8 and sum(1 for p in ps0[1:-1] if not p.strip()) == 1:
         line = " · ".join(p for i, p in enumerate(ps0) if i == 0 or i == len(ps0) - 1 or p.strip())
-    line = re.sub(r"\((?:sen presa numero|sen numero|prese: sen numero)\)", "(prese sen numero)", line)
+    # in the locator only (after «PDF N» or at a lean locator's start), never in an anchor that prints «(sen numero)»
+    # (the trigger audit of 2026-10-28, item 3)
+    line = re.sub(r"(PDF \d+ |· )\((?:sen presa numero|sen numero|prese: sen numero)\)", r"\1(prese sen numero)", line)
     # the locator with its line run on, as readers of the lean brief wrote it where the source's own note asked for the
     # item (2026-10-18t): «…, PDF 12 l. 10», «…, PDF 28 (prese 100) l. 149» → «…, PDF 12 (prese ?), l. 10»
     line = re.sub(r"(, PDF \d+)(?: (\(prese [^)]*\)))? l\. ?(\d+)(?= · |$)", lambda m: f"{m.group(1)} {m.group(2) or '(prese ?)'}, l. {m.group(3)}", line)
@@ -927,7 +894,13 @@ def issue_date(line, day=False):
 # a year more than one from the item's is an OCR error, the same.
 ISSUE_MONTH = re.compile(r"(?i)\b(?:(januar|februar|mart|april|maj|may|juni|juli|a[uŭû]gust|agost|septembr|oktobr|novembr|decembr)o"
                          r"|(janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[ée]cembre)"
-                         r"|(january|february|march|april|may|june|july|august|september|october|november|december))\b")
+                         r"|(january|february|march|april|may|june|july|august|september|october|november|december)"
+                         r"|(balsebal|balsetel|bals|bal|tel|k[iı]l|fol|lul|m[äa]l|vel|j[öo]l|z[üu]l)ul|([IVXı]{1,4})ul)\b")
+# the Volapük months (2026-11-03, the runbook's «Not built yet» of 2026-11-02): «balul» … «balsetelul», the counting
+# words with «-ul», and the numerals «Iul» … «XIIul» (the OCR's «ı» for «i», «kılul»); counted in the journals' texts
+VO_MONTH = {"bal": 1, "tel": 2, "kil": 3, "fol": 4, "lul": 5, "mäl": 6, "vel": 7, "jöl": 8, "zül": 9, "bals": 10,
+            "balsebal": 11, "balsetel": 12}
+ROMAN_MONTH = {r: i for i, r in enumerate(("I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"), 1)}
 # Amerika Esperantisto's English masthead («Volume 5 June, 1909 Number 5», 2026-10-22)
 EN_MONTH = {m: i for i, m in enumerate(("january", "february", "march", "april", "may", "june", "july", "august",
                                          "september", "october", "november", "december"), 1)}
@@ -944,6 +917,10 @@ def masthead_parse(s):
     if not my: return None
     ms_ = [m for m in mo if m.start() < mo[0].end() + my.start()]     # the months before the year: one, or a double number's two
     def m_(m):
+        if m.group(4):   # (the umlaut the OCR dropped: «malul», «jolul», «zulul»)
+            w = m.group(4).lower().replace("ı", "i")
+            return VO_MONTH.get({"mal": "mäl", "jol": "jöl", "zul": "zül"}.get(w, w))
+        if m.group(5): return ROMAN_MONTH.get(m.group(5).upper().replace("ı", "I"))
         if m.group(3): return EN_MONTH[m.group(3).lower()]
         if m.group(2):
             f = m.group(2).lower()
@@ -952,8 +929,14 @@ def masthead_parse(s):
         return mon("aŭg" + g[3:] if g.startswith("aug") else g)
     a = m_(ms_[0]); b = m_(ms_[-1]) or a
     md = re.search(r"(?i)(?<!\w)([1-9]|[12]\d|3[01])(?:-?a|[\"”'ᵃ.])?\s+(?:de\s+)?$", s[:mo[0].start()])
+    # A NUMBER AFTER «No» IS NOT THE DAY (2026-11-03, Progreso's «No 16. Junio 1909» read as the 16th; on the dowse
+    # sources without «no_day», La Suno Hispana 1906's «No 29 MAJO», 56 lines dated 29 May): «N°», «No», «N-ro», «Nro»,
+    # «Nr.», «Num.» and their OCR forms («N"», «Ne», «N'») before the digits; nor one after «Volume» («Volume 5 June»)
+    if md and re.search(r"(?i)\b(?:N(?:[°ºo0'e\"”]|-?ro|r\.?|um\.?)|Vol(?:ume|\.)?)\.?\s*$", s[:mo[0].start()][:md.start()]): md = None
     return (int(my.group(1)), a, b, int(md.group(1)) if md and a == b else None) if a else None
 
+MONTH3 = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "maj": 5, "may": 5, "jun": 6, "jul": 7, "aŭg": 8, "aug": 8, "sep": 9,
+          "okt": 10, "oct": 10, "nov": 11, "dec": 12}   # a month word in a file's name (name_month, 2026-11-11)
 def mastheads():
     """item -> {PDF page: (year, first month, last month, day) or None}, for the texts of every dowse source whose
     brief-config.json has a «journal» «issue_start»."""
@@ -1052,9 +1035,13 @@ def mastheads():
             # than the OCR's mastheads; a group 3 for a double number («jarkolekto-27-28»)
             mnm = re.search(j["name_month"], stem) if j.get("name_month") else None
             off = j.get("name_offset", {}).get(mnm.group(1)) if mnm and j.get("name_offset") else (0 if mnm else None)
+            # a month written as a word in the name («BelgaEsperantisto_1908_n11_nov», 2026-11-11: the int() of «nov» broke
+            # every harvest's mastheads the moment the brief was written): its number, English or Esperanto
+            def _mn(g):
+                return int(g) if g.isdigit() else MONTH3.get(g.lower()[:3], 0)
             if mnm and off is not None:
-                a = int(mnm.group(2)) + off
-                b = int(mnm.group(3)) + off if mnm.lastindex and mnm.lastindex > 2 and mnm.group(3) else a
+                a = _mn(mnm.group(2)) + off
+                b = _mn(mnm.group(3)) + off if mnm.lastindex and mnm.lastindex > 2 and mnm.group(3) else a
                 if 1 <= a <= b <= 12:
                     for p in dates:
                         # (a masthead whose months hold the name's keeps its reading: a double number, a day)
@@ -1158,7 +1145,7 @@ def issue_contents(src, validate=False):
     low, high = defaultdict(list), defaultdict(list)
     fp = os.path.join(GEN, "profiles", "by-source", f"{src}-dowse.md")
     for l in open(fp, encoding="utf-8"):
-        if not l.startswith("- $$$") or "la dato de la numero" in l: continue
+        if not l.startswith("- $$$") or "⟦la dato de la numero" in l: continue   # our note only (audit 17)
         md = re.search(r"\*\*([^*]+)\*\*", l)
         loc = next((p.strip() for p in l.split(" · ")[2:] if re.match(r"^[\w.-]+, (?:PDF|¶) \d+", p.strip())), None)
         ms = locators(loc) if loc else None
@@ -1364,10 +1351,40 @@ def span_by_kind(line):
     new = f"de {q}{a} ĝis {q}{b}" if k in SPAN_DURATION else f"inter {a} kaj {b}" if k in SPAN_POINT else None
     return m.group(1) + f"**{new}**" + line[m.end(2) + 2:] if new else line
 
+# A FOUNDING IS THE FOUNDER'S (the editor, 2026-11-06, on Fromageot at Beaune and Cart at Rouen; on «Per la klopodoj de Gehet kaj Boulet
+# oni fondis»: agency, approved; on BAYOL hoping that a group could be founded: a hope or plan has a kind of its own already): read here, so the lines already read need no redowse
+# and the rule stands in one place. Agency keeps «fondo»; a talk before a founding is «prelego»; a wish is the plan form; a founding with no link to the head is not his
+FONDO_SELF = re.compile(r"(?<!\boni )\bfondis\b|\bfondas\b|\bfondos\b|\bfondigis\b|\bfondinto|\bfondinta\b|\bkunfond|\bfondita (?:de|far)\b", re.I)
+FONDO_AGENT = re.compile(r"\bklopod|\biniciat|\borganiz|\bzorg|\blabor|\bhelp|\bstar(?:igis|as)\b|\bkre(?:is|inta)\b|\bfonda[jĵ]o\b|\bdank|\bsub (?:la |lia |[ŝs]ia )?(?:gvido|konduko|prezido|direkto)\b|\bper (?:la |lia |[ŝs]ia )?(?:energio|peno|agado)\b|\bpeno\b|\bagado\b|\bfervor|\bdeklaris\b|\bpropono\b|\bmono\b", re.I)     # the editor, 2026-11-06
+FONDO_TALK = re.compile(r"\b(?:post|sekve de|okaze de|rezulte de)\b[^.;]{0,50}\b(?:parolad|preleg|konferenc|kurs)|(?:paroladis|prelegis|faris (?:\w+ ){0,2}(?:parolad|prelegon|konferencon))[^.;]{0,120}\bfondi", re.I)
+FONDO_WISH = re.compile(r"\b(?:(?:esper|dezir|plan|intenc|propon|konsil)(?:as|is|os|us|ante|inte|ita)|volas|volis|povos|povus|devus|devas)\b[^.;]{0,60}\bfond|\bfondota", re.I)
+FONDO_NOT = re.compile(r"\bestas la adreso\b|\badreso de la grupo\b|\bĝia adreso\b|\bneniam\b|\brefutit", re.I)
+def fondo_kind(kind, fact):
+    """The kind field, by the rule above, for a line's fact: unchanged, or «fondo» turned to a plan, a talk, or taken off. An only kind taken off becomes «aperoj» with its object."""
+    if "fondo" not in kind: return kind
+    ps = [p.strip() for p in kind.split(";")]
+    i = next((n for n, p in enumerate(ps) if re.match(r"\+?fondo\b", p)), None)
+    if i is None or "planita" in ps[i]: return kind
+    if FONDO_SELF.search(fact): return kind
+    talk = FONDO_TALK.search(fact)
+    if not talk and FONDO_AGENT.search(fact): return kind
+    obj = ps[i].partition(":")[2].strip()
+    if not talk and FONDO_WISH.search(fact):
+        ps[i] += ", planita" if obj else ": planita"
+        return "; ".join(ps)
+    if not talk and not FONDO_NOT.search(fact): return kind     # the first form, any impersonal founding off, was too harsh (the editor): only an address or a denial now
+    if len(ps) > 1 and any(re.match(r"\+?(?:prelego|ofico|propagando|aperoj)\b", p) for n, p in enumerate(ps) if n != i):
+        del ps[i]
+        ps[0] = ps[0].lstrip("+ ")
+        return "; ".join(ps)
+    ps[i] = ("+" if ps[i].startswith("+") else "") + ("prelego" if talk else "aperoj") + (f": {obj}" if obj else ": fondo")
+    return "; ".join(ps)
+
 def take_kind(line):
     """A format-4 line -> (the format-3 line, the kind field without braces), or (line, None)."""
     m = KINDF.match(line.rstrip())
-    return (m.group(1) + m.group(3), m.group(2).strip()) if m else (line, None)
+    if not m: return (line, None)
+    return (m.group(1) + m.group(3), fondo_kind(m.group(2).strip(), m.group(3).lstrip(" ·").split(" · ")[0]))
 
 def kind_list():
     """The kinds in force: the bold first cells of the table under «The list in force»."""
@@ -1408,6 +1425,20 @@ OBJ_PERSON = re.compile(rf"([{_UP}][{_UP}' \-]+?)(?: \(([^)]{{1,40}})\))?")
 # a roster NAME anywhere in a kind field: words of two or more capitals, joined by a space, hyphen or apostrophe, not
 # inside a lower-case word, with an optional qualifier in brackets («LEMAIRE (René)», «DE BEAUFRONT»)
 NAMED = re.compile(rf"(?<![\w])([{_UP}]{{2,}}(?:(?: |-|'|’)[{_UP}]{{2,}})*)(?![\w])(?: \(([^)]{{1,40}})\))?")
+
+# THE RECLASSIFY READER'S TABLE (tools/smelt_reclass.py, 2026-10-30): (person, by-source file, locator, kind as the
+# copy had it) -> the kind from the named person's side; read once
+_RECLASS = None
+def reclassed(name, frm, src, kind):
+    global _RECLASS
+    if _RECLASS is None:
+        p = os.path.join(GEN, "profiles", "build", "KIND-RECLASS.tsv")
+        _RECLASS = {}
+        if os.path.exists(p):
+            for l in open(p, encoding="utf-8").read().splitlines()[1:]:
+                r = l.split("\t")
+                if len(r) >= 5: _RECLASS[(slug(r[0]), r[1], r[2].strip(), r[3].strip())] = r[4].strip()
+    return _RECLASS.get((slug(name), os.path.basename(frm), src.strip(), kind.strip()), kind)
 
 def anchor_of(fact):
     """The anchor of a format-2-shaped fact (its last «…»), else the fact: the key of «the same line»."""
@@ -1470,7 +1501,7 @@ def hostile_labels(now, refs, every):
         ms = locators(now[j][3]) or []
         if not ms: st["no item"] += 1; continue
         line = every[k][3]
-        dy = re.search(r"derivita[^;)]*?\b(1[6-9]\d\d)\b", line)
+        dy = re.search(r"derivita[^;)]*?\b(1[6-9]\d\d)\b", FL.ours(line))   # our label's year, not the anchor's (audit 5)
         for mm in ms:
             item = mm.group("item").strip()
             v = side.get(item)
@@ -1511,6 +1542,18 @@ def scope_entities():
     rows = [l.rstrip("\n").split("\t") for l in open(p, encoding="utf-8") if not l.startswith("#")]
     return {slug(re.sub(r"\s*\(.*", "", r[0])) for r in rows[1:] if len(r) > 4 and r[1] == "entity" and r[4] == "out"}
 
+SUSPECT_BANNER = "Suspektita misa legaĵo"
+def name_suspects():
+    """The names with no fold target that tools/name-ungarble.py calls garbled or SUSPECT, heads and list names alike
+    (dowse/NAME-SUSPECTS-HEADS.tsv, …-LISTS.tsv; the editor, 2026-10-28 17:4x: a name not profiled is not visible, so
+    they keep their profiles, marked, out of the person count and the smelt): {NAME: [(kind, class, reason, source)]}."""
+    out = defaultdict(list)
+    for p in sorted(glob.glob(os.path.join(GEN, "dowse", "NAME-SUSPECTS-*.tsv"))):
+        rows = [l.rstrip("\n").split("\t") for l in open(p, encoding="utf-8") if not l.startswith("#")]
+        for r in rows[1:]:
+            if len(r) >= 6: out[r[0].strip()].append((r[3], r[4], r[5], r[1]))
+    return out
+
 def out_of_scope(name, qual, OUT):
     """By the register: the surname out (an unqualified row), or this qualifier out (one begins the other)."""
     k, q = slug(name), (qual or "").strip().lower()
@@ -1536,7 +1579,7 @@ def life_guess_drops(people):
         for r in rs:
             kd = KINDS.get((r[-1], r[2], r[1], slug(w)), "")
             k = kd.split(":")[0].strip()
-            if k in ("naskiĝo", "morto") and y(r[0]) and "kopio el" not in r[4]: lives[qual(r)][k].append(y(r[0]))
+            if k in ("naskiĝo", "morto") and y(r[0]) and "⟦kopio el" not in r[4]: lives[qual(r)][k].append(y(r[0]))
         if not lives: continue
         quals = {qual(r) for r in rs} - {None}
         for i, r in enumerate(rs):
@@ -1551,7 +1594,7 @@ def life_guess_drops(people):
             d = r[0]
             # a guess from the page or from a periodical's issue (2026-10-17u: an issue of 1907 says nothing of when a man
             # dead in 1885 acted)
-            if "divene" not in d or not ("laŭ la paĝo" in d or "laŭ la numero" in d) or "kopio el" in r[4]: continue
+            if "divene" not in d or not ("laŭ la paĝo" in d or "laŭ la numero" in d) or "⟦kopio el" in r[4]: continue   # our marker only (audit 6)
             kd = KINDS.get((r[-1], r[2], r[1], slug(w)), "")
             if kd.split(":")[0].strip() in SAYING_KINDS | {"interpreto", "historiografio"}: continue
             lo = re.search(r"(?:≥|ĉ\.)\s*(\d{4})", d); hi = re.search(r"(?:≤|ĉ\.)\s*(\d{4})", d)
@@ -1594,8 +1637,11 @@ def copies(people, tocopy, now):
                     skips["nolines"] += 1; skips["names"][name] += 1; continue
                 if (frm, slug(name), src, anchor_of(fact)) in held or (frm, slug(name), src, k, slug(who)) in named:
                     skips["there"] += 1; continue
-                others = "".join(f" kaj {parts[j]}" for j in range(len(parts)) if j != i)
-                ckind = f"{k.strip()}: {me}{others}{tail}"
+                # the persons of the relation in alphabetical order, the line's own head among them (the editor,
+                # 2026-10-28: a relation with more than one object gives them in alphabetical order,
+                # to forestall missorts)
+                who_all = sorted([me] + [parts[j] for j in range(len(parts)) if j != i], key=lambda x: slug(x))
+                ckind = f"{k.strip()}: {' kaj '.join(who_all)}{tail}"
                 cfact = f"**({qual})** {bare}" if qual else bare
                 mark = f"⟦kopio el {me}⟧"
                 cconf = conf[:-1] + f"; {mark})" if conf.rstrip().endswith(")") else f"{conf} ({mark})"
@@ -1642,7 +1688,7 @@ def copies(people, tocopy, now):
         # one the scope register has out (entities go out there, reason «entity»); the meetings' and «kun:»'s copies above
         # come first, and a line already held there is not copied twice.
         base = ";".join(x for x in kind.split(";") if not x.strip().startswith("kun:"))
-        for m in NAMED.finditer(base):
+        for m in NAMED.finditer(FL.unquoted(base)):   # not a name the kind quotes («letero subskribita «CART»»; audit item 1)
             name, qual = m.group(1).strip(), m.group(2)
             if name in FACT_KEYS and not qual: name, qual = FACT_KEYS[name]
             name = canon(name)
@@ -1664,7 +1710,18 @@ def copies(people, tocopy, now):
                 hk = (h.strip()[1:] if h.strip().startswith("+") else h).split(":")[0].strip()
                 if hk in COPY_KINDS and re.search(r"(?<![\w-])" + re.escape(m.group(1).strip()) + r"(?![\w-])", h):
                     heads[hi_] = re.sub(r"(?<![\w-])" + re.escape(m.group(1).strip()) + r"(?: \([^)]*\))?(?![\w-])", me, h, count=1)
+            turned = heads != kind.split(";")
             ckind_named = ";".join(heads)
+            # THE DOER NAMED (the editor, 2026-10-30, on Ekland's «verko: nekrologo de MIDTHUS» copied to Midthus as if
+            # his own work: the doer marked, approved; «{verko: nekrologo de MIDTHUS; de: EKLAND}» allowed where ambiguous,
+            # and «far:» in the notes, not in the prose, where «fare de» tells «de» meaning «by» apart): a
+            # copy whose kind was not turned round is another's act that names this person; «far: <the person copied
+            # from>» says whose, so no tool or writer reads it as this person's own (tools/smelt_works.py leaves it out
+            # of the works; the reclassify reader gives it its kind from this person's side)
+            if not turned:
+                # and its kind from this person's side, where the reclassify reader has given one (tools/smelt_reclass.py;
+                # the editor, 2026-10-30): Ekland's obituary is Midthus's «juĝo», not his «verko»
+                ckind_named = reclassed(name, frm, src, ckind_named) + f"; far: {me}"
             cfact = f"**({qual})** {bare}" if qual else bare
             mark = f"⟦kopio el {me}⟧"
             cconf = conf[:-1] + f"; {mark})" if conf.rstrip().endswith(")") else f"{conf} ({mark})"
@@ -1706,9 +1763,17 @@ def to2(line):
     fact, anchor = " · ".join(parts[:-4]), parts[-4]
     return m.group(1) + f"{fact} «{anchor}» · " + " · ".join(parts[-3:])
 LOC2 = re.compile(r"^(?P<item>[^,·]+?), (?:PDF (?P<pdf>\d+)(?: \(prese [^)]+\))?|¶ (?P<para>\d+))(?:, .+)?$")
-NOVELTY_MARK = re.compile(r"\bNOVA\b|jam registrita|⟳|⟵")
-# EVERY FACTS LINE STANDS ALONE (the editor 2026-10-11
-#): a format-2 line whose fact opens by pointing back at another line, or names issue or article
+# «NOVA» as a word of its own, not the end of a hyphenated name the OCR split («SEmE-NOVA», Semenova: held back as a
+# novelty mark, 2026-10-28)
+NOVELTY_MARK = re.compile(r"(?<![\w-])NOVA(?![\w-])|jam registrita|⟳|⟵")
+
+def unquoted(s):
+    """A field with its quoted source text and our notes blanked: «…», “…”, "…", ⟦…⟧. A trigger word is read only
+    outside them, never in words the source or the OCR prints (the editor, 2026-10-28 had been read
+    as the novelty mark NOVA)."""
+    return re.sub(r"«[^»]*»|“[^”]*”|\"[^\"]*\"|⟦[^⟧]*⟧", " ", s or "")
+# EVERY FACTS LINE STANDS ALONE (the editor 2026-10-11: no anaphora between lines, since lines jumbled in assembly
+# would make no sense): a format-2 line whose fact opens by pointing back at another line, or names «the same» issue or article
 ANAPHOR = re.compile(r"^(same\b|la sama\b|en (tiu|la sama|tiu ĉi)\b|tiu\b|tio\b|tiam\b|poste\b|ĝi\b|ili\b)|"
                      r"\b(la sama|tiu ĉi|tiu) (numero|revuo|gazeto|artikolo|libro|letero|recenzo|poemo|kunsido|broŝuro|teksto)\b|"
                      r"\bsimil(?:a|an|aj|ajn|e)\b", re.I)   # comparison words too (the editor)
@@ -1799,13 +1864,40 @@ def page_dates():
 
 def independence(conf):
     """The independence label in a confidence field, with the cited work after «↤» if any ('' if none)."""
-    m = re.search(r"(sendependa|derivita, fonto nevidita|derivita|sen fontindiko)(\s*↤\s*[^;)]+)?", conf)
+    m = re.search(r"(sendependa|derivita, fonto nevidita|derivita|sen fontindiko)(\s*↤\s*[^;)]+)?", FL.noquotes(conf))   # audit 7
     return m.group(0).strip() if m else ""
 
+_EVERY = []
+def every_reading_items():
+    """The items whose signed line has the name search read every reading (`sources/ocr-rendersearch-all/<item>.txt`
+    in its search field: SEARCH EVERY READING, failure map R97, R98), by the latest signed file of each item, as
+    ocr-dowse.py's signed_lines reads them."""
+    if not _EVERY:
+        out = {}
+        for f in sorted(glob.glob(os.path.join(GEN, "ocr", "lines", "OCR-ACCEPTANCE-LINES-*SIGNED*.txt")) +
+                        glob.glob(os.path.join(GEN, "OCR-ACCEPTANCE-LINES-*SIGNED*.txt")), key=os.path.basename):
+            here = {}
+            for l in open(f, encoding="utf-8"):
+                if l.startswith("ACCEPTED: "):
+                    x = [p.strip() for p in l[len("ACCEPTED: "):].rstrip("\n").split(" | ")]
+                    here.setdefault(x[0], x)
+                elif l.startswith("WITHDRAWN: "):
+                    out.pop(l[len("WITHDRAWN: "):].split(" | ")[0].strip(), None)
+            out.update(here)
+        _EVERY.append({it for it, x in out.items() if len(x) > 3 and "ocr-rendersearch-all" in x[3]})
+    return _EVERY[0]
+
 def item_pages(item, fid):
-    """The OCR text (pages) or born-digital text (¶ as pages) of an item, or None."""
+    """The OCR text (pages) or born-digital text (¶ as pages) of an item, or None. AN ITEM SEARCHED IN EVERY READING
+    (2026-11-03, the bi-script redowse; the editor): each page's words are followed by its every-reading text's,
+    so that a quotation a legilo took from another reading of the page (given it in the brief, dowse-brief-fill.py
+    --other-readings) is found on its page; the preferred text's words come first, unchanged."""
     p = os.path.join(GEN, "sources", "ocr-preferred", item + ".txt")
     b = os.path.join(GEN, "sources", "born-digital-text", item + ".txt")
+    a = os.path.join(GEN, "sources", "ocr-rendersearch-all", item + ".txt")
+    if os.path.exists(p) and os.path.exists(a) and item in every_reading_items():
+        pages, more = fid.load_pages(p), fid.load_pages(a)
+        return {k: pages.get(k, []) + more.get(k, []) for k in sorted(set(pages) | set(more))}
     if os.path.exists(p): return fid.load_pages(p)
     if os.path.exists(b):
         # A PAGED BORN-DIGITAL TEXT (2026-10-26: Couturat's typed PDF and the Beauchemin transcriptions, «=== page N ===»,
@@ -1938,6 +2030,95 @@ def merge_copies(people):
         if drop: people[who] = [r for k, r in enumerate(rows) if k not in drop]
     return n
 
+# THE OLD-FORMAT LINES READ AGAIN (2026-10-31; the editor 2026-10-30 16:4x, on the format 2 and 3 dowses of September:
+# neither kept nor ported, but left out of scope; the plan agreed
+# 16:5x): an old line whose item and page a format-4 dowse has read, with a format-4 line for the same person there, is
+# left out of scope by the newest register profiles/SUPERSEDED-LINES-<tag>.tsv (tools/old-format-supersede.py), keyed
+# by file and the line's text; the old files are never edited, and moving the register out undoes it
+SUPERSEDED_SKIPPED = []
+_superseded = None
+def superseded():
+    """{(by-source file, the line's text)} of the rows with status «superseded» in the newest register."""
+    global _superseded
+    if _superseded is None:
+        regs = sorted(glob.glob(os.path.join(OUT, "SUPERSEDED-LINES-*.tsv")))
+        _superseded = set()
+        if regs:
+            with open(regs[-1], encoding="utf-8") as fh:
+                _superseded = {(r["file"], r["text"]) for r in csv.DictReader((l for l in fh if not l.startswith("#")), delimiter="\t")
+                               if r["status"] in ("superseded", "out of scope", "ported", "dropped by the port")}
+    return _superseded
+
+WITHDRAWN_DROPPED, WITHDRAWN_KEPT = [], []   # (person, dropped row, its twin) / (person, row): for the review document
+
+def drop_withdrawn(people):
+    """A FACT READ FROM A PAGE SCANNED TWICE (2026-10-31; the duplicate scans withdrawn from the texts, Miles 2026-10-30,
+    ocr/method/DUPLICATE-PAGES.tsv, status «withdrawn»; the editor: the second scans of one leaf go; Ezri's choice, no
+    redowse): a line whose one locator is a withdrawn page leaves the profile where the same person has its twin on the
+    page it repeats (`same_as`, or the page either side, for a paragraph run over): of one kind, the same year or both
+    undated, the facts without their anchors sharing 80% of their content words and differing in no number but a year.
+    A line with no twin stays, listed. The fact files and FACTS-LIST keep every line. -> dropped count."""
+    p = os.path.join(GEN, "ocr", "method", "DUPLICATE-PAGES.tsv")
+    if not os.path.exists(p): return 0
+    wd = {(r["item"], int(r["page"])): int(r["same_as"]) for r in csv.DictReader(open(p, encoding="utf-8"), delimiter="\t")
+          if r["status"] == "withdrawn" and r["page"].isdigit() and r["same_as"].isdigit()}
+    k2n = key_names()
+    def place(src):
+        ms = locators(src)
+        if not ms or len(ms) != 1 or not ms[0].group("pdf"): return None
+        return k2n.get(ms[0].group("item").strip(), ms[0].group("item").strip()), int(ms[0].group("pdf"))
+    def cwords(t):
+        return {w for w in re.findall(r"[\wĉĝĥĵŝŭĈĜĤĴŜŬ]{4,}", t.lower())} - {"estis", "kiam", "laŭ", "sian", "siaj", "lian", "liaj", "kiun", "kiuj", "ankaŭ", "post", "antaŭ", "inter", "dum", "ĉar"}
+    def bare(fact): return fact.rsplit(" «", 1)[0]
+    def year(r):
+        m = re.search(r"1[5-9]\d\d|20\d\d", r[0] or ""); return m.group(0) if m else ""
+    n = 0
+    for who, rows in people.items():
+        at = [place(r[2]) for r in rows]
+        if not any(a in wd for a in at): continue
+        drop = set()
+        for i, a in enumerate(at):
+            if a not in wd: continue
+            ri, kept = rows[i], wd[a]
+            ki = KINDS.get((ri[5], ri[2], ri[1], slug(who)), "").split(":")[0].strip()
+            twin = None
+            for j, b in enumerate(at):
+                if j == i or j in drop or not b or b[0] != a[0] or abs(b[1] - kept) > 1 or b in wd: continue
+                rj = rows[j]
+                if KINDS.get((rj[5], rj[2], rj[1], slug(who)), "").split(":")[0].strip() != ki or year(ri) != year(rj): continue
+                na, nb = set(re.findall(r"\d+", bare(ri[1]))), set(re.findall(r"\d+", bare(rj[1])))
+                if any(not re.fullmatch(r"1[6-9]\d\d|20\d\d", z) for z in na ^ nb): continue
+                x, y = cwords(bare(ri[1])), cwords(bare(rj[1]))
+                if len(x) >= 3 and len(y) >= 3 and len(x & y) / min(len(x), len(y)) >= 0.8: twin = rj; break
+            if twin: drop.add(i); WITHDRAWN_DROPPED.append((who, ri, twin)); n += 1
+            else: WITHDRAWN_KEPT.append((who, ri))
+        if drop: people[who] = [r for k, r in enumerate(rows) if k not in drop]
+    return n
+
+LIBRARY_DROPPED = []   # (person, row): for the review document
+
+def drop_library(people):
+    """A FACT READ FROM A LIBRARY'S PAGE (2026-11-03; Miles withdrew 142 cover sheets and notices from the texts,
+    ocr/method/LIBRARY-PAGES.tsv, status «withdrawn»; the editor): a line whose every locator is such a page leaves the profile, its copies with it;
+    no twin is sought, the page being no part of the source. The fact files and FACTS-LIST keep every line. -> count."""
+    p = os.path.join(GEN, "ocr", "method", "LIBRARY-PAGES.tsv")
+    if not os.path.exists(p): return 0
+    lib = {(r["item"], int(r["page"])) for r in csv.DictReader((l for l in open(p, encoding="utf-8") if not l.startswith("#")), delimiter="\t")
+           if r["status"] == "withdrawn" and r["page"].isdigit()}
+    k2n = key_names()
+    def places(src):
+        ms = locators(src) or []
+        return [(k2n.get(m.group("item").strip(), m.group("item").strip()), int(m.group("pdf"))) for m in ms if m.group("pdf")]
+    n = 0
+    for who, rows in people.items():
+        keep = []
+        for r in rows:
+            pl = places(r[2])
+            if pl and all(x in lib for x in pl): LIBRARY_DROPPED.append((who, r)); n += 1
+            else: keep.append(r)
+        if len(keep) < len(rows): people[who] = keep
+    return n
+
 def duplicate_pairs(rows):
     """THE SAME FACT TWICE ON ONE PAGE (2026-10-16; the dowse runbook, D6 point 7, deduping kind (b); the editor;
     a function since 2026-10-17, so that tools/dowse-dedupe-prep.py finds the same pairs as the build's listing): two
@@ -1948,7 +2129,7 @@ def duplicate_pairs(rows):
         return {w for w in re.findall(r"[\wĉĝĥĵŝŭĈĜĤĴŜŬ]{4,}", t.lower())} - {"beaufront", "estis", "kiam", "laŭ", "sian", "siaj", "lian", "liaj", "kiun", "kiuj", "ankaŭ", "post", "antaŭ", "inter", "dum", "ĉar"}
     byplace = defaultdict(list)
     for fn, who, date, src, line_, kind_ in rows:
-        if not fn.endswith("-dowse.md") or "kopio el" in line_: continue
+        if not fn.endswith("-dowse.md") or "⟦kopio el" in line_: continue   # our marker, not «la kopio el la arkivo» (audit 15)
         body = line_.split("** · ", 1)[1].split(" · ")[0] if "** · " in line_ else ""
         anchor = body.rsplit(" «", 1)[1].rstrip("»").strip() if " «" in body else ""
         body = body.rsplit(" «", 1)[0]          # the fact without its anchor: lines sharing one anchor looked alike
@@ -2022,17 +2203,20 @@ def strict(rec, fmt3=False):
     ms = locators(source)
     if not ms:
         return f"format 2: locator must be `<item>, PDF N (prese M)` or `<item>, ¶ N` (several separated by «;»); got {source!r}"
+    # a paragraph-numbered copy (sources/ocr-work/<item>.numbered.txt, the «¶ N» texts) is the same item: its name is
+    # the item's with «.numbered» (2026-10-28, Esperantista Dokumentaro 1905: 307 lines refused for the suffix alone)
+    bare = lambda m: re.sub(r"\.numbered$", "", m.group("item").strip())
     for m in ms:
-        if m.group("item").strip() not in item_table():
+        if bare(m) not in item_table():
             return f"format 2: unknown item key {m.group('item').strip()!r} (not in OCR-ITEM-TABLE.tsv)"
-    kind = item_table()[ms[0].group("item").strip()]       # the first locator is the work; the others its copies
+    kind = item_table()[bare(ms[0])]       # the first locator is the work; the others its copies
     padded = any("⟨fino⟩" in q and len(q.split()) >= 6 for q in (QUOTE.findall(fact)[-1:] if fmt3 else QUOTE.findall(fact)))
     cited = re.search(r", l\. \d+\b", source) and segments(fact, last=fmt3)   # a short anchor on its cited line (2026-10-17)
     if not padded and not cited and not any(len(s) >= 6 for s in segments(fact, last=fmt3)) and not short_record_anchor(ms[0].group("item").strip(), fact):
         return "format 3: the anchor needs six or more words" if fmt3 else "format 2: needs a verbatim quotation «…» of six or more words"
-    if NOVELTY_MARK.search(conf):
+    if NOVELTY_MARK.search(unquoted(conf)):
         return "format 2: no novelty marks (NOVA, jam registrita, ⟳, ⟵) — novelty is decided at the build"
-    if kind == "SECONDARY" and not INDEP.search(conf):
+    if kind == "SECONDARY" and not INDEP.search(unquoted(conf)):
         return "format 2: a secondary source's line needs an independence label (sendependa / derivita ↤ … / sen fontindiko)"
     return None
 
@@ -2224,8 +2408,8 @@ def propose_bearers(surname):
                     score[c] += 2; cue[c].append(f"{fp[c][1][run]} of the {tot_r} assigned lines of the run {run[4:]}")
             sp = fp[c][3]; ys = yrs(l)
             if sp and ys and (min(ys) > sp[1] + 1 or max(ys) < sp[0] + 15): score[c] -= 4; cue[c].append(f"date {ys[0]} outside his life {sp[0]}–{sp[1]}")
-        census = bool(re.search(r"exact name-hits|FIRST dated appearance", l))
-        said = bool(re.search(r"\((?:both|\w+ or \w+)[^)]*\)|undetermined|nedeterminit", l, re.I))   # the line says it is open
+        census = bool(re.search(r"exact name-hits|FIRST dated appearance", FL.ours(l)))   # our words only (audit 18)
+        said = bool(re.search(r"\((?:both|\w+ or \w+)[^)]*\)|undetermined|nedeterminit", FL.ours(l), re.I))   # the line says it is open
         ranked = sorted(score.items(), key=lambda x: -x[1])
         if len(named) >= 2 or census or said:
             prop = "both (split or leave)"
@@ -2251,7 +2435,7 @@ def propose_bearers(surname):
 
 DEDUPE_HEAD = """# {source}: la duoblaj linioj, por la juĝo ({tag})
 
-`[Ezri, {tag}, per tools/harvest-facts.py --dedupe-brief {source} {tag}; the deduping proposal of 2026-10-17, (b) 3, signed by the editor : `geniza/ocr/method/DEDUPE-PROPOSAL-2026-10-17.md`. {n} pairs from `profiles/by-source/{source}-dowse.md` as it stands, found as the build's listing finds them (one person, one page, one kind, the facts without their anchors sharing 80% of their content words). The pairs below are read back by `--dedupe-rows`; do not edit them.]`
+`[Ezri, {tag}, per tools/harvest-facts.py --dedupe-brief {source} {tag}; the deduping proposal of 2026-10-17, (b) 3, signed by the editor: `geniza/ocr/method/DEDUPE-PROPOSAL-2026-10-17.md`. {n} pairs from `profiles/by-source/{source}-dowse.md` as it stands, found as the build's listing finds them (one person, one page, one kind, the facts without their anchors sharing 80% of their content words). The pairs below are read back by `--dedupe-rows`; do not edit them.]`
 
 ## La briefo
 
@@ -2293,7 +2477,6 @@ def dedupe_brief(source, tag):
     D = os.path.join(GEN, "dowse", source)
     out = os.path.join(D, f"dedupe-brief-{tag}.md")
     if os.path.exists(out): sys.exit(f"refusing: {os.path.relpath(out, REPO)} exists")
-    cfg = json.load(open(os.path.join(D, "brief-config.json"), encoding="utf-8"))
     rows, orig = _dowse_rows(source)
     pairs = duplicate_pairs(rows)
     # PAIRS ALREADY RULED (2026-10-17 17:2x; the editor, to a dedupe run before the re-smelt): a pair an earlier
@@ -2316,7 +2499,21 @@ def dedupe_brief(source, tag):
     if before != len(pairs): print(f"{source}: {before - len(pairs)} pairs ruled before, left out")
     if not pairs:
         print(f"{source}: no pair left to ask; no brief written"); return 0
-    texts = ", ".join(f"`{os.path.join(GEN, x)}`" for x in cfg["texts"])
+    cp = os.path.join(D, "brief-config.json")
+    if os.path.exists(cp): tx = json.load(open(cp, encoding="utf-8"))["texts"]
+    else:
+        # A SOURCE READ BY TOOL (2026-11-01; the books' chain, the Polish Adresaro): no legilo's brief, so no
+        # brief-config.json; the texts are those of the items its pairs cite, each in the first text folder that has it
+        src_of = {r[4]: r[3] for r in rows}
+        items = []
+        for p in pairs:
+            for l in p[4:6]:
+                for m in locators(src_of.get(l, "")) or []:
+                    if m.group("item").strip() not in items: items.append(m.group("item").strip())
+        tx = [next((f"sources/{d}/{it}.txt" for d in ("ocr-preferred", "ocr-work", "born-digital-text", "ocr")
+                    if os.path.exists(os.path.join(GEN, "sources", d, f"{it}.txt"))), None) for it in items]
+        if not all(tx): sys.exit(f"refusing: no brief-config.json, and no text found for {[it for it, x in zip(items, tx) if not x]}")
+    texts = ", ".join(f"`{os.path.join(GEN, x)}`" for x in tx)
     body = DEDUPE_HEAD.format(source=source, tag=tag, n=len(pairs), texts=texts, fino=os.path.join(GEN, "dowse", "_FINO.txt"))
     for k, (fn, place, bi, bj, li, lj) in enumerate(pairs, 1):
         body += f"\n### P{k} · {place}\n\n- A: {orig.get(li, li)}\n- B: {orig.get(lj, lj)}\n"
@@ -2554,6 +2751,9 @@ def expand_lean(line, pages, item=""):
     line = re.sub(r"(?<= · )\(?((?:interna )?(?:malantaŭa )?kovrilo)\)? (l\. ?\d+)(?= · |$)", r"(prese \1) \2", line)
     # the line in brackets («· (l. 19)», the same batch, La Suno Hispana part 80)
     line = re.sub(r"(?<= · )\((l\. ?\d+)\)(?= · |$)", r"\1", line)
+    # the paragraph written before the line («¶ 201, l. 6», «¶ 615 l. 6», «(¶ 792) l. 3»: 2026-11-06, OV and the Leteroj at
+    # one part a legilo, 9 parts of 114): the line alone, as the form wants; «=== ¶ N ===» above it gives the paragraph
+    line = re.sub(r"(?<= · )\(?¶ ?\d+\)?,? (l\. ?\d+)(?= · |$)", r"\1", line)
     # a mark written after the head, before the date («$$$ GEFETI $$$ ❓ **[n]**»): moved to the voice at the end, where
     # the form has it (the default voice's «📣 ❓» if there is no voice)
     mh = re.match(r"^(- \$\$\$ .+? \$\$\$(?: *\([^)]{1,60}\))?) ([⚠❓]+) (\*\*)", line)
@@ -2627,8 +2827,9 @@ INDEP_RULED = {
 
 def _ruled_voice(v, label):
     """The voice field V with LABEL for its independence, as above."""
-    if re.search(r"\bderivita\b|refutas:|\bsendependa\b", v): return v
-    if re.search(r"\bsen fontindiko\b", v): return re.sub(r"\bsen fontindiko\b", label, v, count=1)
+    # the labels read and set outside the source's quotations («OCR «Polujo sendependa»»: the trigger audit, item 2)
+    if re.search(r"\bderivita\b|refutas:|\bsendependa\b", FL.unquoted(v)): return v
+    if re.search(r"\bsen fontindiko\b", FL.unquoted(v)): return FL.sub_outside(r"\bsen fontindiko\b", label, v)
     m = re.match(r"^([✅📣📄](?: ?[⚠❓])*)\s*(?:\(((?:[^()]|\([^()]*\))*)\))?\s*$", v.strip())
     if m: return f"{m.group(1)} ({label}" + (f"; {m.group(2)})" if m.group(2) else ")")
     # the reader's note with its brackets unbalanced («📣 (noto 7) de p. 54, … ĝis l. 340)»): the label before it, the
@@ -2649,7 +2850,7 @@ def _default_voice(ps, li):
     # brief's 📣 is «sen fontindiko» unless a label says otherwise, so the label goes in (2026-10-21, Zakrzewski 1913, a
     # SECONDARY source, about 268 lines refused for the label)
     mv = re.fullmatch(r"📣((?: ?[⚠❓])*)\s*(?:\(((?:[^()]|\([^()]*\))*)\))?\s*", ps[-1].strip())
-    if mv and not INDEP.search(ps[-1]):
+    if mv and not INDEP.search(unquoted(ps[-1])):
         ps[-1] = f"📣{mv.group(1)} (sen fontindiko" + (f"; {mv.group(2)})" if mv.group(2) else ")")
 
 def _issue_n(line, notes):
@@ -2782,6 +2983,8 @@ def main():
         for n, line in enumerate(content, 1):
             if not line.startswith("- $$$"): continue
             saw += 1
+            if not fmt4 and (os.path.basename(f), line.strip()) in superseded():
+                SUPERSEDED_SKIPPED.append(os.path.basename(f)); continue
             kind = None
             if fmt4: line, kind = take_kind(line)
             if fmt3: line = to2(line)
@@ -2868,12 +3071,14 @@ def main():
             # year its own entry gives; (ii) when the fact names a year or a month (the check warns: write the date);
             # (iii) in an item not told in its page order (profiles/CHRONOLOGY.tsv); (iv) on a state («li estis …»),
             # which wants «[ĝenerala]» (the check warns)
-            fact = people[who][idx][1].split("«")[0]
+            fact = FL.unquoted(people[who][idx][1])   # every quotation blanked, not the text cut at its first « (audit 10)
             if fact.lstrip().startswith("(bibliografio)"):
                 y = re.search(r"\b(1[6-9]\d\d|20\d\d)\b", people[who][idx][1]) or re.search(r"\b(1[6-9]\d\d|20\d\d)\b", conf)
                 if y: people[who][idx] = (f"[sen dato; divene {y.group(1)} laŭ la bibliografia indiko]",) + people[who][idx][1:]
                 continue
-            if re.search(rf"\b1[6-9]\d\d\b|\b20\d\d\b|\b{MONTHS}\b", fact, re.I): continue
+            # the month names' regex under its own name: «MONTHS» is the month table by line 785, which made this test's
+            # month part the table's text, never matching (the trigger audit of 2026-10-28, item 10)
+            if re.search(rf"\b1[6-9]\d\d\b|\b20\d\d\b|\b{MONTHS_RX}\b", fact, re.I): continue
             # … or dates itself by the life («ĝis sia morto», «dum sia tuta vivo»): neighbouring pages say nothing of it
             if re.search(r"\b(?:ĝis|post|antaŭ|dum|de) (?:sia|lia|ŝia|ilia) (?:tuta )?(?:morto|vivo|junaĝo|infanaĝo|maljunaĝo)\b", fact, re.I): continue
             # a line of a periodical issue is dated by its issue, a state as well as an event: a guess, marked as one
@@ -2953,6 +3158,30 @@ def main():
             for k, (who, ri, rj, lab) in enumerate(COPY_MERGED, 1):
                 fh.write(f"{k}. **{who}**, {lab}\n   - kept: **{ri[0]}** · {ri[1]} · {ri[2]} · ({ri[5]})\n   - merged: **{rj[0]}** · {rj[1]} · {rj[2]} · ({rj[5]})\n")
         print(f"  one fact in two copies or two texts of one work (COPIES): {n_copy} pairs merged in the profiles (profiles/build/COPIES-MERGED-LATEST.md)")
+    n_wd = drop_withdrawn(people)
+    with open(os.path.join(BUILD, "WITHDRAWN-PAGES-LATEST.md"), "w", encoding="utf-8") as fh:
+        fh.write("# Facts read from a page scanned twice: the lines dropped from the profiles, and those kept\n\n"
+                 "`[GENERATED by tools/harvest-facts.py (drop_withdrawn); the withdrawn pages of ocr/method/DUPLICATE-PAGES.tsv. "
+                 "The fact files keep every line; a line below «dropped» is out of the profile, its twin from the kept scan in.]`\n\n"
+                 f"{n_wd} dropped, {len(WITHDRAWN_KEPT)} kept (no twin found).\n\n## Dropped\n\n")
+        for k, (who, ri, rj) in enumerate(WITHDRAWN_DROPPED, 1):
+            fh.write(f"{k}. **{who}**\n   - dropped: **{ri[0]}** · {ri[1]} · {ri[2]} · ({ri[5]})\n   - its twin: **{rj[0]}** · {rj[1]} · {rj[2]} · ({rj[5]})\n")
+        fh.write("\n## Kept, no twin on the kept scan\n\n")
+        for k, (who, ri) in enumerate(WITHDRAWN_KEPT, 1):
+            fh.write(f"{k}. **{who}** · **{ri[0]}** · {ri[1]} · {ri[2]} · ({ri[5]})\n")
+    print(f"  a fact read from a page scanned twice (DUPLICATE-PAGES.tsv): {n_wd} lines dropped, {len(WITHDRAWN_KEPT)} kept without a twin (profiles/build/WITHDRAWN-PAGES-LATEST.md)")
+    n_lib = drop_library(people)
+    with open(os.path.join(BUILD, "LIBRARY-PAGES-LATEST.md"), "w", encoding="utf-8") as fh:
+        fh.write("# Facts read from a library's page: the lines dropped from the profiles\n\n"
+                 "`[GENERATED by tools/harvest-facts.py (drop_library); the withdrawn pages of ocr/method/LIBRARY-PAGES.tsv, a library's "
+                 "cover sheet or notice, metadata and not the source (the editor, 2026-11-03). The fact files keep every line.]`\n\n"
+                 f"{n_lib} dropped.\n\n")
+        for k, (who, ri) in enumerate(LIBRARY_DROPPED, 1):
+            fh.write(f"{k}. **{who}** · **{ri[0]}** · {ri[1]} · {ri[2]} · ({ri[5]})\n")
+    print(f"  a fact read from a library's page (LIBRARY-PAGES.tsv): {n_lib} lines dropped (profiles/build/LIBRARY-PAGES-LATEST.md)")
+    regs = sorted(glob.glob(os.path.join(OUT, "SUPERSEDED-LINES-*.tsv")))
+    print(f"  old-format lines superseded by a format-4 dowse or out of scope: {len(SUPERSEDED_SKIPPED)} left out, from "
+          f"{len(set(SUPERSEDED_SKIPPED))} files ({os.path.relpath(regs[-1], GEN) if regs else 'no register'})")
 
     total = sum(len(v) for v in people.values())
     print(f"scanned {len(files)} per-source files ({len(fmt2)} in facts format 2) · {total} valid fact lines · {len(people)} people · {len(errors)} errors")
@@ -3016,19 +3245,19 @@ def main():
         held = {(fn, slug(canon(rec[0])), pg_of(rec)) for fn, n, rec in toverify}
         orphan = []
         for fn, n, rec in toverify:
-            m = re.search(r"\((?:aproba |malaproba )?aserto pri ([^)]+)\)", rec[2])
+            m = re.search(r"\((?:aproba |malaproba )?aserto pri ([^)]+)\)", FL.unquoted(rec[2]))   # audit 16
             if m and (fn, slug(canon(m.group(1).strip())), pg_of(rec)) not in held: orphan.append((fn, n, m.group(1).strip()))
         print(f"  claims whose event is not under their subject on the same page: {len(orphan)}")
         for fn, n, x in orphan[:100]: print(f"    ⚠ {fn}:{n}: aserto pri {x}")
         # «[sen dato]» naming a year in its fact (2026-10-11, the Frankfurt 1906 photo line); and described dates
         # («in his twelfth year», the editor)
-        yr_named = [(fn, n) for fn, n, rec in toverify if "sen dato" in rec[1] and re.search(r"\b1[89]\d\d\b", rec[2].split("«")[0])]
+        yr_named = [(fn, n) for fn, n, rec in toverify if "sen dato" in rec[1] and re.search(r"\b1[89]\d\d\b", FL.unquoted(rec[2]))]
         # a line dated by its issue (the lean brief's «[n]», ⟦la dato de la numero⟧) whose fact names another year: the
         # text may date the act itself (2026-10-18; the editor)
         yr_named += [(fn, n) for fn, n, rec in toverify if "la dato de la numero⟧" in rec[5] and any(
-            y not in rec[1] for y in re.findall(r"\b1[89]\d\d\b", rec[2].split("«")[0]))]
+            y not in rec[1] for y in re.findall(r"\b1[89]\d\d\b", FL.unquoted(rec[2])))]
         described = [(fn, n) for fn, n, rec in toverify if "sen dato" in rec[1] and re.search(
-            r"jaraĝ|-jara\b|jaro de (?:sia|lia|ŝia) vivo|en (?:sia|lia|ŝia) \w+a jaro|post \w+ jaroj", rec[2].split("«")[0])]
+            r"jaraĝ|-jara\b|jaro de (?:sia|lia|ŝia) vivo|en (?:sia|lia|ŝia) \w+a jaro|post \w+ jaroj", FL.unquoted(rec[2]))]
         print(f"  undated lines that name a year: {len(yr_named)}; undated lines with a described date: {len(described)}")
         for fn, n in (yr_named + described)[:100]: print(f"    ⚠ {fn}:{n}")
         # THE DATE VOCABULARY (the editor 2026-10-12; the forms in
@@ -3051,26 +3280,26 @@ def main():
         MON = r"(?:januar|februar|mart|april|maj|juni|juli|aŭgust|septembr|oktobr|novembr|decembr)on?"
         coarse = [(fn, n) for fn, n, rec in toverify if re.fullmatch(r"\**\d{4}\**", rec[1].strip()) and re.search(
             rf"\b{MON}\b|\bĉirkaŭ\b|\bproksimume\b|\binter \d{{4}} kaj\b|\b(?:post|antaŭ|ĝis|ekde) (?:\d{{4}}|la \d|{MON}\b)"
-            r"|\b(1[89]\d\d)\b.*\b(?!\1)1[89]\d\d\b", rec[2].split("«")[0], re.I)]
+            r"|\b(1[89]\d\d)\b.*\b(?!\1)1[89]\d\d\b", FL.unquoted(rec[2]), re.I)]
         print(f"  dated lines whose fact is more precise or less certain than their date: {len(coarse)}")
         for fn, n in coarse[:200]: print(f"    ⚠ {fn}:{n}")
         # a date computed without saying so (the Fable review's finding 3, approved 2026-10-12): the fact dates the thing
         # relatively («27-jara», «dek tri jarojn poste») and the date is not marked «kalkulite» in pruvo
         uncomputed = [(fn, n) for fn, n, rec in toverify if not re.search(r"sen dato|ĝenerala", rec[1]) and re.search(
-            r"jaraĝ|-jara\b|jarojn poste|jaroj poste|post \w+ jaroj|en (?:sia|lia|ŝia) \w+a jaro", rec[2].split("«")[0])
-            and "kalkulite" not in rec[5] + rec[1]
+            r"jaraĝ|-jara\b|jarojn poste|jaroj poste|post \w+ jaroj|en (?:sia|lia|ŝia) \w+a jaro", FL.unquoted(rec[2]))
+            and "kalkulite" not in FL.noquotes(rec[5]) + rec[1]   # our ⟦kalkulite⟧, not a quotation's (audit 12)
             # an age («33-jara») on a line dated to the day is the record's own statement, not a date worked out from
             # it (the Somme death record; the editor 2026-10-13): spared, unless another relative phrase is there
             and not (re.fullmatch(r"\d{4}-\d\d-\d\d", rec[1].strip("* ")) and not re.search(
-                r"jarojn poste|jaroj poste|post \w+ jaroj|en (?:sia|lia|ŝia) \w+a jaro", rec[2].split("«")[0]))]
+                r"jarojn poste|jaroj poste|post \w+ jaroj|en (?:sia|lia|ŝia) \w+a jaro", FL.unquoted(rec[2])))]
         print(f"  dated lines with a relative date not marked «kalkulite»: {len(uncomputed)}")
         for fn, n in uncomputed[:200]: print(f"    ⚠ {fn}:{n}")
         # a state written «[sen dato]» where «[ĝenerala]» is meant (the Fable review's finding 4 (iv), approved 2026-10-12)
         # … except where the kind decides (2026-10-16 22:2x): origin and character made [ĝenerala] by the profile, the six
         # kinds that may be either guessed as an instant
         kindat = {(fn, n): (k or "").split(":")[0].strip() for fn, n, k in kinded}
-        states = [(fn, n) for fn, n, rec in toverify if "sen dato" in rec[1] and (sm := STATE.match(rec[2].split("«")[0]))
-                  and not OFFICE.match(rec[2].split("«")[0][sm.end():])
+        states = [(fn, n) for fn, n, rec in toverify if "sen dato" in rec[1] and (sm := STATE.match(FL.unquoted(rec[2])))
+                  and not OFFICE.match(FL.unquoted(rec[2])[sm.end():])
                   and kindat.get((fn, n), "") not in WHOLE_LIFE_KINDS | EITHER_KINDS | {"ofico"}]
         print(f"  undated lines that state a state («[ĝenerala]» wanted): {len(states)}")
         for fn, n in states[:200]: print(f"    ⚠ {fn}:{n}")
@@ -3111,13 +3340,13 @@ def main():
         badname = [(fn, n, rec[0]) for fn, n, rec in toverify if re.search(r"(?:^|[\s-])[A-ZĈĜĤĴŜŬ]\.?(?:[\s-]|$)|-.*-", rec[0].split("(")[0].strip())]
         print(f"  NAME forms with an initial or two hyphens (NAME is the surname; a given name only as qualifier): {len(badname)}")
         for fn, n, w in badname[:200]: print(f"    ⚠ {fn}:{n}: {w}")
-        comment = [(fn, n) for fn, n, rec in toverify if re.search(r"¶\s?\d|\bPDF\s?\d|\brim\.\s?\d", rec[2].split("«")[0])]
+        comment = [(fn, n) for fn, n, rec in toverify if re.search(r"¶\s?\d|\bPDF\s?\d|\brim\.\s?\d", FL.unquoted(rec[2]))]
         print(f"  facts citing another page or note of the source (commentary belongs in «pruvo:»): {len(comment)}")
         for fn, n in comment[:200]: print(f"    ⚠ {fn}:{n}")
         # our additions in ⟦…⟧ (the editor 2026-10-14,; ocr/method/ALIGN-JAM-RULE-PROPOSAL-2026-10-14.md, B): in a dowse
         # facts file an addition outside the brackets cannot be stripped for comparison or kept in INTERVENTIONS.tsv
         unbr = [(fn, n) for fn, n, rec in toverify if fn.endswith("-dowse.md")
-                and re.search(r"pruvo:|nia identigo|korektit|kalkulit|ne kontrolita", re.sub(r"⟦[^⟧]*⟧", "", rec[5]))]
+                and re.search(r"pruvo:|nia identigo|korektit|kalkulit|ne kontrolita", FL.unquoted(rec[5]))]   # audit 13
         print(f"  dowse lines with an addition of ours outside ⟦…⟧ (OUR ADDITIONS IN ⟦ ⟧): {len(unbr)}")
         for fn, n in unbr[:200]: print(f"    ⚠ {fn}:{n}")
         # surnames written both with and without a qualifier, whose default bearer the register does not name: there a
@@ -3156,7 +3385,7 @@ def main():
             if not kind or kind.split(":")[0].strip() in ("juĝo", "interpreto", "historiografio"): continue
             l = at.get((fn, n), "")
             body = l.split("** · ", 1)[1].split(" · ")[0] if "** · " in l else ""   # the kind is already taken out
-            if JUDGE_WORDS.search(body): jk.append(f"{fn}:{n}: {{{kind[:70]}}} · {body[:140]}")
+            if JUDGE_WORDS.search(FL.unquoted(body)): jk.append(f"{fn}:{n}: {{{kind[:70]}}} · {body[:140]}")   # our fact's words (audit 14)
         # AN ACT MARKED [ĝenerala] (2026-10-16 22:2x, the editor): every kind but origin, character, the six that
         # may be either, «alia» and «samnomo» is an act, and an act has a date; a judgement or declaration so marked is
         # dated by its saying above, the rest stay as the reader wrote them
@@ -3181,7 +3410,7 @@ def main():
         if not check:
             with open(os.path.join(BUILD, "KIND-FAULTS-LATEST.md"), "w", encoding="utf-8") as fh:
                 fh.write("# Probable kind faults — the last build\n\n**GENERATED by `tools/harvest-facts.py` at every build. Do not edit.** "
-                         "For the cleanup (the smelt runbook, S5) or DECISIONS rows. The editor, 2026-10-16.\n\n"
+                         "For the cleanup (the smelt runbook, S5) or DECISIONS rows. The editor, 2026-10-16: every such judgement date flagged as such, since otherwise it distorts the account.\n\n"
                          f"## A fact reporting a judgement, under a kind other than «juĝo» or «interpreto» ({len(jk)})\n\n"
                          + "".join(f"- {x}\n" for x in jk)
                          + f"\n## Undated lines with a saying theme ([AS], [KAR]) under an event kind, no longer dated by the saying ({len(SAYING_SKIPPED)})\n\n"
@@ -3214,7 +3443,7 @@ def main():
         pat = surnames_finder(sur) if sur else None
         ft, ft_to = [], Counter()
         for fn, who, date, src, line_, kind_ in (r[:6] for r in now):
-            if not fn.endswith("-dowse.md") or not kind_ or "kopio el" in line_ or not pat: continue
+            if not fn.endswith("-dowse.md") or not kind_ or "⟦kopio el" in line_ or not pat: continue
             body = line_.split("** · ", 1)[1].split(" · ")[0] if "** · " in line_ else ""
             # not the line's own sayers: its source's author (the dowse file's first word, a contributor) or the
             # «derivita ↤» source («Laŭ Neves …» in Neves's file is attribution, not a fact about Neves)
@@ -3269,15 +3498,18 @@ def main():
                          f"By context (2026-10-18): **{n_in} clear names** (an initial, a given name or a title before the surname, or the surname in capitals), "
                          f"**{len(ft) - n_in} for a reader's review**; {FT_OUT[0]} occurrences ruled out (inside a periodical's title from BPEAPE, after an article, "
                          "or a sentence's first word with an article after it) are not listed.\n\n")
+                # the rows grouped once, in their order (2026-11-07: a scan of all rows for each name and class took 97 s)
+                ft_by = defaultdict(list)
+                for tt, x, c in ft: ft_by[(tt, c)].append(x)
                 for cls_, head_ in (("in", "Clear names"), ("review", "For a reader's review")):
                     fh.write(f"# {head_}\n\n")
                     for t in sorted(ft_to, key=lambda k: -ft_to[k]):
-                        rows_ = [x for tt, x, c in ft if tt == t and c == cls_]
+                        rows_ = ft_by.get((t, cls_), [])
                         if rows_: fh.write(f"## {t} ({len(rows_)})\n\n" + "".join(f"- {x}\n" for x in rows_) + "\n")
-        twoyears = [(fn, n) for fn, n, rec in toverify if ";" in rec[2].split("«")[0] and len(set(re.findall(r"\b1[6-9]\d\d\b", rec[2].split("«")[0]))) > 1]
+        twoyears = [(fn, n) for fn, n, rec in toverify if ";" in FL.unquoted(rec[2]) and len(set(re.findall(r"\b1[6-9]\d\d\b", FL.unquoted(rec[2])))) > 1]
         print(f"  facts with «;» and two years (one predicate per line): {len(twoyears)}")
         for fn, n in twoyears[:200]: print(f"    ⚠ {fn}:{n}")
-        leaning = [(fn, n, rec[2]) for fn, n, rec in toverify if ANAPHOR.search(rec[2].split("«")[0])]
+        leaning = [(fn, n, rec[2]) for fn, n, rec in toverify if ANAPHOR.search(FL.unquoted(rec[2]))]
         print(f"  lines that may lean on another line (EVERY FACTS LINE STANDS ALONE): {len(leaning)}")
         for fn, n, fact in leaning[:200]: print(f"    ⚠ {fn}:{n}: {fact[:90]}")
         # FAULT RATES BY SOURCE (2026-10-16 22:5x; the smelt runbook, S5, «fault rates per type and source»; the editor:
@@ -3394,6 +3626,7 @@ def main():
         cal.append((re.compile(x[1], re.I), x[2], x[3], x[5].strip() if len(x) > 5 else ""))
     def calendar(y, fact):
         m = re.fullmatch(r"(\d{4})(?:-(\d\d))?", y.strip())
+        fact = FL.unquoted(fact)   # the congress in our fact, not one the anchor names (the trigger audit, 8)
         if not m or not re.search(r"kongres|congr|\bUK\b", fact, re.I): return y
         for rx, yr_, days, st in cal:
             if m.group(1) == yr_ and rx.search(fact) and (not m.group(2) or days.startswith(f"{yr_}-{m.group(2)}")):
@@ -3407,7 +3640,7 @@ def main():
         y = calendar(y, fact)
         if (r_ := resolved(y)): y = f"{y} [{r_.edtf}, laŭ la kalendaro]"   # an event form, resolved
         c = c + contributor(src)
-        fact, c = re.sub(r"\bEzri\b", "AI", fact), re.sub(r"\bEzri\b", "AI", c)
+        fact, c = FL.sub_outside(r"\bEzri\b", "AI", fact), FL.sub_outside(r"\bEzri\b", "AI", c)   # not in a quotation (audit item 4)
         c = re.sub(r"^📄", "📣", c)   # the relaying mark: 📄 in older files, shown as 📣 (2026-10-13)   # «No \"Ezri\" in the dowse facts, but \"AI\"» (the editor 2026-10-12)
         if frm in FMT3:   # show the anchor as its own field again, bare
             fact = re.sub(r" «([^«»]*(?:«[^»]*»[^«»]*)*)»$", r" · \1", fact)
@@ -3497,9 +3730,9 @@ def main():
             # only a plan for the congress's own days (the status sample, 2026-10-22: Blaise's lecture «pri la venonta
             # Kongreso en Parizo», May 1914, was held; the British group's journey of 1 August was made)
             m = re.match(r"\D*(\d{4})", r[0])
-            if not (m and pd and re.search(r"kongres|congr|\bUK\b", r[1], re.I)): return False
+            if not (m and pd and re.search(r"kongres|congr|\bUK\b", FL.unquoted(r[1]), re.I)): return False
             for rx, yr_, days, st in cal:
-                if st != "ne okazis" or yr_ != m.group(1) or not rx.search(r[1]): continue
+                if st != "ne okazis" or yr_ != m.group(1) or not rx.search(FL.unquoted(r[1])): continue
                 a, _, b = days.partition("/")
                 try: cd = date_vocab.parse(f"de {a} ĝis {a[:8] + b if len(b) == 2 else b}")
                 except ValueError: continue
@@ -3510,9 +3743,9 @@ def main():
             #): a plan for a congress the calendar has as held, its date in the congress's days; the event is
             # attested, the person's part in it not (Zamenhof's arrival in Washington, 12 August 1910; Decarli's Orestes)
             m = re.match(r"\D*(\d{4})", r[0])
-            if not (m and pd and re.search(r"kongres|congr|\bUK\b", r[1], re.I)): return None
+            if not (m and pd and re.search(r"kongres|congr|\bUK\b", FL.unquoted(r[1]), re.I)): return None
             for rx, yr_, days, st in cal:
-                if st == "ne okazis" or yr_ != m.group(1) or not rx.search(r[1]): continue
+                if st == "ne okazis" or yr_ != m.group(1) or not rx.search(FL.unquoted(r[1])): continue
                 a, _, b = days.partition("/")
                 try: cd = date_vocab.parse(f"de {a} ĝis {a[:8] + b if len(b) == 2 else a[:5] + b if len(b) == 5 else b}")
                 except ValueError: continue
@@ -3533,6 +3766,7 @@ def main():
                 others = [bykey.get((x[0], x[4])) for g_ in gs for x in g_]
                 others = [o for o in others if o and o is not r]
                 said = [r[1]] + [x for o in others for x in (o[1], KINDS.get((o[5], o[2], o[1], slug(w)), ""))]
+                said = [FL.unquoted(x) for x in said]   # what our lines say, not the anchors' words (the trigger audit, 9)
                 if any(POSTPONED.search(x) for x in said) and not any(ENDED.search(POSTPONED.sub("", x)) for x in said):
                     st = "prokrastita"           # put off is not failed (Ostrovskij's dictionary, 1893)
                 elif any(ENDED.search(POSTPONED.sub("", x)) for x in said) or cal_failed(r, pd):
@@ -3639,9 +3873,18 @@ def main():
                 "La faktoj restas, por ke malĝusta vico estu videbla kaj korektebla; la dowse ne plu serĉas ĉi tiun personon.\n\n")
     n_banner = 0
     written = 0
+    SUSP = name_suspects(); marked = []
+    def suspect_banner(w):
+        ev = SUSP.get(w) or SUSP.get(re.sub(r"\s*\(.*", "", w).strip())
+        if not ev: return ""
+        marked.append((w, ev))
+        why = "; ".join(sorted({f"{'kapo' if k == 'head' else 'en listo'}, {src}: {re.sub(r'^SUSPECT: ', '', t)}" for k, _c, t, src in ev}))[:600]
+        return (f"**{SUSPECT_BANNER}** (`tools/name-ungarble.py`, `dowse/NAME-SUSPECTS-*.tsv`): la nomo ne havas celon por "
+                f"riparo, kaj la mezuro tenas ĝin por misa legaĵo de la OCR ({why}). La faktoj restas videblaj; la nomo ne estas "
+                "kalkulata inter la personoj kaj ne iras al la smelt, ĝis vida legado aŭ riparo decidas.\n\n")
     for w in sorted(standalone.values()):
         isout = tot_w[w] and out_w[w] == tot_w[w]; n_banner += bool(isout)
-        write_profile(slug(w), w, [(w, r) for r in people[w]], banner(out_w[w], w) if isout else ""); written += 1
+        write_profile(slug(w), w, [(w, r) for r in people[w]], (banner(out_w[w], w) if isout else "") + suspect_banner(w)); written += 1
     for who, (labels, amb) in sorted(index.items()):
         s = slug(who)
         lines_ = [f"# {who} — indekso de kunhavata familia nomo\n\n",
@@ -3678,9 +3921,48 @@ def main():
     for w, stem in merges:
         print(f"  merged the stand-alone profile {w} into {stem}.md")
     print(f"  profiles marked out by the scope register (all their lines out; left out of the dowse roster): {n_banner}")
-    print(f"wrote {written} profiles to {os.path.relpath(OUT, REPO)}/")
+    # THE INDEX OF SUSPECTED MISREADINGS (the editor, 2026-10-28 17:4x): every marked profile, its sources and reasons, for
+    # vision or a later fold; the person count below leaves them out
+    with open(os.path.join(BUILD, "SUSPECTED-MISREADINGS-LATEST.md"), "w", encoding="utf-8") as fh:
+        fh.write(f"# Suspected misreadings: names with no fold target\n\n`[GENERATED by tools/harvest-facts.py from dowse/NAME-SUSPECTS-*.tsv "
+                 f"(tools/name-ungarble.py measure --suspects, heads and --lists). Do not hand-edit — re-run it.]`\n\n"
+                 f"{len(marked)} profiles marked «{SUSPECT_BANNER}»: kept and visible, left out of the person count and the smelt.\n\n"
+                 "| profile | lines | as | source | why |\n|---|---|---|---|---|\n")
+        for w, ev in sorted(marked):
+            for k, c, t, src in ev:
+                fh.write(f"| [{w}](../{slug(w)}.md) | {len(people[w])} | {'head' if k == 'head' else 'in a list'} | {src} | {c}: {t} |\n")
+    print(f"  profiles marked suspected misreadings (no fold target; profiles/build/SUSPECTED-MISREADINGS-LATEST.md): {len(marked)}")
+    print(f"wrote {written} profiles to {os.path.relpath(OUT, REPO)}/ ({written - len(marked)} without the suspected misreadings)")
     missing_facts(now, old_profiles, {os.path.basename(p)[:-3] for p in glob.glob(os.path.join(OUT, "*.md"))})
     return 0
 
+def sampled(path):
+    """HARVEST_SAMPLE=<file> (2026-11-07; the editor):
+    where the harvest's minutes go, measured before anything is changed. A thread looks at the main thread's stack every
+    half second and counts the line of main() it stands on and the innermost function of this file; the counts go to
+    <file> (create-only) at the end, as seconds. Nothing the harvest writes or prints changes."""
+    import threading, time, atexit
+    me = os.path.abspath(__file__); tid = threading.main_thread().ident
+    at_main, inner, t0 = Counter(), Counter(), time.time()
+    def look():
+        while True:
+            time.sleep(0.5)
+            f = sys._current_frames().get(tid); m = i = None
+            while f is not None:
+                if os.path.abspath(f.f_code.co_filename) == me:
+                    if i is None: i = f"{f.f_code.co_name}:{f.f_lineno}"
+                    if f.f_code.co_name == "main": m = f.f_lineno
+                f = f.f_back
+            if m: at_main[m] += 1
+            if i: inner[i] += 1
+    threading.Thread(target=look, daemon=True).start()
+    def dump():
+        with open(path, "x", encoding="utf-8") as fh:
+            fh.write(f"# harvest sampled every 0.5 s, {time.time() - t0:.0f} s in all; seconds by the line of main(), then by the innermost function of this file\n")
+            for k, n in sorted(at_main.items()): fh.write(f"main\t{k}\t{n / 2:.1f}\n")
+            for k, n in inner.most_common(60): fh.write(f"inner\t{k}\t{n / 2:.1f}\n")
+    atexit.register(dump)
+
 if __name__ == "__main__":
+    if os.environ.get("HARVEST_SAMPLE"): sampled(os.environ["HARVEST_SAMPLE"])
     sys.exit(main())

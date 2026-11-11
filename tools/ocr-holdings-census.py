@@ -46,6 +46,8 @@ REPO = os.path.join(HERE, "..")
 SPECS = os.path.join(ROOT, "geniza", "ocr", "method", "born-digital-spec-*.tsv")
 
 
+ASSIGNED = re.compile(r"^QUEUED:\s*(cupel\d+[a-z]?\b|born-digital\b)")
+
 def _runs(text, n=5):
     w = re.findall(r"[^\W\d_]{2,}", text.lower())
     return {" ".join(w[i:i + n]) for i in range(len(w) - n + 1)}
@@ -89,7 +91,9 @@ def main():
     a = ap.parse_args()
     if os.path.exists(a.out):
         sys.exit(f"refusing: {a.out} exists")
-    listed = {os.path.realpath(l.strip()) for l in open(a.pdfs, encoding="utf-8") if l.strip()}
+    # the list's lines are absolute or relative to the repo root, whatever the folder the census is run from (2026-10-31,
+    # cupel20a: run from geniza/, the six Ido PDFs listed through _stem-aliases/ came out as leads)
+    listed = {os.path.realpath(os.path.join(REPO, l.strip())) for l in open(a.pdfs, encoding="utf-8") if l.strip()}
     names = {os.path.basename(p) for p in listed}
     sys.path.insert(0, HERE); import born_digital_lines as BDL
     bd = set(BDL.lists("proposed"))
@@ -104,7 +108,7 @@ def main():
                 continue
             x = l.rstrip("\n").split("\t")
             reg.append((x[0], x[1] if len(x) > 1 else "", x[2] if len(x) > 2 else ""))
-    leads, queued, counts = [], [], {"listed": 0, "born-digital": 0, "born-digital (by source)": 0, "left out": 0}
+    leads, queued, unassigned, counts = [], [], [], {"listed": 0, "born-digital": 0, "born-digital (by source)": 0, "left out": 0}
     root = os.path.realpath(ROOT)
     for b in sorted(os.listdir(root)):
         sd = os.path.join(root, b, "sources")
@@ -127,7 +131,11 @@ def main():
                 hit = next((r for g, r, _ in reg if fnmatch.fnmatch(rel, g)), None)
                 if hit is not None:
                     if hit.startswith("QUEUED"):
-                        queued.append((rel, hit))
+                        # A QUEUED ROW NAMES ITS BATCH OR ITS PATH (2026-10-27, the editor: everything downloaded
+                        # assigned to a cupel or ruled out; the ÖNB Germana and Pola Esperantisto sat twelve days
+                        # under a QUEUED row naming no batch): «QUEUED: cupel20a …», «QUEUED: born-digital …». One that
+                        # names neither is listed as unassigned, and counts as a lead for the exit status.
+                        (queued if ASSIGNED.match(hit) else unassigned).append((rel, hit))
                     else:
                         counts["left out"] += 1
                     continue
@@ -144,11 +152,14 @@ def main():
                  "reason.\n\n")
         for r in leads:
             fh.write(f"- `{r}`\n")
+        fh.write(f"\n## Queued with no batch named: unassigned ({len(unassigned)})\n\n")
+        for r, why in unassigned:
+            fh.write(f"- `{r}`: {why}\n")
         fh.write(f"\n## Queued, not yet in ({len(queued)})\n\n")
         for r, why in queued:
             fh.write(f"- `{r}`: {why}\n")
-    print(f"{len(leads)} leads, {len(queued)} queued; accounted for: " + ", ".join(f"{k} {v}" for k, v in counts.items()) + f" → {a.out}")
-    sys.exit(1 if leads else 0)
+    print(f"{len(leads)} leads, {len(unassigned)} queued with no batch named, {len(queued)} queued to a batch; accounted for: " + ", ".join(f"{k} {v}" for k, v in counts.items()) + f" → {a.out}")
+    sys.exit(1 if leads or unassigned else 0)
 
 
 if __name__ == "__main__":

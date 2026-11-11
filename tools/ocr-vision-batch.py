@@ -17,7 +17,15 @@ batch), `BRIEF-TEMPLATE.md` (the transcriber's brief between two «---» lines),
 render  For each page not yet rendered: the page image the CONVERSION read (`tools/ocr_page_images.py` — the same image
         rule as every other reading), greyscale, long side at most 2400 px (about 200 dpi on an A4 page), saved as
         `bNNN/<tag>.png`, plus `bNNN/<tag>.boost.png` (autocontrast, cutoff 0.5). Images are kept (never discarded).
-prompt  Prints the write-mode prompt: the transcriber may use only the Read and Write tools (transcribers run no shell
+        --channel (2026-10-28, *Dia Regno* 1912 p.11, VR-2026-10-28-71; the editor,
+        and the green covers of 1910–1911): greyscale by luminance mixes a coloured paper down to mid-grey, the ink
+        barely darker. `red`, `green`, `blue` take that one band; `auto` takes, page by page, the band with the widest
+        spread between paper (95th percentile) and ink (5th): green for the green covers. `sat` takes the saturation, for
+        a paper whose ink differs from it in hue more than in darkness (tried on 1912 p.11: it lost the text).
+        Default `lum`. --interior-boost: the boost stretched by the page's middle, for faint ink inside a black frame.
+        --crop top|bottom: half a page (55%, overlapping) at the scan's resolution; 1912 p.11's reader, at 2400 px for
+        the whole page, read the headings only. Render the two halves as two batches, one run each.
+prompt  Prints the write-mode prompt: the transcriber may use only the Read and Write tools (subagents run no shell
         commands — standing rule), reads the brief, the key and the images, and WRITES its blocks (=== 01 === … then
         === NOTES ===) to `returns/bNNN.txt`.
 file    Files a return: `page-NNNN.vision.txt` in the item's folder for every block that is not «NONE», NEVER over a
@@ -31,6 +39,37 @@ import concurrent.futures as fut
 
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.join(HERE, "..")
 R = os.path.join(ROOT, "published", "heterophony-resources", "geniza", "sources", "ocr-rendersearch")
+
+
+def grey(img, channel):
+    """The page in one band: luminance, a named colour band, or (auto) the band where paper and ink lie furthest apart."""
+    if channel == "lum" or img.mode not in ("RGB", "RGBA", "P", "CMYK"): return img.convert("L")
+    # sat: the paper saturated, the ink grey (Dia Regno 1912 p.11: no colour band darkened the ink, its hue did)
+    if channel == "sat": return img.convert("RGB").convert("HSV").split()[1]
+    bands = dict(zip("RGB", img.convert("RGB").split()))
+    if channel != "auto": return bands[channel[0].upper()]
+
+    def spread(b):
+        h = b.histogram(); n = sum(h); acc = 0; lo = hi = None
+        for v, k in enumerate(h):
+            acc += k
+            if lo is None and acc >= 0.05 * n: lo = v
+            if hi is None and acc >= 0.95 * n: hi = v
+        return hi - lo
+    return max(bands.values(), key=spread)
+
+
+def interior_boost(g):
+    """The contrast stretch taken from the page's middle (the central 80% each way), not the whole scan: the scanner's
+    black frame filled the dark tail of autocontrast, so faint ink was hardly darkened (Dia Regno 1912 p.11)."""
+    w, h = g.size; c = g.crop((w // 10, h // 10, w - w // 10, h - h // 10))
+    hist = c.histogram(); n = sum(hist); acc = 0; lo = hi = None
+    for v, k in enumerate(hist):
+        acc += k
+        if lo is None and acc >= 0.01 * n: lo = v
+        if hi is None and acc >= 0.90 * n: hi = v
+    if hi <= lo: return g
+    return g.point(lambda v: 0 if v <= lo else 255 if v >= hi else (v - lo) * 255 // (hi - lo))
 
 
 def render(a):
@@ -56,14 +95,21 @@ def render(a):
     def corpus(c):
         work = tempfile.mkdtemp(prefix="vision-"); n = 0
         try:
-            im = OPI.page_images(paths[c], work, jobs=2, pages=[p for _, _, p in by[c]])
+            if a.via_render:   # the page as a viewer draws it (decode arrays, masks applied), not the stored image
+                im = {p: r for _, _, p in by[c] if (r := OPI.render_page(paths[c], work, p))}
+            else:
+                im = OPI.page_images(paths[c], work, jobs=2, pages=[p for _, _, p in by[c]])
             for b, tag, p in by[c]:
                 if p not in im: continue
                 os.makedirs(os.path.join(a.dir, b), exist_ok=True)
-                g = Image.open(im[p]).convert("L")
+                g = grey(Image.open(im[p]), a.channel)
+                if a.crop:   # the top or bottom 55% at the scan's own resolution, the halves overlapping by a tenth
+                    w, h = g.size
+                    g = g.crop((0, 0, w, h * 55 // 100) if a.crop == "top" else (0, h * 45 // 100, w, h))
                 if max(g.size) > 2400: g.thumbnail((2400, 2400))
                 g.save(os.path.join(a.dir, b, f"{tag}.png"))
-                ImageOps.autocontrast(g, cutoff=0.5).save(os.path.join(a.dir, b, f"{tag}.boost.png")); n += 1
+                (interior_boost(g) if a.interior_boost else ImageOps.autocontrast(g, cutoff=0.5)).save(
+                    os.path.join(a.dir, b, f"{tag}.boost.png")); n += 1
         finally:
             shutil.rmtree(work, ignore_errors=True)   # the helper's working copies; the batch images are kept
         return c, n
@@ -112,6 +158,14 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("mode", choices=("render", "prompt", "file")); ap.add_argument("--dir", required=True)
     ap.add_argument("--pdfs"); ap.add_argument("--jobs", type=int, default=6); ap.add_argument("--batch"); ap.add_argument("--record")
+    ap.add_argument("--channel", choices=("lum", "red", "green", "blue", "sat", "auto"), default="lum",
+                    help="render: the band the greyscale image is taken from (coloured paper: auto)")
+    ap.add_argument("--crop", choices=("top", "bottom"),
+                    help="render: only the top or bottom 55%% of each page, so the 2400 px cap keeps the scan's resolution")
+    ap.add_argument("--via-render", action="store_true",
+                    help="render: draw the page with pdftoppm (as a viewer does) instead of extracting its stored image")
+    ap.add_argument("--interior-boost", action="store_true",
+                    help="render: the boost image stretched by the page's middle, not the whole scan (a black frame, faint ink)")
     ap.add_argument("--as-add", action="store_true", help="file: as page-NNNN.vision-add.txt (lines added to the OCR), for a return that cut text to «[...]»")
     a = ap.parse_args()
     if a.mode == "render" and not a.pdfs: sys.exit("render needs --pdfs")

@@ -17,8 +17,9 @@ before): it cites them as circumstances, never groups them, never opens an episo
 from E901 and G9001; the tool's G and U keep theirs. Writes S3-INPUT-<tag>-p<k>.md, S3-BRIEF-<tag>-p<k>.md (k = 1…,
 and «g»); refuses a part whose return is filed. --join writes S3-RETURN-<tag>.md, create-only, each of the five
 sections the parts' in order, so that smelt-view.py and the S4 brief read it as one return. Ezri, 2026-10-17."""
-import argparse, os, re, sys
+import argparse, collections, os, re, sys
 import smelt_parts    # the three parts, for --s4-gist (2026-10-22)
+import smelt_pieces   # the S4 writers write their parts in pieces (2026-10-30)
 ROOT =os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 G = os.path.join(ROOT, "published", "heterophony-resources", "geniza")
 YEAR = re.compile(r"\b(1[6-9]\d\d|20\d\d)\b")
@@ -177,10 +178,12 @@ def general(d, tag):
     open(p, "w", encoding="utf-8").write(b.replace(mark, "\n" + "\n".join(f"- {h.strip().removeprefix('- ')}" for h in heads) + "\n"))
     print(f"S3-BRIEF-{tag}-pg.md: {len(heads)} episode titles from {len(rets)} period returns")
 
-def join(d, tag):
+def join(d, tag, files=None, by="smelt-periods.py --join"):
+    """The parts' S3 returns joined as S3-RETURN-<tag>.md; `files` and `by` for smelt-compress.py --s3-join, whose parts
+    are named S3-RETURN-<tag>-reader-p<k>.md."""
     out_p = os.path.join(d, f"S3-RETURN-{tag}.md")
     if os.path.exists(out_p): sys.exit(f"refusing: S3-RETURN-{tag}.md exists")
-    files = period_parts(d, tag) + ([f"S3-RETURN-{tag}-pg.md"] if os.path.exists(os.path.join(d, f"S3-RETURN-{tag}-pg.md")) else [])
+    files = files or period_parts(d, tag) + ([f"S3-RETURN-{tag}-pg.md"] if os.path.exists(os.path.join(d, f"S3-RETURN-{tag}-pg.md")) else [])
     if not files: sys.exit("refusing: no part returns filed")
     secs, pre, ne, ng = {k: [] for k in "12345"}, [], 0, 0
     for f in files:
@@ -194,8 +197,8 @@ def join(d, tag):
                 continue
             if cur: secs[cur].append(l)
             elif l.strip() and not l.startswith("# "): pre.append(l)
-    names = {"1": "La epizodoj", "2": "La grupoj", "3": "La kandidatoj kaj la nomumoj", "4": "La linioj en neniu grupo", "5": "La faŭltoj de la linioj"}
-    body = [f"# S3, joined from {len(files)} parts ({', '.join(files)})", "", "`[tools/smelt-periods.py --join]`", ""] + pre
+    names = {"1": "La epizodoj", "2": "La grupoj", "3": "La kandidatoj kaj la nomumoj", "4": "La linioj en neniu grupo", "5": "La difektoj de la linioj"}
+    body = [f"# S3, joined from {len(files)} parts ({', '.join(files)})", "", f"`[tools/{by}]`", ""] + pre
     for k in "12345":
         body += ["", f"## {k}. {names[k]}", ""] + [l for l in secs[k] if l.strip()]
     body += ["", f"Fino: {ne} epizodoj, {ng} grupoj."]
@@ -209,20 +212,26 @@ def join(d, tag):
 # sections and «Kie troviĝas la fontoj» from every part's «La arkivo»; a last reader writes the abstract from the sections'
 # summaries; --s4-join puts them together in the form of one S4 return, for smelt-s4-view.py, smelt-view.py and S5.
 FORM_TAIL = ("poste `### La malfermitaj konfliktoj` kaj `### Notoj pri malgravaj malkongruoj`, nur pri via parto, kun «—» se "
-             "malplenaj; poste `## 2. Epizodoj kaj linioj ne uzitaj, kaj kial` (kun `### Juĝoj ne uzitaj`), `## 3. Foriroj de la "
-             "grupoj aŭ epizodoj, kaj kial`, `## 4. Malklaraĵoj kaj faŭltoj de la profilo; proponoj por la registro`; kaj la "
+             "malplenaj; poste `## 2. Epizodoj kaj linioj ne uzitaj, kaj kial` (kun `### Juĝoj ne uzitaj`), `## 3. Devioj de la "
+             "grupoj aŭ epizodoj, kun kaŭzoj`, `## 4. Malklaraĵoj kaj difektoj de la profilo; proponoj por la registro`; kaj la "
              "linio «Fino.».")
 EXCERPT = ("**Via profilo estas eltiraĵo:** nur la linioj, kiujn via parto citas, ĉiu kun sia L-numero antaŭe, la numero en la "
            "tuta frosta profilo; citu per tiuj numeroj. Same la unuopaj grupoj: nur tiuj, kiujn via parto citas.")
 
 def part_keys(d, tag):
-    """The parts as S3 briefed them: 1…n, then g."""
-    ks = [re.search(r"-p(\d+)\.md$", f).group(1) for f in os.listdir(d) if re.fullmatch(rf"S3-BRIEF-{re.escape(tag)}-p\d+\.md", f)]
+    """The parts as S3 cut them: 1…n, then g. By their inputs, not their briefs (2026-10-30: the compressed route's
+    parts are cut from one S3 return by tools/smelt-compress.py --split-s4, and have no S3 briefs)."""
+    ks = [re.search(r"-p(\d+)\.md$", f).group(1) for f in os.listdir(d) if re.fullmatch(rf"S3-INPUT-{re.escape(tag)}-p\d+\.md", f)]
     return sorted(ks, key=int) + ["g"]
 
 def span(d, tag, k):
     m = re.search(r"the period (\d+)–(\d+)", open(os.path.join(d, f"S3-INPUT-{tag}-p{k}.md"), encoding="utf-8").readline())
     return (m.group(1), m.group(2)) if m else None
+
+def months(d, tag, k):
+    """A one-year part cut between months (smelt-compress.py --s4-months, 2026-11-10): «monatoj 1–6 …», else «»."""
+    m = re.search(r"the period \d+–\d+ \((monatoj [^)]*)\)", open(os.path.join(d, f"S3-INPUT-{tag}-p{k}.md"), encoding="utf-8").readline())
+    return m.group(1) if m else ""
 
 def s4(d, stem, tag, name):
     rd = lambda f: open(os.path.join(d, f), encoding="utf-8").read()
@@ -243,6 +252,25 @@ def s4(d, stem, tag, name):
     import importlib.util
     spec = importlib.util.spec_from_file_location("s2", os.path.join(ROOT, "tools", "smelt-s2-prep.py"))
     s2 = importlib.util.module_from_spec(spec); spec.loader.exec_module(s2)
+    # FABLE'S PROPOSALS 1–5 (2026-10-30, tools/smelt_inputs.py; the editor: proposal 1 approved with the suggested
+    # mitigation, 3 and 4 as obvious, 2 as a draft, 5 to be built): the lines in the short form, each single's U
+    # on its line and no S4-SINGLES file, the sources line on the part's lines by siglum, the register cut to the part's
+    # names, every file the brief names whole in one Read
+    import smelt_inputs as SI
+    label = SI.labels(d, tag)
+    u_of = {int(m.group(1)): u for u, l in singles.items() for m in [re.search(r"— L(\d+)\s*$", l)] if m}
+    def part_text(k):
+        return rd(f"S3-RETURN-{tag}-p{k}.md") + "\n" + rd(f"S3-INPUT-{tag}-p{k}.md") + ("\n" + "\n".join(l for _, l in arkivo) if k == "g" else "")
+    def lines_of(text):
+        us_ = sorted({int(x) for x in re.findall(r"\bU(\d+)\b", text) if int(x) in singles})
+        named_ = {n for i in re.findall(r"\b([GKNE]\d+)\b", text) for n in by_id.get(i, ())}
+        return {int(x) for x in REF.findall(text + "\n" + "\n".join(singles[u] for u in us_)) if int(x) in lines} | (named_ & set(lines))
+    # PART g WITHOUT THE WHOLE PROFILE'S VERDICTS AND DIFEKTOJ (2026-11-10; the editor, to leaving out the lines that
+    # only sections 3 and 5 of part g's S3 return bring, Bourlet's part g 1,471 lines; with the mitigation): a line of those
+    # sections that reaches no other part's lines stays, so every line reaches some writer; the sections' text stays
+    others = set()
+    for k in ks:
+        if k != "g": others |= lines_of(part_text(k))
     for k in ks:
         if os.path.exists(os.path.join(d, f"S4-RETURN-{tag}-p{k}.md")): sys.exit(f"refusing: S4-RETURN-{tag}-p{k}.md is filed")
         ret = f"S3-RETURN-{tag}-p{k}.md"
@@ -250,21 +278,45 @@ def s4(d, stem, tag, name):
         us = sorted({int(x) for x in re.findall(r"\bU(\d+)\b", text) if int(x) in singles})
         named = {n for i in re.findall(r"\b([GKNE]\d+)\b", text) for n in by_id.get(i, ())}
         ls = sorted({int(x) for x in REF.findall(text + "\n" + "\n".join(singles[u] for u in us)) if int(x) in lines} | (named & set(lines)))
+        if k == "g":
+            lean = re.sub(r"(?ms)^## 3\..*?(?=^## 4\.)", "", re.sub(r"(?ms)^## 5\..*?(?=^## 6\.)", "", text))
+            red = lines_of(lean); back = (set(ls) - red) - others
+            print(f"  part g: {len(ls)} lines; {len(set(ls) - red - back)} of sections 3 and 5 left out (each in another part's lines), "
+                  f"{len(back)} kept (in no other part's lines)")
+            ls = sorted(red | back)
         sp = span(d, tag, k) if k != "g" else None
         what = f"the period {sp[0]}–{sp[1]}" if sp else "the lines with no usable date, and every part's «La arkivo»"
-        lp, up = os.path.join(d, f"S4-LINES-{tag}-p{k}.md"), os.path.join(d, f"S4-SINGLES-{tag}-p{k}.md")
+        lp = os.path.join(d, f"S4-LINES-{tag}-p{k}.md")
+        # THE SALE NOTICES FOLDED (2026-11-10, tools/smelt_fold.py; the editor: approved, as a general
+        # optimisation): a work's notices of sale one line, every L kept to cite
+        import smelt_fold
+        ents = smelt_fold.fold(ls, lines.get)
+        if smelt_fold.DOUBLES: ents = smelt_fold.doubles(ents, lines.get, label)
+        def one(e):
+            if e[0] == "line": return SI.short(e[1], lines[e[1]], label.get(e[1]), u_of.get(e[1]) if u_of.get(e[1]) in us else None)
+            if e[0] == "fold": return smelt_fold.folded_line(e[2], lines.get)
+            n0 = e[1][0]; s = SI.short(n0, lines[n0], label.get(n0), u_of.get(n0) if u_of.get(n0) in us else None)
+            return ", ".join(f"L{n}" for n in e[1]) + f" (faldite de ilo: la sama fakto el {len(e[1])} ekzempleroj de la verko){s[s.index(':'):]}"
+        body = [one(e) for e in ents]
+        nd = sum(len(e[1]) for e in ents if e[0] == "double")
+        nf = sum(len(e[2]) for e in ents if e[0] == "fold"); gf = sum(1 for e in ents if e[0] == "fold")
+        fnote = (f"; {nf} notices of sale folded into {gf} lines by tools/smelt_fold.py, each listing all its L, to cite" if nf else "")
+        fnote += (f"; {nd} lines given twice by two copies of a work, one line each pair" if nd else "")
         open(lp, "w", encoding="utf-8").write(
             f"# S4, part {k} of {stem} ({tag}): the profile's lines for {what}\n\n`[tools/smelt-periods.py --s4: the {len(ls)} lines "
             f"of PROFILE-FROZEN-{tag}.md that S3-INPUT-{tag}-p{k}.md and {ret} cite, directly or by their single-line groups; "
-            f"each headed by its L, its number in the whole frozen profile.]`\n\n" + "\n".join(f"L{n}: {lines[n]}" for n in ls) + "\n")
-        open(up, "w", encoding="utf-8").write(
-            f"# S4, part {k} of {stem} ({tag}): the single-line groups it cites\n\n`[tools/smelt-periods.py --s4, from "
-            f"S3-SINGLES-{tag}.md: {len(us)} of {len(singles)}.]`\n\n" + "\n".join(singles[u] for u in us) + "\n")
-        b, _, _ = s2.s4_body(stem, name, frozen, lp, os.path.join(d, ret), up)
+            f"each headed by its L, its number in the whole frozen profile, and a single-line group's U; in the short form "
+            f"(tools/smelt_inputs.py){fnote}.]`\n\n" + "\n".join(body) + "\n")
+        rp, nk, na = SI.register("\n".join(body) + "\n" + rd(ret), os.path.join(d, f"NAMES-REGISTER-{tag}-p{k}.tsv"))
+        b, _, _ = s2.s4_body(stem, name, frozen, SI.paths(SI.for_reader(lp)), SI.paths(SI.for_reader(os.path.join(d, ret))), None,
+                             short=True, fontoj_block=SI.sources(ls, lines.get, label), registro=rp, on_lines=True)
         why = "(la smelt-gvidlibro, S4 en periodoj; la redaktoro, 2026-10-17)"
         if sp:
-            para = (f"\n\n**Via parto: la periodo {sp[0]}–{sp[1]}** {why}. La biografio estas tro granda por unu verkanto, do ĝi estas "
-                    f"verkata en partoj: vi verkas nur la sekciojn de la periodo {sp[0]}–{sp[1]}, el la epizodoj kaj grupoj de via "
+            mo = months(d, tag, k)
+            mo_h = f", {mo}" if mo else ""
+            mo_t = f" ({mo}; la aliajn monatojn de {sp[0]} verkas alia verkanto)" if mo else ""
+            para = (f"\n\n**Via parto: la periodo {sp[0]}–{sp[1]}{mo_h}** {why}. La biografio estas tro granda por unu verkanto, do ĝi estas "
+                    f"verkata en partoj: vi verkas nur la sekciojn de la periodo {sp[0]}–{sp[1]}{mo_t}, el la epizodoj kaj grupoj de via "
                     f"parto. Aliaj verkantoj verkas la aliajn periodojn kaj la temajn sekciojn (la eroj sen uzebla dato, kun «Kie "
                     f"troviĝas la fontoj»); la ĝenerala resumo estas verkata poste, el la resumoj de la sekcioj. {EXCERPT} Linio, kiun "
                     f"via epizoda legilo havis «nur por legi», estas cirkonstanco, ne fakto de via sekcio. **Ne verku** la ĝeneralan "
@@ -286,9 +338,14 @@ def s4(d, stem, tag, name):
         if "\n**La raporto:**" not in b: sys.exit("refusing: the S4 template has no «**La raporto:**»")
         b = b.replace("\n**La raporto:**", para + "\n\n**La raporto:**", 1)
         head = (f"# La biografio de {name} (smelt S4, {tag}, part {k})\n\n`[tools/smelt-periods.py --s4, from "
-                f"ocr/method/BIOGRAPHY-BRIEF-TEMPLATE-EO-2026-10-14.md on {ret}, S4-LINES-{tag}-p{k}.md and S4-SINGLES-{tag}-p{k}.md.]`\n\n")
-        open(os.path.join(d, f"S4-BRIEF-{tag}-p{k}.md"), "w", encoding="utf-8").write(head + b)
-        print(f"part {k}: {what}; {len(ls)} lines, {len(us)} single-line groups → S4-BRIEF-{tag}-p{k}.md")
+                f"ocr/method/BIOGRAPHY-BRIEF-TEMPLATE-EO-2026-10-14.md on {ret}, S4-LINES-{tag}-p{k}.md and NAMES-REGISTER-{tag}-p{k}.tsv.]`\n\n")
+        # the writer writes its part in pieces (smelt_pieces.py; the pilot, 2026-10-30: three readers cut off at their output limit)
+        b = smelt_pieces.add(b, os.path.join(d, f"S4-RETURN-{tag}-p{k}.md"))
+        bp = os.path.join(d, f"S4-BRIEF-{tag}-p{k}.md")
+        open(bp, "w", encoding="utf-8").write(head + b)
+        big = [os.path.basename(p) for p in (bp, rp) if os.path.getsize(p) > SI.CUT * 1.1]
+        print(f"part {k}: {what}; {len(ls)} lines" + (f" ({nf} notices of sale folded into {gf})" if nf else "") + f", {len(us)} single-line groups on their lines, register {nk} of {na} rows → "
+              f"S4-BRIEF-{tag}-p{k}.md" + (f"; over one Read: {', '.join(big)}" if big else ""))
 
 def s4_parse(text):
     """A part's S4 return in pieces: its sections [(title, lines)], and the blocks for the joined return."""
@@ -395,9 +452,9 @@ def s4_gist(d, tag):
         if p != cur: cur = p; groups.append(f"\n### {smelt_parts.TITLES[p]}\n")
         groups.append(f"- **{t}:** {it or '(sen resumo)'}")
     with open(out, "x", encoding="utf-8") as fh: fh.write(
-        f"# La mallonga biografio de {name} (smelt S4, {tag}, por ne-fakuloj)\n\n`[tools/smelt-periods.py --s4-gist: the "
+        f"# La skiza biografio de {name} (smelt S4, {tag}, por ne-fakuloj)\n\n`[tools/smelt-periods.py --s4-gist: the "
         f"sections' summaries of S4-RETURN-{tag}-p{', -p'.join(ks)}, in the parts of tools/smelt_parts.py.]`\n\n## La briefo\n\n"
-        f"Vi verkas mallongan biografion por esplora projekto pri la historio de la internaciaj helplingvoj. Legu nur ĉi tiun "
+        f"Vi verkas skizan biografion por esplora projekto pri la historio de la internaciaj helplingvoj. Legu nur ĉi tiun "
         f"briefon: ne rulu ŝelajn komandojn, ne faru retajn serĉojn, ne skribu dosierojn. Via fina mesaĝo estas via raporto. "
         f"Skribu en Esperanto.\n\nLa plena biografio de {name} havas multajn sekciojn, ĉiu kun resumo de du aŭ tri frazoj. Sube "
         f"estas tiuj resumoj, laŭ la ordo de la biografio kaj en ĝiaj partoj. **Verku el ili unu fluan biografion por legantoj, "
@@ -406,8 +463,9 @@ def s4_gist(d, tag):
         f"(nomojn de malgravaj personoj, titolojn de artikoloj, numerojn), sed ne aldonu ion, kio ne estas en ili, kaj ne ŝanĝu "
         f"ilian sencon. Kunigu, kio ripetiĝas. Sen citaĵoj de linioj kaj sen niaj markoj (=, ∴, ◊?, ⚫️): kie resumo dubas aŭ diras, "
         f"ke la fontoj malkonsentas, diru tion per vortoj («eble», «laŭ Jossinet», «la fontoj ne diras»). Titoloj de libroj kaj "
-        f"gazetoj kursive. Proksimume duono de la longo de la resumoj sube.\n\n**La raporto:** nur la biografio, de la unua "
-        f"titolo `##`, poste la linio «Fino.»\n\n## La resumoj de la sekcioj\n" + "\n".join(groups + threads(d, tag, "la biografio")) + "\n")
+        f"gazetoj kursive. «OSR», neniam «OCR»; la biblioteko de Vieno «Aŭstra Nacia Biblioteko», sen la germana nomo (la "
+        f"redaktoro, 2026-11-10). Proksimume duono de la longo de la resumoj sube.\n\n**La raporto:** la unua linio «# La skiza biografio de "
+        f"‹lia plena nomo, kiel la resumoj ĝin donas›», malplena linio, tiam la biografio de la unua titolo `##`, poste la linio «Fino.»\n\n## La resumoj de la sekcioj\n" + "\n".join(groups + threads(d, tag, "la biografio")) + "\n")
     print(f"S4-BRIEF-{tag}-{sfx}.md: {len(secs)} sections' summaries, the death {dy or 'not in the profile'}"
           + (", with the throughlines" if threads(d, tag, "") else ""))
 
@@ -421,18 +479,57 @@ def s4_join(d, tag):
     rd = lambda f: open(os.path.join(d, f), encoding="utf-8").read()
     name = re.match(r"# La biografio de (.*) \(smelt S4", rd(f"S4-BRIEF-{tag}-p{ks[0]}.md").split("\n")[0]).group(1)
     parts = [(k, s4_parse(rd(f"S4-RETURN-{tag}-p{k}.md"))) for k in ks]
-    label = lambda k: f"**Parto {k}" + (" ({}–{})".format(*span(d, tag, k)) if k != "g" else " (la temaj sekcioj)") + ":**"
+    label = lambda k: f"**Parto {k}" + (" ({}–{}".format(*span(d, tag, k)) + (f", {months(d, tag, k)}" if months(d, tag, k) else "") + ")"
+                                        if k != "g" else " (la temaj sekcioj)") + ":**"
     summ = [l for l in rd(f"S4-RETURN-{tag}-ps.md").split("\nFino.")[0].split("\n") if l.strip() and not l.startswith(("#", "`["))]
     body = [f"# La biografio de {name} (smelt S4, {tag})", "", f"`[tools/smelt-periods.py --s4-join: {', '.join(files)}]`", "",
             "## 1. La resumo kaj la biografio", "", "= kalkulite · ∴ konkludite · ◊? konjektite · ⚫️: truo en la legitaj fontoj",
             "", "### Resumo", ""] + summ
+    # A THEMATIC SECTION WITH A PERIOD SECTION'S TITLE, MERGED INTO IT BY YEAR (2026-11-10, De Beaufront: «La juĝo de la
+    # historiistoj» twice, 117 by the last period's writer, 127 by part g's from one line, Forster 1985, whose date was a
+    # wrong guess; the editor): part g's section goes into the dated one, its italic summary left out, each
+    # paragraph before the first paragraph of a later year («**Notoj.**» and after stay last); any other title twice is
+    # printed, not merged
+    base = lambda t: re.sub(r"\s*\([^)]*\d{4}[^)]*\)\s*$", "", t).strip()
+    def year_of(b, prev):
+        m = re.search(r"\b(1[5-9]\d\d|20\d\d)\b", " ".join(b)[:200])
+        return int(m.group(1)) if m else prev
+    def blocks(ls):
+        out, cur = [], []
+        for l in ls:
+            if l.strip(): cur.append(l)
+            elif cur: out.append(cur); cur = []
+        if cur: out.append(cur)
+        return out
+    secs = [[k, t, list(ls)] for k, p in parts for t, ls in p["secs"]]
+    dated = {base(t): s for s in secs for k, t, _ in [s] if k != "g"}
+    for s in [s for s in secs if s[0] == "g" and base(s[1]) in dated]:
+        tgt = dated[base(s[1])]
+        tb, sb = blocks(tgt[2]), blocks(s[2])
+        if any(b[0].startswith("**Notoj") for b in sb): print(f"  the title twice, not merged (part g has notes): «{s[1]}»"); continue
+        head = [tb.pop(0)] if tb and tb[0][0].startswith("*") and not tb[0][0].startswith("**") else []
+        notes = []
+        while tb and any(b[0].startswith("**Notoj") for b in tb): notes.insert(0, tb.pop())
+        if sb and sb[0][0].startswith("*") and not sb[0][0].startswith("**"): sb.pop(0)
+        keys, prev = [], 0
+        for b in tb: prev = year_of(b, prev); keys.append(prev)
+        prev = 0
+        for b in sb:
+            prev = year_of(b, prev)
+            at = next((i for i, y in enumerate(keys) if y > prev), len(tb))
+            tb.insert(at, b); keys.insert(at, prev)
+            print(f"  merged: «{s[1]}» of part g into part {tgt[0]}'s «{tgt[1]}», its paragraph of {prev} at {at + 1} of {len(tb)}")
+        tgt[2] = [l for b in head + tb + notes for l in b + [""]]
+        secs.remove(s)
+    seen = collections.Counter(base(t) for _, t, _ in secs)
+    for t, c in seen.items():
+        if c > 1: print(f"  the title twice, not merged: «{t}» ({c} sections)")
     n = 0
-    for k, p in parts:
-        for t, ls in p["secs"]:
-            n += 1; body += ["", f"### {n}. {t}", ""] + trim(ls)
+    for k, t, ls in secs:
+        n += 1; body += ["", f"### {n}. {t}", ""] + trim(ls)
     for key, title in (("kie", "### Kie troviĝas la fontoj"), ("conf", "### La malfermitaj konfliktoj"), ("disc", "### Notoj pri malgravaj malkongruoj"),
                        ("r2", "## 2. Epizodoj kaj linioj ne uzitaj, kaj kial"), ("jug", "### Juĝoj ne uzitaj"),
-                       ("r3", "## 3. Foriroj de la grupoj aŭ epizodoj, kaj kial"), ("r4", "## 4. Malklaraĵoj kaj faŭltoj de la profilo; proponoj por la registro")):
+                       ("r3", "## 3. Devioj de la grupoj aŭ epizodoj, kun kaŭzoj"), ("r4", "## 4. Malklaraĵoj kaj difektoj de la profilo; proponoj por la registro")):
         body += ["", title, ""]
         got = [(k, trim(p[key])) for k, p in parts if trim(p[key])]
         if not got: body.append("—")

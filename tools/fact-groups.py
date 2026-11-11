@@ -27,6 +27,7 @@ from collections import defaultdict
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import date_vocab
+import factline as FL   # a line's own fields, the source's words left out (2026-10-28)
 
 GEN = os.path.join(os.path.dirname(HERE), "published", "heterophony-resources", "geniza")
 LIST = os.path.join(GEN, "profiles", "build", "FACTS-LIST.tsv")
@@ -164,14 +165,14 @@ def groups_entity(rows, corpus=None):
         return f"{key}|{q or ''}"
     buckets = defaultdict(list)
     for r in rows:
-        if "diferenco inter la kopioj" in r[4]: continue      # about the editions, not the person (round 2)
+        if "diferenco inter la kopioj" in FL.ours(r[4]): continue      # about the editions, not the person (round 2); our words only (audit 37)
         parts = [r[3].split(";")[0]] + [x.strip()[1:] for x in r[3].split(";")[1:] if x.strip().startswith("+") and ":" in x]
         for part in parts:
             kind, _, obj = part.partition(":"); kind = kind.strip()
             if kind and kind not in ("alia", "samnomo"):
                 # a refuted claim is never a witness for the fact it denies (round 2 of the check, all three readers:
                 # «refutita aserto» grouped with its refutation): it groups only with refuted lines of its object
-                ref = " [refutita]" if "(refutita aserto)" in r[4] else ""
+                ref = " [refutita]" if "(refutita aserto)" in FL.ours(r[4]) else ""
                 buckets[(r[0], kind, key_of(r[0], kind, obj) + ref)].append((r, norm_object(obj)))
     out, noms = [], []
     for (who, kind, key), rs in buckets.items():
@@ -227,7 +228,10 @@ def groups_entity(rows, corpus=None):
                 split += ps
                 CANDIDATES.extend((who, kind, key, ps[0], p) for p in ps[1:])
             cl = split
-        edge_cands(who, kind, key, [c for c in cl if c], [(x[3], x[4]) for x in CANDIDATES if x[:3] == (who, kind, key)])
+        # the probe's list of this bucket's candidates, a scan of every candidate so far, only when the probe is on (2026-11-07,
+        # the harvest's minutes: with the probe off, edge_cands returns at once, and the scan for each bucket was the waste)
+        if YEAR_EDGE_DAYS > 0:
+            edge_cands(who, kind, key, [c for c in cl if c], [(x[3], x[4]) for x in CANDIDATES if x[:3] == (who, kind, key)])
         out += [(who, kind, key, c) for c in cl if c]
     return out, noms
 
@@ -271,10 +275,10 @@ def sayer(r):
     """Who says a judgement line: the source it is derived from («derivita ↤ X», up to the first comma), else the item
     the line cites, with the contributor of a collective volume («(kontribuo de X)»)."""
     line = r[4]
-    m = re.search(r"derivita(?:, fonto nevidita)? ↤ ([^,;)]+)", line)
+    m = re.search(r"derivita(?:, fonto nevidita)? ↤ ([^,;)]+)", FL.ours(line))   # our label, not the anchor (audit 37)
     if m: return m.group(1).strip().lower()
     it = re.search(r" · ([\w.-]+), (?:PDF|¶|p\.|pĝ|l\.)", line)
-    ct = re.search(r"⟦kontribuo: ([^⟧]+)⟧", line) or re.search(r"\(kontribuo de ([^)]+)\)", line)   # the label from 2026-10-17
+    ct = re.search(r"⟦kontribuo: ([^⟧]+)⟧", line) or re.search(r"\(kontribuo de ([^)]+)\)", FL.ours(line))   # the label from 2026-10-17
     return f"{it.group(1) if it else '?'}|{ct.group(1) if ct else ''}"
 
 RELATIONAL = {"renkonto", "konflikto", "interkonsento", "influo"}
@@ -368,7 +372,7 @@ def main():
         L.append(f"- **{kind} / {obj or '-'}**: {len(rs)} lines")
         for r in rs:
             fact = r[4].split(" · ")[1] if " · " in r[4] else r[4]
-            mark = "[refutita] " if re.search(r"refutita aserto|\brefutas\b", r[4]) and "(refutita aserto)" in r[4] else ""
+            mark = "[refutita] " if re.search(r"refutita aserto|\brefutas\b", FL.ours(r[4])) and "(refutita aserto)" in FL.ours(r[4]) else ""
             L.append(f"  - {mark}{r[2]} · {fact[:140]} ⟵ `{r[1]}`")
     if noms:
         L += ["", f"## Possible date errors, nominated ({len(noms)}): a line whose whole object is a group's, with another date", ""]
